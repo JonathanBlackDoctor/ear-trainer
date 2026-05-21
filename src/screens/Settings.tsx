@@ -1,0 +1,227 @@
+import React, { useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useStore } from '../store/useStore';
+
+export function Settings() {
+  const navigate = useNavigate();
+  const { settings, updateSettings, resetData, exportData, importData } = useStore();
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function handleExport() {
+    const json = exportData();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ear-trainer-backup-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleImportClick() {
+    fileRef.current?.click();
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const json = ev.target?.result as string;
+      const ok = importData(json);
+      alert(ok ? '✅ 데이터 가져오기 완료!' : '❌ 파일 형식이 올바르지 않습니다.');
+    };
+    reader.readAsText(file);
+  }
+
+  function handleReset() {
+    if (confirm('모든 학습 기록을 초기화하시겠습니까? 되돌릴 수 없습니다.')) {
+      resetData();
+      alert('초기화 완료.');
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 pb-10">
+      <div className="bg-white border-b border-slate-100 px-4 py-4">
+        <div className="max-w-lg mx-auto flex items-center gap-3">
+          <button className="btn-ghost" onClick={() => navigate('/')}>← 뒤로</button>
+          <span className="font-semibold text-slate-700">⚙️ 설정</span>
+        </div>
+      </div>
+
+      <div className="max-w-lg mx-auto px-4 mt-5 space-y-4">
+        {/* Notation */}
+        <div className="card">
+          <div className="text-sm font-semibold text-slate-600 mb-3">코드 표기 방식</div>
+          <div className="flex gap-2">
+            {[
+              { value: 'number', label: '넘버 (1, 4, 5)' },
+              { value: 'roman', label: '로마 (I, IV, V)' },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  settings.notation === opt.value
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-slate-100 text-slate-600'
+                }`}
+                onClick={() => updateSettings({ notation: opt.value as 'number' | 'roman' })}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Reference tone */}
+        <div className="card">
+          <div className="text-sm font-semibold text-slate-600 mb-3">기준음 재생</div>
+          <div className="flex flex-col gap-2">
+            {[
+              { value: 'off', label: '끄기' },
+              { value: 'perQuestion', label: '매 문제마다' },
+              { value: 'perSession', label: '세션 시작 시 1회' },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                className={`py-2 px-4 rounded-lg text-sm font-semibold text-left transition-colors ${
+                  settings.referenceTone === opt.value
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-slate-100 text-slate-600'
+                }`}
+                onClick={() => updateSettings({ referenceTone: opt.value as any })}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Key mode */}
+        <div className="card">
+          <div className="text-sm font-semibold text-slate-600 mb-3">조성 설정</div>
+          <div className="flex gap-2 mb-3">
+            {[
+              { value: 'random', label: '무작위' },
+              { value: 'fixed', label: '고정' },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  settings.keyMode === opt.value
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-slate-100 text-slate-600'
+                }`}
+                onClick={() => updateSettings({ keyMode: opt.value as any })}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {settings.keyMode === 'fixed' && (
+            <div className="grid grid-cols-4 gap-2">
+              {['C', 'G', 'D', 'A', 'F', 'Bb', 'Eb', 'Ab'].map((k) => (
+                <button
+                  key={k}
+                  className={`py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                    settings.fixedKey === k
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-slate-100 text-slate-600'
+                  }`}
+                  onClick={() => updateSettings({ fixedKey: k })}
+                >
+                  {k}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Questions per session */}
+        <div className="card">
+          <div className="text-sm font-semibold text-slate-600 mb-3">
+            세션 문항 수: <span className="text-primary-600 font-bold">{settings.questionsPerSession}</span>
+          </div>
+          <input
+            type="range"
+            min={5}
+            max={30}
+            step={5}
+            value={settings.questionsPerSession}
+            onChange={(e) => updateSettings({ questionsPerSession: Number(e.target.value) })}
+            className="w-full accent-primary-600"
+          />
+          <div className="flex justify-between text-xs text-slate-400 mt-1">
+            <span>5</span><span>10</span><span>15</span><span>20</span><span>25</span><span>30</span>
+          </div>
+        </div>
+
+        {/* Difficulty */}
+        <div className="card">
+          <div className="text-sm font-semibold text-slate-600 mb-3">난이도 모드</div>
+          <div className="flex gap-2">
+            {[
+              { value: 'adaptive', label: '🤖 자동(적응형)' },
+              { value: 'manual', label: '✋ 수동 선택' },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  settings.difficultyMode === opt.value
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-slate-100 text-slate-600'
+                }`}
+                onClick={() => updateSettings({ difficultyMode: opt.value as any })}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Staff feedback */}
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold text-slate-600">악보 피드백</div>
+              <div className="text-xs text-slate-400 mt-0.5">정답을 오선보로 표시</div>
+            </div>
+            <button
+              className={`w-12 h-6 rounded-full transition-colors ${
+                settings.showStaffFeedback ? 'bg-primary-500' : 'bg-slate-200'
+              }`}
+              onClick={() => updateSettings({ showStaffFeedback: !settings.showStaffFeedback })}
+            >
+              <div
+                className={`w-5 h-5 rounded-full bg-white shadow transition-transform mx-0.5 ${
+                  settings.showStaffFeedback ? 'translate-x-6' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+
+        {/* Data management */}
+        <div className="card">
+          <div className="text-sm font-semibold text-slate-600 mb-3">기록 관리</div>
+          <div className="space-y-2">
+            <button className="w-full btn-secondary text-sm" onClick={handleExport}>
+              📤 기록 내보내기 (JSON)
+            </button>
+            <button className="w-full btn-secondary text-sm" onClick={handleImportClick}>
+              📥 기록 가져오기 (JSON)
+            </button>
+            <button className="w-full text-red-500 border-2 border-red-200 bg-red-50 rounded-xl py-3 text-sm font-semibold" onClick={handleReset}>
+              🗑️ 기록 초기화
+            </button>
+          </div>
+          <p className="text-xs text-slate-400 mt-3">
+            기록은 이 기기의 브라우저에만 저장됩니다. 브라우저 데이터 삭제 시 기록도 사라집니다.
+          </p>
+          <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={handleFileChange} />
+        </div>
+      </div>
+    </div>
+  );
+}
