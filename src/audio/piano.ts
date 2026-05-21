@@ -103,13 +103,12 @@ export async function playArpeggio(
 /** Play metronome click */
 export function playClick(accent = false): void {
   const synth = new Tone.MetalSynth({
-    frequency: accent ? 800 : 400,
     envelope: { attack: 0.001, decay: 0.1, release: 0.1 },
     harmonicity: 5.1,
     modulationIndex: 32,
     resonance: 4000,
     octaves: 1.5,
   }).toDestination();
+  synth.frequency.value = accent ? 800 : 400;
   synth.triggerAttackRelease('16n', Tone.now());
-  setTimeout(() => synth.dispose(), 500);
-}
+  setTimeout(() => synth.dispose(
