@@ -111,4 +111,5 @@ export function playClick(accent = false): void {
   }).toDestination();
   synth.frequency.value = accent ? 800 : 400;
   synth.triggerAttackRelease('16n', Tone.now());
-  setTimeout(() => synth.dispose(
+  setTimeout(() => synth.dispose(), 500);
+}
