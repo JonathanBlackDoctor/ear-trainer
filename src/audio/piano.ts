@@ -4,6 +4,7 @@ import * as Tone from 'tone';
 // ─── State ────────────────────────────────────────────────────────────────
 let sampler: Tone.Sampler | null = null;
 let synth: Tone.PolySynth | null = null;
+let outputGain: Tone.Gain | null = null;
 let audioStarted = false;
 let samplerReady = false;
 let samplerFailed = false;
@@ -27,6 +28,18 @@ const SAMPLE_URLS: Record<string, string> = Object.fromEntries(
 // scheduling at bare Tone.now() drops the note silently on iOS/Android.
 const SCHEDULE_LOOKAHEAD = 0.05;
 
+// ─── Output gain (kill switch) ──────────────────────────────────────────────
+// All instruments route through this gain node so we can cut every active and
+// already-scheduled note instantly when the user advances to the next question.
+// Without this, the Sampler's release tail and any notes scheduled ahead via
+// triggerAttackRelease(..., futureTime) bleed into the next question.
+function getOutputGain(): Tone.Gain {
+  if (!outputGain) {
+    outputGain = new Tone.Gain(1).toDestination();
+  }
+  return outputGain;
+}
+
 // ─── Instrument setup ───────────────────────────────────────────────────────
 /** Built-in synth — no network needed, always works. */
 function getSynth(): Tone.PolySynth {
@@ -34,7 +47,7 @@ function getSynth(): Tone.PolySynth {
     synth = new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: 'triangle' },
       envelope: { attack: 0.005, decay: 0.3, sustain: 0.35, release: 1.4 },
-    }).toDestination();
+    }).connect(getOutputGain());
     synth.volume.value = -8;
   }
   return synth;
@@ -66,7 +79,7 @@ function loadSamplerInBackground(): void {
         clearTimeout(timeout);
         console.warn('[audio] piano samples failed to load, using built-in synth:', err);
       },
-    }).toDestination();
+    }).connect(getOutputGain());
   } catch (err) {
     samplerFailed = true;
     clearTimeout(timeout);
@@ -180,19 +193,51 @@ export function getAudioStatus(): AudioQuality {
   return 'synth';
 }
 
+// ─── Stop / scheduling helpers ──────────────────────────────────────────────
+/**
+ * Silence everything currently sounding or already scheduled.
+ * Used when advancing to the next question so the previous question's release
+ * tail and any notes still queued via triggerAttackRelease(..., futureTime)
+ * don't overlap with the new question.
+ *
+ * We don't releaseAll/dispose the instruments — that doesn't cancel future
+ * scheduled BufferSource starts inside Tone.Sampler. Instead we ramp the
+ * shared output gain to 0 fast (5ms, to avoid clicks). Stale notes still fire
+ * inside the audio graph but produce no sound, and the next playback restores
+ * the gain to 1 exactly when its first note begins (see scheduleStart).
+ */
+export function stopAllAudio(): void {
+  if (!audioStarted) return;
+  const gain = getOutputGain();
+  const now = Tone.now();
+  const cur = gain.gain.value;
+  gain.gain.cancelScheduledValues(now);
+  gain.gain.setValueAtTime(cur, now);
+  gain.gain.linearRampToValueAtTime(0, now + 0.005);
+}
+
+/** Compute a start time for new playback and arm the gain to 1 at that moment. */
+function scheduleStart(): number {
+  const start = Tone.now() + SCHEDULE_LOOKAHEAD;
+  const gain = getOutputGain();
+  gain.gain.cancelScheduledValues(start);
+  gain.gain.setValueAtTime(1, start);
+  return start;
+}
+
 // ─── Playback helpers ─────────────────────────────────────────────────────────
 /** Play a single note */
 export async function playNote(note: string, duration = '2n'): Promise<void> {
   if (!audioStarted) await startAudio();
   await ensureRunning();
-  getInstrument().triggerAttackRelease(note, duration, Tone.now() + SCHEDULE_LOOKAHEAD);
+  getInstrument().triggerAttackRelease(note, duration, scheduleStart());
 }
 
 /** Play multiple notes simultaneously (chord) */
 export async function playChord(notes: string[], duration = '2n'): Promise<void> {
   if (!audioStarted) await startAudio();
   await ensureRunning();
-  getInstrument().triggerAttackRelease(notes, duration, Tone.now() + SCHEDULE_LOOKAHEAD);
+  getInstrument().triggerAttackRelease(notes, duration, scheduleStart());
 }
 
 /** Play notes sequentially (melody or arpeggio) */
@@ -204,7 +249,7 @@ export async function playSequence(
   if (!audioStarted) await startAudio();
   await ensureRunning();
   const inst = getInstrument();
-  const start = Tone.now() + SCHEDULE_LOOKAHEAD;
+  const start = scheduleStart();
   const dSecs = Tone.Time(noteDuration).toSeconds() / speedFactor;
   notes.forEach((note, i) => {
     inst.triggerAttackRelease(note, noteDuration, start + i * dSecs);
@@ -220,7 +265,7 @@ export async function playProgression(
   if (!audioStarted) await startAudio();
   await ensureRunning();
   const inst = getInstrument();
-  const start = Tone.now() + SCHEDULE_LOOKAHEAD;
+  const start = scheduleStart();
   const dSecs = Tone.Time(chordDuration).toSeconds() / speedFactor;
   chordNotes.forEach((notes, i) => {
     inst.triggerAttackRelease(notes, chordDuration, start + i * dSecs);
@@ -236,7 +281,7 @@ export async function playArpeggio(
   if (!audioStarted) await startAudio();
   await ensureRunning();
   const inst = getInstrument();
-  const start = Tone.now() + SCHEDULE_LOOKAHEAD;
+  const start = scheduleStart();
   const dSecs = Tone.Time(noteDuration).toSeconds() / speedFactor;
   notes.forEach((note, i) => {
     inst.triggerAttackRelease(note, '4n', start + i * dSecs);
@@ -251,8 +296,8 @@ export function playClick(accent = false): void {
     modulationIndex: 32,
     resonance: 4000,
     octaves: 1.5,
-  }).toDestination();
+  }).connect(getOutputGain());
   synthClick.frequency.value = accent ? 800 : 400;
-  synthClick.triggerAttackRelease('16n', Tone.now() + SCHEDULE_LOOKAHEAD);
+  synthClick.triggerAttackRelease('16n', scheduleStart());
   setTimeout(() => synthClick.dispose(), 500);
 }

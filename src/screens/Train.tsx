@@ -21,6 +21,7 @@ import { getSolfegeChoices } from '../modes/solfegeMode';
 import { getDegreeChoices } from '../modes/progressionMode';
 import {
   startAudio, playNote, playChord, playSequence, playProgression, playArpeggio, playClick,
+  stopAllAudio, getAudioStatus, type AudioQuality,
 } from '../audio/piano';
 import { INTERVAL_MODE_INFO } from '../modes/intervalMode';
 import { CHORD_MODE_INFO } from '../modes/chordMode';
@@ -69,6 +70,7 @@ export function Train() {
   const [rhythmTaps, setRhythmTaps] = useState<number[]>([]);
   const [rhythmStartTime, setRhythmStartTime] = useState<number>(0);
   const [isCountingIn, setIsCountingIn] = useState(false);
+  const [audioQuality, setAudioQuality] = useState<AudioQuality>('synth');
 
   const modeKey = mode as ModeKey;
   const modeInfo = MODE_INFO[modeKey] ?? { name: modeKey, emoji: '🎵' };
@@ -78,10 +80,22 @@ export function Train() {
   async function handleAudioStart() {
     setLoading(true);
     await startAudio();
+    setAudioQuality(getAudioStatus());
     setAudioReady(true);
     setLoading(false);
     beginSession();
   }
+
+  // Keep audio-quality indicator in sync as background sample loading resolves.
+  useEffect(() => {
+    if (!audioReady) return;
+    const id = setInterval(() => {
+      const q = getAudioStatus();
+      setAudioQuality((prev) => (prev === q ? prev : q));
+      if (q !== 'synth') clearInterval(id);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [audioReady]);
 
   // ─── Session Management ─────────────────────────────────────────────────────
   function beginSession() {
@@ -129,6 +143,9 @@ export function Train() {
 
   // ─── Playback ─────────────────────────────────────────────────────────────
   async function playQuestion(q: Question, speed = 1.0) {
+    // Cut any audio left over from the previous question (release tails,
+    // notes still queued in the future) before starting the new one.
+    stopAllAudio();
     setLoading(true);
     try {
       // Play reference tone if enabled
@@ -214,6 +231,7 @@ export function Train() {
   async function handlePlayReference() {
     const q = currentQuestion;
     if (!q?.context?.referenceToneNote) return;
+    stopAllAudio();
     await playNote(q.context.referenceToneNote, '2n');
   }
 
@@ -314,6 +332,9 @@ export function Train() {
   }
 
   function advanceQuestion() {
+    // Silence the previous question immediately on tap, so there's no
+    // overlap during the 100ms gap before the next question plays.
+    stopAllAudio();
     const idx = (session?.currentIdx ?? 0) + 1;
     if (idx >= totalQuestions) {
       finishSession();
@@ -440,6 +461,11 @@ export function Train() {
             </span>
           </div>
           <ProgressBar current={currentIdx + (phase === 'feedback' ? 1 : 0)} total={totalQuestions} correct={correctCount} />
+          {audioQuality === 'synth-fallback' && (
+            <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
+              🎹 피아노 샘플을 불러오지 못해 기본 음색으로 재생 중입니다 (소리는 정상 출력).
+            </div>
+          )}
         </div>
       </div>
 
