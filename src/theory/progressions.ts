@@ -43,6 +43,56 @@ export const PRAISE_PATTERNS: Array<{ name: string; pattern: Array<[number, stri
 // Common key list for random selection
 export const COMMON_KEYS = ['C','G','D','A','E','F','Bb','Eb'];
 
+export interface ProgressionLevelConfig {
+  label: string;
+  length: 2 | 3 | 4 | 5;
+  degreePool: number[];            // allowed degrees (1..7)
+  playback: 'arpeggio' | 'block';
+  keyMode: 'fixed' | 'random';
+}
+
+const CORE_TRIAD = [1, 4, 5];
+const CORE_PLUS_VI = [1, 4, 5, 6];
+const CORE_PLUS_II = [1, 2, 4, 5, 6];
+const CORE_PLUS_III = [1, 2, 3, 4, 5, 6];
+const ALL_7 = [1, 2, 3, 4, 5, 6, 7];
+
+export const PROGRESSION_LEVELS: Record<number, ProgressionLevelConfig> = {
+  1:  { label: '2화음 진행 (I·IV·V)',    length: 2, degreePool: CORE_TRIAD,    playback: 'arpeggio', keyMode: 'fixed'  },
+  2:  { label: '+ vi 추가',              length: 2, degreePool: CORE_PLUS_VI,  playback: 'arpeggio', keyMode: 'fixed'  },
+  3:  { label: '3화음 진행',             length: 3, degreePool: CORE_PLUS_VI,  playback: 'arpeggio', keyMode: 'fixed'  },
+  4:  { label: '4화음 진행',             length: 4, degreePool: CORE_PLUS_VI,  playback: 'arpeggio', keyMode: 'fixed'  },
+  5:  { label: '+ ii 추가',              length: 4, degreePool: CORE_PLUS_II,  playback: 'arpeggio', keyMode: 'fixed'  },
+  6:  { label: '+ iii 추가',             length: 4, degreePool: CORE_PLUS_III, playback: 'arpeggio', keyMode: 'fixed'  },
+  7:  { label: '블록 코드 재생',         length: 4, degreePool: CORE_PLUS_III, playback: 'block',    keyMode: 'fixed'  },
+  8:  { label: '+ vii° 추가 (전 7도)',   length: 4, degreePool: ALL_7,         playback: 'block',    keyMode: 'fixed'  },
+  9:  { label: '+ 랜덤 키',              length: 4, degreePool: ALL_7,         playback: 'block',    keyMode: 'random' },
+  10: { label: '5화음 진행',             length: 5, degreePool: ALL_7,         playback: 'block',    keyMode: 'random' },
+};
+
+/** Build a progression respecting the level's degreePool and length. Starts on I. */
+export function randomProgressionFromConfig(
+  cfg: ProgressionLevelConfig,
+  tonic: string,
+  octave = 3
+): ChordStep[] {
+  const { length, degreePool } = cfg;
+  const degrees: number[] = [1];
+  for (let i = 1; i < length; i++) {
+    const prev = degrees[degrees.length - 1];
+    const avail = degreePool.filter((d) => d !== prev);
+    const next = avail.length > 0
+      ? avail[Math.floor(Math.random() * avail.length)]
+      : degreePool[Math.floor(Math.random() * degreePool.length)];
+    degrees.push(next);
+  }
+  const pattern: Array<[number, string]> = degrees.map((d) => {
+    const info = MAJOR_DIATONIC[(d - 1) % 7];
+    return [d, info?.quality ?? 'major'];
+  });
+  return buildProgressionSteps(pattern, tonic, octave);
+}
+
 /** Get the scale notes for a major key */
 export function getScaleNotes(tonic: string, octave = 4): string[] {
   const scale = Scale.get(`${tonic}${octave} major`);

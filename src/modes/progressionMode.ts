@@ -1,4 +1,16 @@
+import type { ChoiceOption } from '../components/ChoiceGrid';
+import { intervalLabel } from '../theory/intervals';
+import { MAX_LEVEL, TRANSPOSE_LEVELS } from './levels';
 import type { ModeKey } from '../types';
+
+export function getTransposeChoices(level: number): ChoiceOption[] {
+  const cfg = TRANSPOSE_LEVELS[level] ?? TRANSPOSE_LEVELS[1];
+  return cfg.intervals.map((name) => ({
+    value: name,
+    label: name,
+    sublabel: intervalLabel(name),
+  }));
+}
 
 export const PROGRESSION_MODE_INFO = {
   key: 'progression' as ModeKey,
@@ -6,7 +18,7 @@ export const PROGRESSION_MODE_INFO = {
   emoji: '🎸',
   description: '코드 진행을 듣고 도수를 맞혀보세요',
   howTo: '조성(키)을 알려준 뒤 코드 진행이 들립니다. 각 코드의 도수(I, IV, V…)를 순서대로 입력하세요.',
-  maxLevel: 4,
+  maxLevel: MAX_LEVEL,
   defaultLevel: 1,
 };
 
@@ -16,7 +28,7 @@ export const MELODY_MODE_INFO = {
   emoji: '🎶',
   description: '멜로디를 듣고 건반으로 입력하세요',
   howTo: '짧은 멜로디가 들립니다. 화면의 피아노 건반에서 들은 음을 순서대로 눌러 입력하세요.',
-  maxLevel: 3,
+  maxLevel: MAX_LEVEL,
   defaultLevel: 1,
 };
 
@@ -26,7 +38,7 @@ export const TRANSPOSE_MODE_INFO = {
   emoji: '🔄',
   description: '다른 조로 들어도 같은 도수/계명을 인식하세요',
   howTo: '매 문제마다 조성이 바뀌어 들립니다. 조가 달라져도 같은 도수/계명으로 인식해 답을 선택하세요.',
-  maxLevel: 2,
+  maxLevel: MAX_LEVEL,
   defaultLevel: 1,
 };
 
@@ -36,7 +48,7 @@ export const RHYTHM_MODE_INFO = {
   emoji: '🥁',
   description: '들은 리듬을 탭으로 따라쳐 보세요',
   howTo: '리듬 패턴이 먼저 들립니다. 이어서 화면의 탭 버튼을 눌러 같은 리듬으로 따라치세요.',
-  maxLevel: 4,
+  maxLevel: MAX_LEVEL,
   defaultLevel: 1,
 };
 
@@ -46,7 +58,7 @@ export const TEMPO_MODE_INFO = {
   emoji: '⏱️',
   description: '메트로놈을 듣고 같은 빠르기로 이어 치세요',
   howTo: '메트로놈이 몇 박 들린 뒤 멈춥니다. 같은 빠르기를 유지하며 탭 버튼으로 박을 이어 치세요.',
-  maxLevel: 3,
+  maxLevel: MAX_LEVEL,
   defaultLevel: 1,
 };
 
@@ -56,7 +68,7 @@ export const BPM_MODE_INFO = {
   emoji: '🎯',
   description: '들려주는 메트로놈의 빠르기(BPM)를 맞혀보세요',
   howTo: '메트로놈이 일정한 빠르기로 들립니다. 슬라이더로 들은 빠르기(BPM)를 추정해 맞혀보세요.',
-  maxLevel: 3,
+  maxLevel: MAX_LEVEL,
   defaultLevel: 1,
 };
 

@@ -16,14 +16,34 @@ export const INTERVAL_NAMES = [
   { name: 'P8', label: '완전8도 (옥타브)', semitones: 12 },
 ];
 
-// Intervals grouped by level
-export const INTERVAL_LEVELS: Record<number, string[]> = {
-  1: ['P5', 'P4', 'M3', 'm3', 'P8'],
-  2: ['P5', 'P4', 'M3', 'm3', 'P8', 'M2', 'm2', 'M6', 'm6'],
-  3: ['P5', 'P4', 'M3', 'm3', 'P8', 'M2', 'm2', 'M6', 'm6', 'M7', 'm7', 'A4'],
-};
-
 export type IntervalDirection = 'up' | 'down' | 'harmonic';
+
+export interface IntervalLevelConfig {
+  label: string;
+  intervals: string[];
+  directions: IntervalDirection[];
+  noteRangeLow: string;
+  noteRangeHigh: string;
+}
+
+const CORE_5 = ['P5', 'P4', 'M3', 'm3', 'P8'];
+const PLUS_2_6 = [...CORE_5, 'M2', 'm2', 'M6', 'm6'];
+const PLUS_TRITONE = [...PLUS_2_6, 'A4'];
+const PLUS_M7 = [...PLUS_TRITONE, 'M7'];
+const ALL_12 = [...PLUS_M7, 'm7'];
+
+export const INTERVAL_LEVELS: Record<number, IntervalLevelConfig> = {
+  1:  { label: '기본 5음 (P5·P4·3도·8도)', intervals: CORE_5,       directions: ['up', 'harmonic'],         noteRangeLow: 'C4', noteRangeHigh: 'C5' },
+  2:  { label: '하행 추가',                  intervals: CORE_5,       directions: ['up', 'down', 'harmonic'], noteRangeLow: 'C4', noteRangeHigh: 'C5' },
+  3:  { label: '음역 확장',                  intervals: CORE_5,       directions: ['up', 'down', 'harmonic'], noteRangeLow: 'C3', noteRangeHigh: 'G4' },
+  4:  { label: '2도·6도 추가',               intervals: PLUS_2_6,     directions: ['up', 'down', 'harmonic'], noteRangeLow: 'C3', noteRangeHigh: 'G4' },
+  5:  { label: '광역 음역',                  intervals: PLUS_2_6,     directions: ['up', 'down', 'harmonic'], noteRangeLow: 'A2', noteRangeHigh: 'C6' },
+  6:  { label: '트라이톤 추가',              intervals: PLUS_TRITONE, directions: ['up', 'down', 'harmonic'], noteRangeLow: 'A2', noteRangeHigh: 'C6' },
+  7:  { label: '장7도 추가',                 intervals: PLUS_M7,      directions: ['up', 'down', 'harmonic'], noteRangeLow: 'A2', noteRangeHigh: 'C6' },
+  8:  { label: '단7도 추가 (전음정)',        intervals: ALL_12,       directions: ['up', 'down', 'harmonic'], noteRangeLow: 'A2', noteRangeHigh: 'C6' },
+  9:  { label: '화성만 듣기',                intervals: ALL_12,       directions: ['harmonic'],               noteRangeLow: 'A2', noteRangeHigh: 'C6' },
+  10: { label: '하행만 듣기',                intervals: ALL_12,       directions: ['down'],                   noteRangeLow: 'A2', noteRangeHigh: 'C6' },
+};
 
 /** Given a root note and interval name, return the second note */
 export function buildInterval(

@@ -9,8 +9,9 @@ import { useStore } from '../store/useStore';
 import {
   makeIntervalQuestion, makeChordQuestion, makeMelodyQuestion,
   makeSolfegeQuestion, makeProgressionQuestion, makeRhythmQuestion,
-  makeTempoQuestion, makeBpmQuestion,
+  makeTempoQuestion, makeBpmQuestion, makeTransposeQuestion,
 } from '../engine/questionFactory';
+import { MAX_LEVEL, getLevelLabel } from '../modes/levels';
 import { judge, type TempoJudgeDetails } from '../engine/judge';
 import { PlaybackControls } from '../components/PlaybackControls';
 import { ChoiceGrid, type ChoiceOption } from '../components/ChoiceGrid';
@@ -20,7 +21,7 @@ import { ProgressBar } from '../components/ProgressBar';
 import { getIntervalChoices } from '../modes/intervalMode';
 import { getChordChoices } from '../modes/chordMode';
 import { getSolfegeChoices } from '../modes/solfegeMode';
-import { getDegreeChoices } from '../modes/progressionMode';
+import { getDegreeChoices, getTransposeChoices } from '../modes/progressionMode';
 import {
   startAudio, playNote, playChord, playSequence, playProgression, playArpeggio,
   playMetronomeClick, playRhythmClick,
@@ -182,7 +183,7 @@ export function Train() {
       case 'solfege': return makeSolfegeQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter);
       case 'progression': return makeProgressionQuestion(level, k, fk, progressionSource);
       case 'melody': return makeMelodyQuestion(level, k, fk);
-      case 'transpose': return makeIntervalQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter);
+      case 'transpose': return makeTransposeQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter);
       case 'rhythm': return makeRhythmQuestion(level);
       case 'tempo': return makeTempoQuestion(level);
       case 'bpm': return makeBpmQuestion(level);
@@ -240,8 +241,14 @@ export function Train() {
       }
       case 'progression': {
         const d = data as ProgressionData;
-        const chordNotes = d.chords.map((c) => c.notes);
-        await playProgression(chordNotes, '2n', speed);
+        if (d.playback === 'arpeggio') {
+          for (const c of d.chords) {
+            await playArpeggio(c.notes, '8n', speed);
+          }
+        } else {
+          const chordNotes = d.chords.map((c) => c.notes);
+          await playProgression(chordNotes, '2n', speed);
+        }
         break;
       }
       case 'melody': {
@@ -504,23 +511,27 @@ export function Train() {
             </div>
           )}
 
-          {/* Level selector */}
+          {/* Level selector — 10 levels in a 2×5 grid + label strip */}
           <div className="card w-full max-w-sm">
             <div className="text-sm font-semibold text-slate-600 mb-3">레벨 선택</div>
-            <div className="flex gap-2">
-              {Array.from({ length: MODE_INFO[modeKey as string]?.maxLevel ?? 3 }, (_, i) => i + 1).map((lv) => (
+            <div className="grid grid-cols-5 gap-2">
+              {Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map((lv) => (
                 <button
                   key={lv}
-                  className={`flex-1 py-2 rounded-lg font-semibold text-sm transition-colors ${
+                  className={`py-2 rounded-lg font-semibold text-sm transition-colors ${
                     level === lv
                       ? 'bg-primary-600 text-white'
                       : 'bg-slate-100 text-slate-600 active:bg-slate-200'
                   }`}
                   onClick={() => setLevel(lv)}
+                  aria-label={`레벨 ${lv}`}
                 >
-                  Lv{lv}
+                  {lv}
                 </button>
               ))}
+            </div>
+            <div className="mt-3 text-xs text-slate-500 min-h-[1.25rem] leading-snug">
+              Lv{level} · {getLevelLabel(modeKey, level)}
             </div>
           </div>
 
@@ -571,6 +582,7 @@ export function Train() {
   const isSolfege = modeKey === 'solfege';
   const isInterval = modeKey === 'interval';
   const isChord = modeKey === 'chord';
+  const isTranspose = modeKey === 'transpose';
   const isTempo = modeKey === 'tempo';
   const isBpm = modeKey === 'bpm';
 
@@ -686,13 +698,13 @@ export function Train() {
               )}
 
               {/* Choice-based modes */}
-              {(isInterval || isChord || (isSolfege && solfegeInputMethod === 'choice')) && (
+              {(isInterval || isChord || isTranspose || (isSolfege && solfegeInputMethod === 'choice')) && (
                 <ChoiceGrid
                   options={getChoiceOptions(modeKey, level)}
                   selected={selectedAnswer ?? undefined}
                   answered={false}
                   onSelect={handleChoiceSelect}
-                  columns={isInterval ? 2 : isChord ? 2 : 3}
+                  columns={isInterval || isTranspose ? 2 : isChord ? 2 : 3}
                   disabled={loading}
                 />
               )}
@@ -844,6 +856,7 @@ export function Train() {
                   );
                 }
                 // Slider mode
+                const [sliderMin, sliderMax] = bd.sliderRange ?? [40, 180];
                 return (
                   <div className="space-y-4">
                     <div className="text-sm text-slate-500 text-center">
@@ -854,8 +867,8 @@ export function Train() {
                     </div>
                     <input
                       type="range"
-                      min={40}
-                      max={180}
+                      min={sliderMin}
+                      max={sliderMax}
                       step={1}
                       value={bpmSliderValue}
                       onChange={(e) => setBpmSliderValue(Number(e.target.value))}
@@ -863,8 +876,8 @@ export function Train() {
                       disabled={loading}
                     />
                     <div className="flex justify-between text-xs text-slate-400">
-                      <span>40</span>
-                      <span>180</span>
+                      <span>{sliderMin}</span>
+                      <span>{sliderMax}</span>
                     </div>
                     <button
                       className="btn-primary w-full py-3"
@@ -880,14 +893,14 @@ export function Train() {
           ) : (
             /* After feedback: show correct answer highlight for choice modes */
             <>
-              {(isInterval || isChord || (isSolfege && solfegeInputMethod === 'choice')) && (
+              {(isInterval || isChord || isTranspose || (isSolfege && solfegeInputMethod === 'choice')) && (
                 <ChoiceGrid
                   options={getChoiceOptions(modeKey, level)}
                   selected={selectedAnswer ?? undefined}
                   correct={feedbackResult?.correctAnswer as string}
                   answered
                   onSelect={() => {}}
-                  columns={isInterval ? 2 : isChord ? 2 : 3}
+                  columns={isInterval || isTranspose ? 2 : isChord ? 2 : 3}
                 />
               )}
               {isSolfege && solfegeInputMethod === 'piano' && feedbackResult && (
@@ -961,6 +974,7 @@ export function Train() {
 // ─── Helpers ────────────────────────────────────────────────────────────────
 function getChoiceOptions(mode: ModeKey, level: number): ChoiceOption[] {
   if (mode === 'interval') return getIntervalChoices(level);
+  if (mode === 'transpose') return getTransposeChoices(level);
   if (mode === 'chord') return getChordChoices(level);
   if (mode === 'solfege') return getSolfegeChoices(level);
   return [];

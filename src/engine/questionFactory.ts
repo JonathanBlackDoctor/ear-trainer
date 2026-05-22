@@ -1,10 +1,31 @@
-import { Note, Scale } from 'tonal';
-import type { Question, ChordStep, ProgressionAnswer, ModeKey, ModeSrs, ModeStats } from '../types';
-import { INTERVAL_LEVELS, type IntervalDirection, randomNote, pickRandom } from '../theory/intervals';
+import { Note } from 'tonal';
+import type { Question, ChordStep, ProgressionAnswer, ModeSrs, ModeStats } from '../types';
+import {
+  INTERVAL_LEVELS,
+  type IntervalDirection,
+  randomNote,
+  pickRandom,
+} from '../theory/intervals';
 import { CHORD_LEVELS, buildChord } from '../theory/chords';
-import { COMMON_KEYS, randomDiatonicProgression, randomPraiseProgression, degreeToNote, getScaleNotes } from '../theory/progressions';
-import { semitoneToSolfege } from '../theory/solfege';
-import { transposeNote } from '../theory/transpose';
+import {
+  PROGRESSION_LEVELS,
+  COMMON_KEYS,
+  randomProgressionFromConfig,
+  randomPraiseProgression,
+  getScaleNotes,
+} from '../theory/progressions';
+import {
+  SOLFEGE_LEVELS,
+  semitoneToSolfege,
+  solfegeToSemitone,
+} from '../theory/solfege';
+import {
+  MELODY_LEVELS,
+  TRANSPOSE_LEVELS,
+  RHYTHM_LEVELS,
+  TEMPO_LEVELS,
+  BPM_LEVELS,
+} from '../modes/levels';
 import { pickDue } from './srs';
 
 /** SRS-aware target picker. Falls back to a random item when SRS is empty. */
@@ -32,20 +53,15 @@ function genId(): string {
 // ─── Interval ─────────────────────────────────────────────────────────────────
 export function makeIntervalQuestion(
   level: number,
-  keyMode: 'fixed' | 'random',
+  _keyMode: 'fixed' | 'random',
   fixedKey: string,
   lastItemKey?: string,
   srs?: ModeSrs,
   stats?: ModeStats,
   candidateFilter?: (key: string) => boolean
 ): Question {
-  const intervals = INTERVAL_LEVELS[level] ?? INTERVAL_LEVELS[1];
-  const directions: IntervalDirection[] = level >= 2
-    ? ['up', 'down', 'harmonic']
-    : ['up', 'harmonic'];
-  // Build all itemKey candidates as `${name}_${direction}` so SRS can pick the
-  // most overdue. Apply caller-supplied filter (e.g. weak-only sessions).
-  const allItemKeys = intervals.flatMap((n) => directions.map((d) => `${n}_${d}`));
+  const cfg = INTERVAL_LEVELS[level] ?? INTERVAL_LEVELS[1];
+  const allItemKeys = cfg.intervals.flatMap((n) => cfg.directions.map((d) => `${n}_${d}`));
   const filteredKeys = candidateFilter
     ? allItemKeys.filter(candidateFilter)
     : allItemKeys;
@@ -53,20 +69,18 @@ export function makeIntervalQuestion(
   const chosenItemKey = nextTarget(itemKeys, srs, stats, lastItemKey);
   const [intervalName, direction] = chosenItemKey.split('_') as [string, IntervalDirection];
 
-  // Pick a root note that keeps both notes in range
-  const rootNote = randomNote('C3', 'G4');
+  const rootNote = randomNote(cfg.noteRangeLow, cfg.noteRangeHigh);
   const semitones = getIntervalSemitones(intervalName);
   const secondMidi = (Note.midi(rootNote) ?? 60) + (direction === 'down' ? -semitones : semitones);
   const secondNote = Note.fromMidi(secondMidi) ?? 'C4';
 
-  const notes = direction === 'down' ? [rootNote, secondNote] : [rootNote, secondNote];
-  const itemKey = chosenItemKey;
+  const notes = [rootNote, secondNote];
 
   return {
     id: genId(),
     mode: 'interval',
     level,
-    itemKey,
+    itemKey: chosenItemKey,
     data: { type: 'interval', notes, direction, intervalName },
     answer: intervalName,
     context: { key: fixedKey },
@@ -83,17 +97,16 @@ function getIntervalSemitones(name: string): number {
 // ─── Chord ─────────────────────────────────────────────────────────────────────
 export function makeChordQuestion(
   level: number,
-  keyMode: 'fixed' | 'random',
+  _keyMode: 'fixed' | 'random',
   fixedKey: string,
-  arpeggio: boolean,
+  _arpeggioOverride: boolean,
   lastItemKey?: string,
   srs?: ModeSrs,
   stats?: ModeStats,
   candidateFilter?: (key: string) => boolean
 ): Question {
-  const qualities = CHORD_LEVELS[level] ?? CHORD_LEVELS[1];
-  const inversions = level >= 4 ? [0, 1] : [0];
-  const allItemKeys = qualities.flatMap((q) => inversions.map((inv) => `${q}_inv${inv}`));
+  const cfg = CHORD_LEVELS[level] ?? CHORD_LEVELS[1];
+  const allItemKeys = cfg.qualities.flatMap((q) => cfg.inversions.map((inv) => `${q}_inv${inv}`));
   const filtered = candidateFilter ? allItemKeys.filter(candidateFilter) : allItemKeys;
   const itemKeys = filtered.length > 0 ? filtered : allItemKeys;
   const itemKey = nextTarget(itemKeys, srs, stats, lastItemKey);
@@ -108,7 +121,7 @@ export function makeChordQuestion(
     mode: 'chord',
     level,
     itemKey,
-    data: { type: 'chord', notes, root: rootNote, quality, inversion, arpeggio },
+    data: { type: 'chord', notes, root: rootNote, quality, inversion, arpeggio: cfg.arpeggio },
     answer: quality,
     context: { key: fixedKey },
   };
@@ -117,16 +130,16 @@ export function makeChordQuestion(
 // ─── Progression ───────────────────────────────────────────────────────────────
 export function makeProgressionQuestion(
   level: number,
-  keyMode: 'fixed' | 'random',
+  _keyMode: 'fixed' | 'random',
   fixedKey: string,
   source: 'diatonic' | 'praise'
 ): Question {
-  const key = randomKey(keyMode, fixedKey);
-  const length = level <= 1 ? 2 : level <= 2 ? 3 : 4;
+  const cfg = PROGRESSION_LEVELS[level] ?? PROGRESSION_LEVELS[1];
+  const key = cfg.keyMode === 'random' ? pickRandom(COMMON_KEYS) : fixedKey;
 
   const steps: ChordStep[] = source === 'praise'
     ? randomPraiseProgression(key)
-    : randomDiatonicProgression(length as 2|3|4, key);
+    : randomProgressionFromConfig(cfg, key);
 
   const answer: ProgressionAnswer[] = steps.map((s) => ({
     degree: s.degree,
@@ -140,7 +153,7 @@ export function makeProgressionQuestion(
     mode: 'progression',
     level,
     itemKey,
-    data: { type: 'progression', chords: steps, key, source },
+    data: { type: 'progression', chords: steps, key, source, playback: cfg.playback },
     answer,
     context: { key, referenceToneNote: key + '4' },
   };
@@ -149,110 +162,79 @@ export function makeProgressionQuestion(
 // ─── Melody ────────────────────────────────────────────────────────────────────
 export function makeMelodyQuestion(
   level: number,
-  keyMode: 'fixed' | 'random',
+  _keyMode: 'fixed' | 'random',
   fixedKey: string
 ): Question {
-  const key = level >= 3 ? randomKey(keyMode, fixedKey) : fixedKey;
-  const scaleNotes = getScaleNotes(key, 4);
+  const cfg = MELODY_LEVELS[level] ?? MELODY_LEVELS[1];
+  const key = cfg.keyMode === 'random' ? pickRandom(COMMON_KEYS) : fixedKey;
+  const scale = buildExtendedScale(key, cfg.scaleOctaves);
+  const lastIdx = scale.length - 1;
 
-  const noteCount = level <= 1 ? pickRandom([3, 4]) : level <= 2 ? pickRandom([5, 6]) : pickRandom([7, 8]);
-  const melody: string[] = [];
-  for (let i = 0; i < noteCount; i++) {
-    if (melody.length === 0) {
-      melody.push(scaleNotes[0]); // start on tonic
-    } else {
-      const prev = melody[melody.length - 1];
-      const prevIdx = scaleNotes.indexOf(prev.replace(/\d/, '').concat(prev.replace(/[A-Za-z#b]/, '') || '4').trim());
-      const maxJump = level <= 1 ? 1 : level <= 2 ? 2 : 4;
-      const candidateIndices: number[] = [];
-      for (let j = Math.max(0, prevIdx - maxJump); j <= Math.min(6, prevIdx + maxJump); j++) {
-        if (j !== prevIdx) candidateIndices.push(j);
-      }
-      const idx = candidateIndices.length > 0
-        ? pickRandom(candidateIndices)
-        : Math.floor(Math.random() * 7);
-      melody.push(scaleNotes[idx] ?? scaleNotes[0]);
-    }
+  const notes: string[] = [scale[0]]; // start on tonic
+  let prevIdx = 0;
+  for (let i = 1; i < cfg.noteCount; i++) {
+    const lo = Math.max(0, prevIdx - cfg.maxJump);
+    const hi = Math.min(lastIdx, prevIdx + cfg.maxJump);
+    const candidates: number[] = [];
+    for (let j = lo; j <= hi; j++) if (j !== prevIdx) candidates.push(j);
+    const idx = candidates.length > 0 ? pickRandom(candidates) : prevIdx;
+    notes.push(scale[idx]);
+    prevIdx = idx;
   }
-
-  // Build proper chromatic melody notes from scale
-  const finalMelody = buildMelodyNotes(melody.length, key, level);
 
   return {
     id: genId(),
     mode: 'melody',
     level,
     itemKey: `melody_lv${level}`,
-    data: { type: 'melody', notes: finalMelody, key },
-    answer: finalMelody,
+    data: { type: 'melody', notes, key },
+    answer: notes,
     context: { key, referenceToneNote: key + '4' },
   };
 }
 
-function buildMelodyNotes(count: number, key: string, level: number): string[] {
-  const scale = getScaleNotes(key, 4);
-  const notes: string[] = [];
-  const maxJump = level <= 1 ? 1 : level <= 2 ? 2 : 3;
-
-  let prevIdx = 0; // start on tonic
-  for (let i = 0; i < count; i++) {
-    if (i === 0) {
-      notes.push(scale[0]);
-      continue;
-    }
-    const lo = Math.max(0, prevIdx - maxJump);
-    const hi = Math.min(6, prevIdx + maxJump);
-    const candidates = Array.from({ length: hi - lo + 1 }, (_, k) => lo + k)
-      .filter((j) => j !== prevIdx);
-    const idx = candidates.length > 0 ? pickRandom(candidates) : prevIdx;
-    notes.push(scale[idx]);
-    prevIdx = idx;
-  }
-  return notes;
+function buildExtendedScale(tonic: string, octaves: 1 | 2): string[] {
+  const oct1 = getScaleNotes(tonic, 4);
+  if (octaves === 1) return oct1;
+  // For 2-octave span we use octave 4 + the first 7 notes of octave 5.
+  const oct2 = getScaleNotes(tonic, 5);
+  return [...oct1, ...oct2];
 }
 
 // ─── Solfege ───────────────────────────────────────────────────────────────────
 export function makeSolfegeQuestion(
   level: number,
-  keyMode: 'fixed' | 'random',
+  _keyMode: 'fixed' | 'random',
   fixedKey: string,
   lastItemKey?: string,
   srs?: ModeSrs,
   stats?: ModeStats,
   candidateFilter?: (key: string) => boolean
 ): Question {
-  const key = level >= 3 ? randomKey(keyMode, fixedKey) : fixedKey;
-  const scale = getScaleNotes(key, 4);
+  const cfg = SOLFEGE_LEVELS[level] ?? SOLFEGE_LEVELS[1];
+  const key = cfg.keyMode === 'random' ? pickRandom(cfg.keyPool) : fixedKey;
 
-  // Level 1: diatonic only; Level 2+: include chromatic.
-  const noteCandidates = level <= 1 ? scale : [
-    ...scale,
-    ...[1, 3, 6, 8, 10].map((st) => {
-      const midi = (Note.midi(scale[0]) ?? 60) + st;
-      return Note.fromMidi(midi) ?? scale[0];
-    }),
-  ];
-
-  // Build itemKey-indexed pool so SRS can pick by syllable. Itemkey →
-  // representative note, then we let SRS select among unique itemKeys.
-  const keyToNote = new Map<string, string>();
-  for (const n of noteCandidates) {
-    const noteMidi = Note.midi(n) ?? 60;
-    const tonicMidi = Note.midi(key + '4') ?? 60;
-    const semis = ((noteMidi - tonicMidi) % 12 + 12) % 12;
-    const ik = `solfege_${semitoneToSolfege(semis)}`;
-    if (!keyToNote.has(ik)) keyToNote.set(ik, n);
+  // Build itemKey-indexed pool from the candidate syllables.
+  const keyToSemis = new Map<string, number>();
+  for (const syl of cfg.candidates) {
+    const semis = solfegeToSemitone(syl);
+    if (semis < 0) continue;
+    keyToSemis.set(`solfege_${syl}`, semis);
   }
-  const allItemKeys = Array.from(keyToNote.keys());
+  const allItemKeys = Array.from(keyToSemis.keys());
   const filtered = candidateFilter ? allItemKeys.filter(candidateFilter) : allItemKeys;
   const itemKeys = filtered.length > 0 ? filtered : allItemKeys;
   const itemKey = nextTarget(itemKeys, srs, stats, lastItemKey);
-  const note = keyToNote.get(itemKey) ?? noteCandidates[0];
+  const semis = keyToSemis.get(itemKey) ?? 0;
+  const solfegeAnswer = semitoneToSolfege(semis);
 
-  const tonicMidi = Note.midi(key + '4') ?? 60;
-  const noteMidi = Note.midi(note) ?? 60;
-  const semitones = ((noteMidi - tonicMidi) % 12 + 12) % 12;
-  const solfegeAnswer = semitoneToSolfege(semitones);
+  // Choose an octave for the played note. With jitter, randomly ±1 octave.
+  const baseOctave = 4;
+  const octave = cfg.octaveJitter === 0
+    ? baseOctave
+    : baseOctave + (Math.random() < 0.5 ? -1 : Math.random() < 0.5 ? 0 : 1);
+  const tonicMidi = Note.midi(key + octave) ?? 60;
+  const note = Note.fromMidi(tonicMidi + semis) ?? key + octave;
 
   return {
     id: genId(),
@@ -261,50 +243,57 @@ export function makeSolfegeQuestion(
     itemKey,
     data: { type: 'solfege', note, solfege: solfegeAnswer, key },
     answer: solfegeAnswer,
-    context: { key, referenceToneNote: key + '4' },
+    context: cfg.suppressReferenceTone
+      ? { key }
+      : { key, referenceToneNote: key + '4' },
+  };
+}
+
+// ─── Transpose ─────────────────────────────────────────────────────────────────
+export function makeTransposeQuestion(
+  level: number,
+  _keyMode: 'fixed' | 'random',
+  fixedKey: string,
+  lastItemKey?: string,
+  srs?: ModeSrs,
+  stats?: ModeStats,
+  candidateFilter?: (key: string) => boolean
+): Question {
+  const cfg = TRANSPOSE_LEVELS[level] ?? TRANSPOSE_LEVELS[1];
+  const key = cfg.keyPool.length <= 1
+    ? (cfg.keyPool[0] ?? fixedKey)
+    : pickRandom(cfg.keyPool);
+
+  const allItemKeys = cfg.intervals.flatMap((n) => cfg.directions.map((d) => `${n}_${d}`));
+  const filteredKeys = candidateFilter ? allItemKeys.filter(candidateFilter) : allItemKeys;
+  const itemKeys = filteredKeys.length > 0 ? filteredKeys : allItemKeys;
+  const chosenItemKey = nextTarget(itemKeys, srs, stats, lastItemKey);
+  const [intervalName, direction] = chosenItemKey.split('_') as [string, IntervalDirection];
+
+  // Anchor the root on the tonic of the picked key — that's the whole point of
+  // transposition practice: same interval, different starting pitch.
+  const rootMidi = Note.midi(key + '4') ?? 60;
+  const rootNote = Note.fromMidi(rootMidi) ?? 'C4';
+  const semitones = getIntervalSemitones(intervalName);
+  const secondMidi = rootMidi + (direction === 'down' ? -semitones : semitones);
+  const secondNote = Note.fromMidi(secondMidi) ?? 'C4';
+
+  return {
+    id: genId(),
+    mode: 'transpose',
+    level,
+    itemKey: chosenItemKey,
+    data: { type: 'interval', notes: [rootNote, secondNote], direction, intervalName },
+    answer: intervalName,
+    context: { key },
   };
 }
 
 // ─── Rhythm ────────────────────────────────────────────────────────────────────
-interface RhythmPattern {
-  beats: number[];  // beat positions in 16th notes
-  duration: number; // total length in 16th notes
-}
-
-const RHYTHM_PATTERNS: Record<number, RhythmPattern[]> = {
-  1: [
-    { beats: [0, 4, 8, 12], duration: 16 },
-    { beats: [0, 8], duration: 16 },
-    { beats: [0, 4, 8], duration: 12 },
-    { beats: [0, 4, 12], duration: 16 },
-  ],
-  2: [
-    { beats: [0, 2, 4, 8, 10, 12], duration: 16 },
-    { beats: [0, 4, 6, 8, 12], duration: 16 },
-    { beats: [0, 2, 8, 10], duration: 16 },
-    { beats: [0, 4, 6, 10, 12], duration: 16 },     // 붙임줄 느낌
-    { beats: [0, 2, 6, 8, 14], duration: 16 },      // 8분 + 점음표
-    { beats: [0, 4, 10, 12], duration: 16 },        // 당김음 시작
-  ],
-  3: [
-    { beats: [0, 1, 4, 6, 8, 9, 12, 14], duration: 16 },
-    { beats: [0, 3, 4, 8, 11, 12], duration: 16 },
-    { beats: [0, 2, 5, 8, 10, 13], duration: 16 },  // 셋잇단 느낌 (5,13 = off-grid)
-    { beats: [0, 3, 6, 8, 11, 14], duration: 16 },  // 싱코페이션
-    { beats: [0, 1, 2, 8, 10, 12, 13, 14], duration: 16 }, // 16분 묶음
-  ],
-  4: [
-    { beats: [0, 3, 5, 8, 10, 11, 13, 15], duration: 16 },  // 강한 싱코페이션
-    { beats: [0, 1, 3, 5, 8, 9, 11, 13, 14], duration: 16 }, // 16분 + 셋잇단 혼합
-    { beats: [0, 2, 3, 6, 8, 11, 13, 14], duration: 16 },   // 당김음 풍성
-    { beats: [0, 1, 4, 5, 7, 8, 11, 12, 15], duration: 16 }, // 빠른 16분
-  ],
-};
-
 export function makeRhythmQuestion(level: number): Question {
-  const patterns = RHYTHM_PATTERNS[level] ?? RHYTHM_PATTERNS[1];
-  const pattern = pickRandom(patterns);
-  const bpm = level <= 1 ? 80 : level <= 2 ? 90 : level <= 3 ? 100 : 110;
+  const cfg = RHYTHM_LEVELS[level] ?? RHYTHM_LEVELS[1];
+  const pattern = pickRandom(cfg.patterns);
+  const bpm = cfg.bpm;
   const sixteenthMs = (60_000 / bpm) / 4;
 
   const beatTimes = pattern.beats.map((b) => b * sixteenthMs);
@@ -331,29 +320,16 @@ export function makeRhythmQuestion(level: number): Question {
 
 // ─── Tempo Hold ────────────────────────────────────────────────────────────────
 export function makeTempoQuestion(level: number): Question {
-  let bpm: number;
-  let countInBeats: number;
-  let holdBeats: number;
-  if (level <= 1) {
-    bpm = 90;
-    countInBeats = 4;
-    holdBeats = 4;
-  } else if (level <= 2) {
-    bpm = 60 + Math.floor(Math.random() * 61); // 60~120
-    countInBeats = 4;
-    holdBeats = 8;
-  } else {
-    bpm = 60 + Math.floor(Math.random() * 81); // 60~140
-    countInBeats = 2;
-    holdBeats = 8;
-  }
+  const cfg = TEMPO_LEVELS[level] ?? TEMPO_LEVELS[1];
+  const [lo, hi] = cfg.bpmRange;
+  const bpm = lo === hi ? lo : lo + Math.floor(Math.random() * (hi - lo + 1));
 
   return {
     id: genId(),
     mode: 'tempo',
     level,
     itemKey: `tempo_lv${level}`,
-    data: { type: 'tempo', bpm, countInBeats, holdBeats },
+    data: { type: 'tempo', bpm, countInBeats: cfg.countInBeats, holdBeats: cfg.holdBeats },
     answer: bpm,
     context: { key: 'C' },
   };
@@ -361,28 +337,30 @@ export function makeTempoQuestion(level: number): Question {
 
 // ─── BPM Guess ─────────────────────────────────────────────────────────────────
 export function makeBpmQuestion(level: number): Question {
+  const cfg = BPM_LEVELS[level] ?? BPM_LEVELS[1];
   const beats = 8;
+  const [lo, hi] = cfg.bpmRange;
+
   let bpm: number;
-  let inputMode: 'choice' | 'slider';
   let choices: number[] | undefined;
 
-  if (level <= 1) {
-    inputMode = 'choice';
-    choices = [60, 80, 100, 120];
-    bpm = pickRandom(choices);
-  } else if (level <= 2) {
-    inputMode = 'choice';
-    const base = 60 + Math.floor(Math.random() * 7) * 10; // 60~120
-    bpm = base;
-    // 4지선다: 정답 + 인접 BPM 3개 (간격 10)
-    const pool = [base - 20, base - 10, base, base + 10, base + 20].filter(
-      (b) => b >= 40 && b <= 160
-    );
-    while (pool.length > 4) pool.pop();
-    choices = shuffle(pool);
+  if (cfg.inputMode === 'choice') {
+    const spacing = cfg.choiceSpacing ?? cfg.bpmStep;
+    // Enumerate all answer slots on the spacing grid within the BPM range.
+    const slots: number[] = [];
+    for (let b = lo; b <= hi; b += spacing) slots.push(b);
+    bpm = slots[Math.floor(Math.random() * slots.length)];
+    // Pick the 3 slots closest to the answer as distractors; if the range
+    // can't supply 3, the choice list shrinks rather than padding with bogus
+    // values.
+    const distractors = slots
+      .filter((s) => s !== bpm)
+      .sort((a, b2) => Math.abs(a - bpm) - Math.abs(b2 - bpm))
+      .slice(0, 3);
+    choices = shuffle([bpm, ...distractors]);
   } else {
-    inputMode = 'slider';
-    bpm = 50 + Math.floor(Math.random() * 121); // 50~170
+    // Slider mode: free-form integer in range.
+    bpm = lo + Math.floor(Math.random() * (hi - lo + 1));
   }
 
   return {
@@ -390,7 +368,10 @@ export function makeBpmQuestion(level: number): Question {
     mode: 'bpm',
     level,
     itemKey: `bpm_lv${level}`,
-    data: { type: 'bpm', bpm, beats, inputMode, choices },
+    data: {
+      type: 'bpm', bpm, beats, inputMode: cfg.inputMode, choices,
+      sliderRange: cfg.inputMode === 'slider' ? cfg.bpmRange : undefined,
+    },
     answer: bpm,
     context: { key: 'C' },
   };
