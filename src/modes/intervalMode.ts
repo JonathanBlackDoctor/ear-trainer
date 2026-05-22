@@ -9,6 +9,7 @@ export const INTERVAL_MODE_INFO = {
   name: '음정 듣기',
   emoji: '🎵',
   description: '두 음 사이의 간격을 맞혀보세요',
+  howTo: '두 음이 차례로 들립니다. 두 음 사이의 음정(장2도, 완전5도 등)을 아래 버튼에서 선택하세요.',
   maxLevel: 3,
   defaultLevel: 1,
 };
