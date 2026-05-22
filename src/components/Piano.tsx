@@ -60,9 +60,13 @@ export function Piano({
 
   function noteClass(note: string, isBlack: boolean): string {
     const pc = note.replace(/\d/, '');
-    const inHighlight = highlightNotes.some((n) => Note.pitchClass(n) === pc || n === note);
-    const inCorrect = correctNotes.some((n) => Note.pitchClass(n) === pc || n === note);
-    const inWrong = wrongNotes.some((n) => Note.pitchClass(n) === pc || n === note);
+    const midi = Note.midi(note);
+    // Match by MIDI (enharmonic-aware) so a Bb in the answer highlights the A# key.
+    const matches = (n: string) =>
+      n === note || Note.pitchClass(n) === pc || (midi != null && Note.midi(n) === midi);
+    const inHighlight = highlightNotes.some(matches);
+    const inCorrect = correctNotes.some(matches);
+    const inWrong = wrongNotes.some(matches);
 
     if (isBlack) {
       if (inCorrect) return 'bg-emerald-500';

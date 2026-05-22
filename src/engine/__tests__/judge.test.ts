@@ -45,6 +45,39 @@ describe('judge — melody', () => {
     const r = judge(ques, ['C4', 'D4']);
     expect(r.partialScore).toBe(0);
   });
+  it('enharmonic-equivalent input (A#4 vs Bb4) counts as correct', () => {
+    const fQues = q({
+      mode: 'melody',
+      answer: ['F4', 'A4', 'Bb4'],
+      data: { type: 'melody', notes: ['F4', 'A4', 'Bb4'], key: 'F' },
+    });
+    // Piano always emits sharp form, so the user's correct play of Bb4
+    // is reported as A#4 — judge must treat them as equivalent.
+    const r = judge(fQues, ['F4', 'A4', 'A#4']);
+    expect(r.correct).toBe(true);
+    expect(r.partialScore).toBe(1);
+  });
+});
+
+describe('judge — transpose', () => {
+  // Transpose mode answer is the interval-name string (e.g. "P5") picked
+  // from a choice grid. A bug previously routed it through the array-
+  // comparison branch, so every answer scored 0.
+  const ques = q({
+    mode: 'transpose',
+    answer: 'P5',
+    data: { type: 'interval', notes: ['C4', 'G4'], direction: 'up', intervalName: 'P5' },
+  });
+  it('exact string match → correct', () => {
+    const r = judge(ques, 'P5');
+    expect(r.correct).toBe(true);
+    expect(r.partialScore).toBe(1);
+  });
+  it('wrong choice → incorrect', () => {
+    const r = judge(ques, 'P4');
+    expect(r.correct).toBe(false);
+    expect(r.partialScore).toBe(0);
+  });
 });
 
 describe('judge — progression', () => {

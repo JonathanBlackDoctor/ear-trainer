@@ -1,3 +1,4 @@
+import { Note } from 'tonal';
 import type { Question, AnswerValue, ProgressionAnswer } from '../types';
 
 export interface TempoJudgeDetails {
@@ -31,6 +32,7 @@ export function judge(question: Question, userAnswer: AnswerValue): JudgeResult 
     case 'interval':
     case 'chord':
     case 'solfege':
+    case 'transpose':
     case 'lab-scale':
     case 'lab-cadence':
     case 'lab-key':
@@ -46,7 +48,13 @@ export function judge(question: Question, userAnswer: AnswerValue): JudgeResult 
       if (ua.length !== ca.length) {
         return { correct: false, partialScore: 0, correctAnswer: correct };
       }
-      const matches = ua.filter((n, i) => n === ca[i]).length;
+      // Compare by MIDI so the piano's sharp-form input (e.g. A#4) matches
+      // the scale's enharmonic spelling (e.g. Bb4 in F major).
+      const matches = ua.filter((n, i) => {
+        const a = Note.midi(n);
+        const b = Note.midi(ca[i]);
+        return a != null && b != null && a === b;
+      }).length;
       const score = matches / ca.length;
       return { correct: score === 1, partialScore: score, correctAnswer: correct };
     }
@@ -60,18 +68,6 @@ export function judge(question: Question, userAnswer: AnswerValue): JudgeResult 
       const matches = ua.filter((a, i) =>
         a.degree === ca[i].degree && a.quality === ca[i].quality
       ).length;
-      const score = matches / ca.length;
-      return { correct: score === 1, partialScore: score, correctAnswer: correct };
-    }
-
-    case 'transpose': {
-      // For melody transposition: compare note arrays
-      const ua = userAnswer as string[];
-      const ca = correct as string[];
-      if (!Array.isArray(ua) || ua.length !== ca.length) {
-        return { correct: false, partialScore: 0, correctAnswer: correct };
-      }
-      const matches = ua.filter((n, i) => n === ca[i]).length;
       const score = matches / ca.length;
       return { correct: score === 1, partialScore: score, correctAnswer: correct };
     }

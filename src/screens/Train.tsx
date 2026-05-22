@@ -1015,7 +1015,12 @@ export function Train() {
                   <Piano
                     highlightNotes={feedbackResult.correctAnswer as string[]}
                     correctNotes={feedbackResult.correctAnswer as string[]}
-                    wrongNotes={pianoInput.filter((n) => !(feedbackResult.correctAnswer as string[]).includes(n))}
+                    wrongNotes={pianoInput.filter((n) => {
+                      const m = Note.midi(n);
+                      return !(feedbackResult.correctAnswer as string[]).some(
+                        (cn) => m != null && Note.midi(cn) === m
+                      );
+                    })}
                     disabled
                   />
                 </div>
