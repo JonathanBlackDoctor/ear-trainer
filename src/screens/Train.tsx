@@ -11,7 +11,7 @@ import {
   makeSolfegeQuestion, makeProgressionQuestion, makeRhythmQuestion,
   makeTempoQuestion, makeBpmQuestion,
 } from '../engine/questionFactory';
-import { judge } from '../engine/judge';
+import { judge, type TempoJudgeDetails } from '../engine/judge';
 import { PlaybackControls } from '../components/PlaybackControls';
 import { ChoiceGrid, type ChoiceOption } from '../components/ChoiceGrid';
 import { Piano } from '../components/Piano';
@@ -23,7 +23,7 @@ import { getSolfegeChoices } from '../modes/solfegeMode';
 import { getDegreeChoices } from '../modes/progressionMode';
 import {
   startAudio, playNote, playChord, playSequence, playProgression, playArpeggio, playClick,
-  playMetronome, stopAllAudio, getAudioStatus, type AudioQuality,
+  playMetronome, stopAllAudio, getAudioStatus, getPlaybackGen, type AudioQuality,
 } from '../audio/piano';
 import { INTERVAL_MODE_INFO } from '../modes/intervalMode';
 import { CHORD_MODE_INFO } from '../modes/chordMode';
@@ -111,6 +111,13 @@ export function Train() {
     return () => clearInterval(id);
   }, [audioReady]);
 
+  // Silence any in-flight playback when the user leaves the training screen
+  // (back button, route change, browser nav). Without this, the question
+  // audio keeps ringing on the home screen.
+  useEffect(() => {
+    return () => { stopAllAudio(); };
+  }, []);
+
   // ─── Session Management ─────────────────────────────────────────────────────
   function beginSession() {
     const startTime = Date.now();
@@ -166,16 +173,25 @@ export function Train() {
     // Cut any audio left over from the previous question (release tails,
     // notes still queued in the future) before starting the new one.
     stopAllAudio();
+    // Capture the playback generation right after stopping so the rest of
+    // this async chain (reference-tone gap, question audio) can bail out if
+    // the user triggers another stop mid-flight — otherwise the in-flight
+    // promise resumes and overlaps with the newer playback.
+    const gen = getPlaybackGen();
     setLoading(true);
     try {
       // Play reference tone if enabled
       if (settings.referenceTone === 'perQuestion' && q.context?.referenceToneNote) {
         await playNote(q.context.referenceToneNote, '2n');
+        if (gen !== getPlaybackGen()) return;
         await delay(700 / speed);
+        if (gen !== getPlaybackGen()) return;
       }
       await playQuestionAudio(q, speed);
     } finally {
-      setLoading(false);
+      // Only release the loading state if we're still the active playback;
+      // otherwise the newer playback owns it.
+      if (gen === getPlaybackGen()) setLoading(false);
     }
   }
 
@@ -237,18 +253,22 @@ export function Train() {
   }
 
   async function playRhythmPattern(data: RhythmData) {
+    const gen = getPlaybackGen();
     const bpm = data.bpm;
     const sixteenthMs = (60_000 / bpm) / 4;
     // Count-in
     setIsCountingIn(true);
     for (let i = 0; i < 4; i++) {
+      if (gen !== getPlaybackGen()) { setIsCountingIn(false); return; }
       playClick(i === 0);
       await delay(sixteenthMs * 4);
     }
+    if (gen !== getPlaybackGen()) { setIsCountingIn(false); return; }
     setIsCountingIn(false);
     // Play pattern
     const startT = Date.now();
     for (const beat of data.pattern) {
+      if (gen !== getPlaybackGen()) return;
       const targetTime = startT + beat.time * sixteenthMs;
       const wait = targetTime - Date.now();
       if (wait > 0) await delay(wait);
@@ -586,6 +606,11 @@ export function Train() {
                 <div className="mt-3">
                   <Staff notes={currentQuestion.data.type === 'melody' ? (currentQuestion.data as MelodyData).notes : []} />
                 </div>
+              )}
+
+              {/* Tempo detail feedback */}
+              {isTempo && feedbackResult.details?.kind === 'tempo' && (
+                <TempoFeedbackDetail details={feedbackResult.details} />
               )}
             </div>
           )}
@@ -943,6 +968,136 @@ function ProgressionInput({ notation, onSelect, disabled }: ProgInputProps) {
           {c.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+// ─── Tempo Feedback Detail ──────────────────────────────────────────────────
+function TempoFeedbackDetail({ details }: { details: TempoJudgeDetails }) {
+  const {
+    targetBpm, userBpm, bpmDelta, deviationPct, tolerancePct,
+    intervalBpms, jitterPct,
+  } = details;
+
+  const tolBpm = targetBpm * tolerancePct;
+  // Visual scale for bars: clamp to 3× tolerance so extreme outliers don't break layout.
+  const visualHalfRangeBpm = Math.max(tolBpm * 3, Math.abs(bpmDelta) + tolBpm);
+
+  const inTolerance = (bpm: number) => Math.abs(bpm - targetBpm) / targetBpm <= tolerancePct;
+  const fastSlowLabel =
+    Math.abs(bpmDelta) < 0.5 ? '딱 맞음'
+    : bpmDelta > 0 ? `${bpmDelta.toFixed(1)} BPM 빠름`
+    : `${Math.abs(bpmDelta).toFixed(1)} BPM 느림`;
+
+  // Consistency rating
+  const consistencyLabel =
+    jitterPct <= tolerancePct ? '매우 안정'
+    : jitterPct <= tolerancePct * 2 ? '약간 흔들림'
+    : '많이 흔들림';
+  const consistencyColor =
+    jitterPct <= tolerancePct ? 'text-emerald-700'
+    : jitterPct <= tolerancePct * 2 ? 'text-amber-700'
+    : 'text-red-700';
+
+  return (
+    <div className="mt-3 pt-3 border-t border-slate-200 space-y-3">
+      {/* Headline numbers */}
+      <div className="grid grid-cols-3 gap-2 text-center">
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-slate-500">목표</div>
+          <div className="text-lg font-bold text-slate-800 tabular-nums">
+            {Math.round(targetBpm)}
+          </div>
+          <div className="text-[10px] text-slate-400">BPM</div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-slate-500">내 템포</div>
+          <div className={`text-lg font-bold tabular-nums ${
+            deviationPct <= tolerancePct ? 'text-emerald-700' : 'text-red-700'
+          }`}>
+            {userBpm.toFixed(1)}
+          </div>
+          <div className="text-[10px] text-slate-400">BPM</div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-slate-500">편차</div>
+          <div className={`text-lg font-bold tabular-nums ${
+            deviationPct <= tolerancePct ? 'text-emerald-700' : 'text-red-700'
+          }`}>
+            {bpmDelta >= 0 ? '+' : ''}{bpmDelta.toFixed(1)}
+          </div>
+          <div className="text-[10px] text-slate-400">
+            {(deviationPct * 100).toFixed(1)}%
+          </div>
+        </div>
+      </div>
+
+      {/* Verbal summary */}
+      <div className="text-xs text-slate-600 text-center">
+        평균 <b>{fastSlowLabel}</b>
+        {' · '}
+        허용 ±{(tolerancePct * 100).toFixed(0)}%
+        {' · '}
+        일관성 <span className={`font-semibold ${consistencyColor}`}>{consistencyLabel}</span>
+        {' '}
+        <span className="text-slate-400">(흔들림 {(jitterPct * 100).toFixed(1)}%)</span>
+      </div>
+
+      {/* Per-tap BPM chart: each interval drawn as a bar from the target line */}
+      <div>
+        <div className="text-[10px] text-slate-500 mb-1 flex justify-between">
+          <span>탭별 BPM 변동</span>
+          <span className="text-slate-400">총 {intervalBpms.length}개 간격</span>
+        </div>
+        <div className="relative h-20 bg-slate-50 rounded border border-slate-200 overflow-hidden">
+          {/* Tolerance band */}
+          <div
+            className="absolute left-0 right-0 bg-emerald-100/70"
+            style={{
+              top: `${50 - (tolBpm / visualHalfRangeBpm) * 50}%`,
+              height: `${(tolBpm / visualHalfRangeBpm) * 100}%`,
+            }}
+          />
+          {/* Target line (center) */}
+          <div className="absolute left-0 right-0 top-1/2 border-t border-dashed border-slate-400" />
+          {/* Bars */}
+          <div className="absolute inset-0 flex items-stretch justify-around px-1">
+            {intervalBpms.map((bpm, i) => {
+              const offsetBpm = bpm - targetBpm; // signed
+              const pct = Math.max(-1, Math.min(1, offsetBpm / visualHalfRangeBpm));
+              const heightPct = Math.abs(pct) * 50;
+              const isOk = inTolerance(bpm);
+              return (
+                <div key={i} className="flex-1 flex flex-col justify-center mx-0.5 relative">
+                  <div
+                    className={`absolute left-0 right-0 mx-auto rounded-sm ${
+                      isOk ? 'bg-emerald-500' : 'bg-red-400'
+                    }`}
+                    style={
+                      pct >= 0
+                        ? { bottom: '50%', height: `${heightPct}%`, width: '70%' }
+                        : { top: '50%', height: `${heightPct}%`, width: '70%' }
+                    }
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        {/* Per-tap BPM numbers */}
+        <div className="mt-1 flex justify-around gap-1 text-[10px] tabular-nums">
+          {intervalBpms.map((bpm, i) => (
+            <span
+              key={i}
+              className={`flex-1 text-center ${
+                inTolerance(bpm) ? 'text-emerald-700' : 'text-red-600'
+              }`}
+            >
+              {bpm.toFixed(0)}
+            </span>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

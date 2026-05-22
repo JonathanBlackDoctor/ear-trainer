@@ -31,6 +31,24 @@ const SAMPLE_URLS: Record<string, string> = Object.fromEntries(
 // scheduling at bare Tone.now() drops the note silently on iOS/Android.
 const SCHEDULE_LOOKAHEAD = 0.05;
 
+// ─── Cancellable scheduling ─────────────────────────────────────────────────
+// Notes inside a sequence/progression/arpeggio are dispatched via setTimeout
+// (instead of being pre-scheduled in the audio thread) so we can actually
+// cancel pending notes when the user advances/replays. The generation counter
+// is a backstop: any setTimeout that survives a stopAllAudio() will see a
+// changed gen and bail before triggering its note.
+const pendingTimeouts = new Set<number>();
+let playbackGen = 0;
+
+function trackTimeout(fn: () => void, ms: number): number {
+  const id = window.setTimeout(() => {
+    pendingTimeouts.delete(id);
+    fn();
+  }, ms);
+  pendingTimeouts.add(id);
+  return id;
+}
+
 // ─── Output gain (kill switch) ──────────────────────────────────────────────
 // All instruments route through this gain node so we can cut every active and
 // already-scheduled note instantly when the user advances to the next question.
@@ -58,9 +76,14 @@ function getSynth(): Tone.PolySynth {
       harmonicity: 1,
       modulationIndex: 5,
       oscillator: { type: 'sine' },
-      envelope: { attack: 0.003, decay: 0.8, sustain: 0, release: 1.0 },
+      // release was 1.0s — far longer than the 50ms stop-mute window, so a
+      // releaseAll() during stopAllAudio could not finish fading before the
+      // gain restored to 1 and the tail bled into the next playback. 0.05s
+      // is long enough to avoid a click but short enough that the envelope
+      // is at zero by the time new playback begins.
+      envelope: { attack: 0.003, decay: 0.8, sustain: 0, release: 0.05 },
       modulation: { type: 'sine' },
-      modulationEnvelope: { attack: 0.002, decay: 0.3, sustain: 0, release: 0.3 },
+      modulationEnvelope: { attack: 0.002, decay: 0.3, sustain: 0, release: 0.05 },
     }).connect(getOutputGain());
     synth.volume.value = -10;
   }
@@ -112,6 +135,11 @@ function loadSampler(): Promise<void> {
     try {
       sampler = new Tone.Sampler({
         urls: SAMPLE_URLS,
+        // Short release so releaseAll() during stopAllAudio() silences active
+        // notes inside the 50ms mute window. The natural ringing of the piano
+        // sample is baked into the buffer; this only controls the fade when
+        // we ask it to stop.
+        release: 0.05,
         onload: () => {
           samplerReady = true;
           samplerFailed = false;
@@ -242,6 +270,16 @@ export function isAudioStarted(): boolean {
   return audioStarted;
 }
 
+/**
+ * Snapshot of the current playback generation. Callers that orchestrate
+ * multi-step async playback (e.g. "reference tone → 700ms gap → question
+ * audio", or a rhythm-pattern loop) capture this at start, then bail if it
+ * changes — that means stopAllAudio() ran and a new playback already began.
+ */
+export function getPlaybackGen(): number {
+  return playbackGen;
+}
+
 export type AudioQuality = 'piano' | 'synth' | 'synth-fallback';
 
 /** Tells the UI which instrument is in use so it can show a status note. */
@@ -254,24 +292,37 @@ export function getAudioStatus(): AudioQuality {
 // ─── Stop / scheduling helpers ──────────────────────────────────────────────
 /**
  * Silence everything currently sounding or already scheduled.
- * Used when advancing to the next question so the previous question's release
- * tail and any notes still queued via triggerAttackRelease(..., futureTime)
- * don't overlap with the new question.
  *
- * We don't releaseAll/dispose the instruments — that doesn't cancel future
- * scheduled BufferSource starts inside Tone.Sampler. Instead we ramp the
- * shared output gain to 0 fast (5ms, to avoid clicks). Stale notes still fire
- * inside the audio graph but produce no sound, and the next playback restores
- * the gain to 1 exactly when its first note begins (see scheduleStart).
+ * Three layers of defense, each one needed:
+ *   1) Clear pending JS-side setTimeouts so notes 2..N of a sequence that
+ *      haven't fired yet never fire. (The first note of any playback is
+ *      scheduled directly in the audio thread; the rest go through
+ *      trackTimeout — see playSequence/playProgression/playArpeggio.)
+ *   2) Bump playbackGen so any setTimeout that races past the clear above
+ *      bails out instead of triggering a stale note.
+ *   3) releaseAll() on both instruments to start the envelope release on
+ *      anything currently sounding, AND drop the output gain to 0 hard so
+ *      already-fired BufferSources/oscillators that we can't cancel at the
+ *      audio-context level become inaudible. We DO NOT restore the gain
+ *      here — scheduleStart() lifts it back to 1 only at the moment new
+ *      playback begins.
+ *
+ * Earlier this only ramped the gain to 0 for 5ms and let scheduleStart
+ * restore it 50ms later. That window was too narrow for the synth's 1s
+ * release tail to fade, so notes from the previous question bled into the
+ * next one whenever the user hit 다시 듣기 / 기준음 / 다음 mid-playback.
  */
 export function stopAllAudio(): void {
   if (!audioStarted) return;
+  for (const id of pendingTimeouts) clearTimeout(id);
+  pendingTimeouts.clear();
+  playbackGen++;
+  try { sampler?.releaseAll(); } catch { /* ignore */ }
+  try { synth?.releaseAll(); } catch { /* ignore */ }
   const gain = getOutputGain();
   const now = Tone.now();
-  const cur = gain.gain.value;
   gain.gain.cancelScheduledValues(now);
-  gain.gain.setValueAtTime(cur, now);
-  gain.gain.linearRampToValueAtTime(0, now + 0.005);
+  gain.gain.setValueAtTime(0, now);
 }
 
 /** Compute a start time for new playback and arm the gain to 1 at that moment. */
@@ -298,6 +349,30 @@ export async function playChord(notes: string[], duration = '2n'): Promise<void>
   getInstrument().triggerAttackRelease(notes, duration, scheduleStart());
 }
 
+// Each playSequence/playProgression/playArpeggio fires its first item
+// immediately on the audio thread (so the user gets instant feedback on tap)
+// and dispatches the rest via trackTimeout. Pre-scheduling everything in the
+// audio thread — as we used to — meant a 4s melody queued 4s of un-cancellable
+// notes, so stopAllAudio() was powerless to silence them.
+function firePlayback(
+  items: Array<string | string[]>,
+  noteDuration: string,
+  perItemSec: number,
+  triggerDuration: string = noteDuration,
+): void {
+  const inst = getInstrument();
+  const gen = playbackGen;
+  // First item rides the audio-thread start so it lands with the gain ramp.
+  inst.triggerAttackRelease(items[0] as any, triggerDuration, scheduleStart());
+  for (let i = 1; i < items.length; i++) {
+    const item = items[i];
+    trackTimeout(() => {
+      if (gen !== playbackGen) return; // stop was called — skip
+      getInstrument().triggerAttackRelease(item as any, triggerDuration, scheduleStart());
+    }, i * perItemSec * 1000);
+  }
+}
+
 /** Play notes sequentially (melody or arpeggio) */
 export async function playSequence(
   notes: string[],
@@ -306,12 +381,7 @@ export async function playSequence(
 ): Promise<void> {
   if (!audioStarted) await startAudio();
   await ensureRunning();
-  const inst = getInstrument();
-  const start = scheduleStart();
-  const dSecs = Tone.Time(noteDuration).toSeconds() / speedFactor;
-  notes.forEach((note, i) => {
-    inst.triggerAttackRelease(note, noteDuration, start + i * dSecs);
-  });
+  firePlayback(notes, noteDuration, Tone.Time(noteDuration).toSeconds() / speedFactor);
 }
 
 /** Play chord progression */
@@ -322,12 +392,7 @@ export async function playProgression(
 ): Promise<void> {
   if (!audioStarted) await startAudio();
   await ensureRunning();
-  const inst = getInstrument();
-  const start = scheduleStart();
-  const dSecs = Tone.Time(chordDuration).toSeconds() / speedFactor;
-  chordNotes.forEach((notes, i) => {
-    inst.triggerAttackRelease(notes, chordDuration, start + i * dSecs);
-  });
+  firePlayback(chordNotes, chordDuration, Tone.Time(chordDuration).toSeconds() / speedFactor);
 }
 
 /** Play arpeggio (chord notes one by one) */
@@ -338,12 +403,9 @@ export async function playArpeggio(
 ): Promise<void> {
   if (!audioStarted) await startAudio();
   await ensureRunning();
-  const inst = getInstrument();
-  const start = scheduleStart();
-  const dSecs = Tone.Time(noteDuration).toSeconds() / speedFactor;
-  notes.forEach((note, i) => {
-    inst.triggerAttackRelease(note, '4n', start + i * dSecs);
-  });
+  // Note value sent to triggerAttackRelease is '4n' (longer than the gap
+  // between notes) so consecutive arpeggio notes can ring through each other.
+  firePlayback(notes, noteDuration, Tone.Time(noteDuration).toSeconds() / speedFactor, '4n');
 }
 
 /** Play metronome click (built-in, no network) */
@@ -363,12 +425,20 @@ export function playClick(accent = false): void {
 /**
  * Play a steady metronome at `bpm` for `beats` beats.
  * First beat is accented. Resolves when the last click has been fired.
+ * Bails early if stopAllAudio() is called mid-pattern.
+ *
+ * The inter-click wait uses a plain setTimeout (not trackTimeout) — clearing
+ * it would leave the await hanging forever. Instead the gen check at the top
+ * of each iteration short-circuits the loop before the next click fires; in
+ * the worst case one beat of silent wait runs after the stop.
  */
 export async function playMetronome(bpm: number, beats: number): Promise<void> {
   if (!audioStarted) await startAudio();
   await ensureRunning();
   const beatMs = 60_000 / bpm;
+  const gen = playbackGen;
   for (let i = 0; i < beats; i++) {
+    if (gen !== playbackGen) return;
     playClick(i === 0);
     if (i < beats - 1) {
       await new Promise<void>((resolve) => setTimeout(resolve, beatMs));

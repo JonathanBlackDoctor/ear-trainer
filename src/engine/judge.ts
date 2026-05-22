@@ -1,9 +1,26 @@
 import type { Question, AnswerValue, ProgressionAnswer } from '../types';
 
+export interface TempoJudgeDetails {
+  kind: 'tempo';
+  targetBpm: number;
+  userBpm: number;          // BPM derived from mean inter-tap interval
+  bpmDelta: number;         // userBpm - targetBpm (signed; + = fast, − = slow)
+  deviationPct: number;     // |bpmDelta| / targetBpm
+  tolerancePct: number;     // level-based passing threshold
+  intervalsMs: number[];    // raw inter-tap intervals in ms
+  intervalBpms: number[];   // per-interval BPM
+  meanIntervalMs: number;
+  stdDevMs: number;         // SD of intervals — raw jitter
+  jitterPct: number;        // stdDevMs / meanIntervalMs — relative jitter
+}
+
+export type JudgeDetails = TempoJudgeDetails;
+
 export interface JudgeResult {
   correct: boolean;
   partialScore: number;   // 0.0 – 1.0
   correctAnswer: AnswerValue;
+  details?: JudgeDetails;
 }
 
 /** Judge a user's answer against a question */
@@ -74,21 +91,45 @@ export function judge(question: Question, userAnswer: AnswerValue): JudgeResult 
       if (!Array.isArray(taps) || taps.length < 2) {
         return { correct: false, partialScore: 0, correctAnswer: correct };
       }
-      const intervals: number[] = [];
-      for (let i = 1; i < taps.length; i++) intervals.push(taps[i] - taps[i - 1]);
-      const meanMs = intervals.reduce((s, v) => s + v, 0) / intervals.length;
+      const intervalsMs: number[] = [];
+      for (let i = 1; i < taps.length; i++) intervalsMs.push(taps[i] - taps[i - 1]);
+      const meanMs = intervalsMs.reduce((s, v) => s + v, 0) / intervalsMs.length;
       if (meanMs <= 0) {
         return { correct: false, partialScore: 0, correctAnswer: correct };
       }
       const userBpm = 60_000 / meanMs;
-      const deviationPct = Math.abs(userBpm - targetBpm) / targetBpm;
+      const intervalBpms = intervalsMs.map((ms) => 60_000 / ms);
+      const variance =
+        intervalsMs.reduce((s, v) => s + (v - meanMs) ** 2, 0) / intervalsMs.length;
+      const stdDevMs = Math.sqrt(variance);
+      const jitterPct = stdDevMs / meanMs;
+      const bpmDelta = userBpm - targetBpm;
+      const deviationPct = Math.abs(bpmDelta) / targetBpm;
       // Tolerance: Lv1 ~8%, Lv2 ~6%, Lv3 ~5%
-      const tolerance = question.level <= 1 ? 0.08 : question.level <= 2 ? 0.06 : 0.05;
-      const score = Math.max(0, 1 - deviationPct / tolerance * 0.5);
+      const tolerancePct =
+        question.level <= 1 ? 0.08 : question.level <= 2 ? 0.06 : 0.05;
+      // Partial score now reflects both accuracy (mean BPM) and consistency (jitter).
+      // Each component decays linearly from 1 → 0 over a 2× tolerance band.
+      const accuracyScore = Math.max(0, 1 - deviationPct / (tolerancePct * 2));
+      const consistencyScore = Math.max(0, 1 - jitterPct / (tolerancePct * 2));
+      const partialScore = Math.min(1, 0.65 * accuracyScore + 0.35 * consistencyScore);
       return {
-        correct: deviationPct <= tolerance,
-        partialScore: Math.min(1, score),
+        correct: deviationPct <= tolerancePct,
+        partialScore,
         correctAnswer: correct,
+        details: {
+          kind: 'tempo',
+          targetBpm,
+          userBpm,
+          bpmDelta,
+          deviationPct,
+          tolerancePct,
+          intervalsMs,
+          intervalBpms,
+          meanIntervalMs: meanMs,
+          stdDevMs,
+          jitterPct,
+        },
       };
     }
 
