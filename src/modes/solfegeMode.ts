@@ -6,6 +6,7 @@ export const SOLFEGE_MODE_INFO = {
   name: '계명 (이동도)',
   emoji: '🎼',
   description: '기준음을 듣고 계명을 맞혀보세요',
+  howTo: '기준음(도)이 먼저 들리고 이어서 문제 음이 재생됩니다. 들은 음의 계명(도·레·미…)을 아래 버튼에서 선택하세요.',
   maxLevel: 3,
   defaultLevel: 1,
 };

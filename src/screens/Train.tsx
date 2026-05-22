@@ -38,7 +38,7 @@ import { Note } from 'tonal';
 import { semitoneToSolfege } from '../theory/solfege';
 import { topWeakItems } from '../engine/weakness';
 
-const MODE_INFO: Record<string, { name: string; emoji: string; maxLevel?: number }> = {
+const MODE_INFO: Record<string, { name: string; emoji: string; maxLevel?: number; howTo?: string }> = {
   interval: INTERVAL_MODE_INFO,
   chord: CHORD_MODE_INFO,
   solfege: SOLFEGE_MODE_INFO,
@@ -492,6 +492,14 @@ export function Train() {
           {isWeakSession && (
             <div className="badge-accent text-xs">
               ⚡ 약점 집중 세션 · {totalQuestions}문항
+            </div>
+          )}
+
+          {/* How-to */}
+          {modeInfo.howTo && (
+            <div className="card w-full max-w-sm">
+              <div className="text-sm font-semibold text-slate-600 mb-2">사용법</div>
+              <p className="text-sm text-slate-600 leading-relaxed">{modeInfo.howTo}</p>
             </div>
           )}
 

@@ -7,6 +7,7 @@ export const CHORD_MODE_INFO = {
   name: '코드 듣기',
   emoji: '🎹',
   description: '코드의 종류를 맞혀보세요',
+  howTo: '한 코드의 구성음이 동시 또는 분산으로 들립니다. 코드의 종류(메이저, 마이너, dim, 7 등)를 아래 버튼에서 선택하세요.',
   maxLevel: 4,
   defaultLevel: 1,
 };
