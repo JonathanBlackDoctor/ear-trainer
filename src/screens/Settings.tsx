@@ -2,12 +2,26 @@ import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { toast } from '../store/useToast';
+import { usePwaInstall } from '../hooks/usePwaInstall';
 
 export function Settings() {
   const navigate = useNavigate();
   const { settings, updateSettings, resetData, exportData, importData } = useStore();
   const fileRef = useRef<HTMLInputElement>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const { canInstall, isStandalone, isIOS, promptInstall } = usePwaInstall();
+
+  async function handleInstall() {
+    if (isIOS) {
+      toast.info("Safari 하단의 공유 메뉴를 눌러 '홈 화면에 추가'를 선택해 주세요.", 6000);
+      return;
+    }
+    const outcome = await promptInstall();
+    if (outcome === 'accepted') toast.success('앱 설치가 시작되었어요.');
+    else if (outcome === 'unavailable') {
+      toast.info('지금은 설치할 수 없어요. 브라우저 메뉴에서 설치를 시도해 보세요.', 5000);
+    }
+  }
 
   function handleExport() {
     try {
@@ -67,6 +81,29 @@ export function Settings() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 mt-5 space-y-4">
+        {/* PWA install — 설치된 상태면 숨김 */}
+        {!isStandalone && (isIOS || canInstall) && (
+          <div className="card">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-slate-600">앱으로 설치</div>
+                <div className="text-xs text-slate-400 mt-0.5">
+                  {isIOS
+                    ? '홈 화면에 추가하면 앱처럼 빠르게 열려요.'
+                    : '홈 화면/시작 메뉴에 추가하고 오프라인에서 사용해요.'}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn-primary text-sm whitespace-nowrap focus-ring"
+                onClick={handleInstall}
+              >
+                📲 앱으로 설치
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Notation */}
         <div className="card">
           <div className="text-sm font-semibold text-slate-600 mb-3">코드 표기 방식</div>
