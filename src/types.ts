@@ -160,10 +160,13 @@ export interface SessionResult {
   questionId: string;
   itemKey: string;
   mode: ModeKey;
+  level: number;          // level the question was generated at (for XP)
   correct: boolean;
   skipped: boolean;
   partialScore: number;
   timeTaken: number;
+  xpEarned: number;       // gamification: XP awarded for this answer
+  comboAtAnswer: number;  // gamification: combo length after this answer (0 if reset)
 }
 
 // ─── Stats Item ────────────────────────────────────────────────────────────────
@@ -200,6 +203,38 @@ export interface SrsCard {
 
 export type ModeSrs = Record<string, SrsCard>;
 
+// ─── Gamification ──────────────────────────────────────────────────────────────
+export type RankTier =
+  | 'bronze1' | 'bronze2' | 'bronze3'
+  | 'silver' | 'gold' | 'platinum' | 'diamond' | 'master';
+
+export interface XpAward {
+  base: number;
+  correctness: number;
+  speed: number;
+  combo: number;
+  total: number;
+}
+
+export interface AchievementUnlock {
+  unlockedAt: number;
+}
+
+export interface GamificationState {
+  totalXp: number;
+  achievements: Record<string, AchievementUnlock>;
+  bestComboByMode: Partial<Record<ModeKey, number>>;
+  lifetimeCorrect: number;
+  lifetimeAnswers: number;
+  perfectSessionCount: number;
+  modesEverTried: Partial<Record<ModeKey, boolean>>;
+  // For weakness_conquered detection. Key: `${mode}:${itemKey}`. Value: best
+  // accuracy (0..1) ever observed for that item after sufficient attempts.
+  weaknessConqueredSnapshot: Record<string, number>;
+  // Lifetime count of correct answers given in <1s, for the lightning achievement.
+  lightningCount: number;
+}
+
 // ─── App Store State ────────────────────────────────────────────────────────────
 export interface AppState {
   settings: AppSettings;
@@ -207,6 +242,7 @@ export interface AppState {
   sessions: SessionSummary[];
   customPatterns: string[][];
   srs: Record<ModeKey, ModeSrs>;
+  gamification: GamificationState;
 }
 
 export interface SessionSummary {
@@ -215,4 +251,6 @@ export interface SessionSummary {
   total: number;
   correct: number;
   durationSec: number;
+  bestCombo: number;
+  xpEarned: number;
 }
