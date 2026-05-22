@@ -1,4 +1,7 @@
 node_modules/
 dist/
+dev-dist/
 *.timestamp-*.mjs
+*.tsbuildinfo
 .DS_Store
+coverage/

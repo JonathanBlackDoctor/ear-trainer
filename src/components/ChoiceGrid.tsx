@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 
 export interface ChoiceOption {
   value: string;
@@ -14,8 +14,16 @@ interface ChoiceGridProps {
   onSelect: (value: string) => void;
   columns?: 2 | 3 | 4;
   disabled?: boolean;
+  /** Optional ARIA label for the radiogroup (e.g. "인터벌 보기"). */
+  ariaLabel?: string;
 }
 
+/**
+ * Choice grid with proper radiogroup semantics + keyboard support:
+ *   • Number keys (1–9) jump straight to that option.
+ *   • Arrow keys move focus between options without selecting.
+ *   • Space / Enter selects the focused option.
+ */
 export function ChoiceGrid({
   options,
   selected,
@@ -24,9 +32,30 @@ export function ChoiceGrid({
   onSelect,
   columns = 2,
   disabled = false,
+  ariaLabel,
 }: ChoiceGridProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Global number-key shortcuts (1..9). Skip while disabled/answered.
+  useEffect(() => {
+    if (disabled || answered) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.target instanceof HTMLElement) {
+        const tag = e.target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable) return;
+      }
+      const n = parseInt(e.key, 10);
+      if (Number.isFinite(n) && n >= 1 && n <= options.length) {
+        e.preventDefault();
+        onSelect(options[n - 1].value);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [disabled, answered, options, onSelect]);
+
   function btnClass(value: string): string {
-    const base = 'relative choice-btn py-4 px-2 text-lg min-h-[64px] touch-manipulation';
+    const base = 'relative choice-btn py-4 px-2 text-lg min-h-[64px] touch-manipulation focus-ring';
     if (answered) {
       if (value === correct) return `${base} choice-btn-correct`;
       if (value === selected && value !== correct) return `${base} choice-btn-wrong`;
@@ -42,27 +71,73 @@ export function ChoiceGrid({
     4: 'grid-cols-2 sm:grid-cols-4',
   }[columns];
 
+  function handleKeyNav(e: React.KeyboardEvent<HTMLButtonElement>, idx: number) {
+    const last = options.length - 1;
+    let next = -1;
+    switch (e.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        next = idx < last ? idx + 1 : 0;
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        next = idx > 0 ? idx - 1 : last;
+        break;
+      case 'Home':
+        next = 0;
+        break;
+      case 'End':
+        next = last;
+        break;
+    }
+    if (next >= 0) {
+      e.preventDefault();
+      const buttons = containerRef.current?.querySelectorAll<HTMLButtonElement>('button');
+      buttons?.[next]?.focus();
+    }
+  }
+
   return (
-    <div className={`grid ${gridCols} gap-3`}>
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          className={btnClass(opt.value)}
-          onClick={() => !disabled && !answered && onSelect(opt.value)}
-          disabled={disabled || (answered && opt.value !== correct && opt.value !== selected)}
-        >
-          <span className="block font-bold">{opt.label}</span>
-          {opt.sublabel && (
-            <span className="block text-sm font-normal opacity-70 mt-0.5">{opt.sublabel}</span>
-          )}
-          {answered && opt.value === correct && (
-            <span className="absolute top-1 right-2 text-emerald-500 text-lg">✓</span>
-          )}
-          {answered && opt.value === selected && opt.value !== correct && (
-            <span className="absolute top-1 right-2 text-red-500 text-lg">✗</span>
-          )}
-        </button>
-      ))}
+    <div
+      ref={containerRef}
+      role="radiogroup"
+      aria-label={ariaLabel ?? '답안 선택'}
+      className={`grid ${gridCols} gap-3`}
+    >
+      {options.map((opt, idx) => {
+        const isSelected = opt.value === selected;
+        const isCorrect = answered && opt.value === correct;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            role="radio"
+            aria-checked={isSelected}
+            aria-label={`${idx + 1}. ${opt.label}${opt.sublabel ? `, ${opt.sublabel}` : ''}`}
+            className={btnClass(opt.value)}
+            onClick={() => !disabled && !answered && onSelect(opt.value)}
+            onKeyDown={(e) => handleKeyNav(e, idx)}
+            disabled={disabled || (answered && opt.value !== correct && opt.value !== selected)}
+            tabIndex={answered ? -1 : isSelected || (selected === undefined && idx === 0) ? 0 : -1}
+          >
+            <span className="block font-bold">{opt.label}</span>
+            {opt.sublabel && (
+              <span className="block text-sm font-normal opacity-70 mt-0.5">{opt.sublabel}</span>
+            )}
+            {!answered && (
+              <span className="absolute top-1 left-2 text-[10px] font-mono text-slate-400 tabular-nums">
+                {idx + 1}
+              </span>
+            )}
+            {isCorrect && (
+              <span className="absolute top-1 right-2 text-emerald-500 text-lg" aria-hidden>✓</span>
+            )}
+            {answered && opt.value === selected && opt.value !== correct && (
+              <span className="absolute top-1 right-2 text-red-500 text-lg" aria-hidden>✗</span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }

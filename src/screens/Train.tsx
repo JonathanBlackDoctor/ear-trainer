@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import type {
   Question, ModeKey, SessionResult, ProgressionAnswer,
   IntervalData, ChordData, SolfegeData, MelodyData, ProgressionData, RhythmData,
@@ -35,6 +35,7 @@ import {
 import type { ChordStep } from '../types';
 import { Note } from 'tonal';
 import { semitoneToSolfege } from '../theory/solfege';
+import { topWeakItems } from '../engine/weakness';
 
 const MODE_INFO: Record<string, { name: string; emoji: string; maxLevel?: number }> = {
   interval: INTERVAL_MODE_INFO,
@@ -61,7 +62,9 @@ interface SessionState {
 export function Train() {
   const { mode } = useParams<{ mode: string }>();
   const navigate = useNavigate();
-  const { settings, stats, recordResult, addSession } = useStore();
+  const [searchParams] = useSearchParams();
+  const { settings, stats, srs, recordResult, addSession } = useStore();
+  const focusMode = searchParams.get('focus'); // 'weak' | null
 
   const [phase, setPhase] = useState<TrainPhase>('setup');
   const [session, setSession] = useState<SessionState | null>(null);
@@ -83,7 +86,21 @@ export function Train() {
 
   const modeKey = mode as ModeKey;
   const modeInfo = MODE_INFO[modeKey] ?? { name: modeKey, emoji: '🎵' };
-  const totalQuestions = settings.questionsPerSession;
+  const isWeakSession = focusMode === 'weak';
+  const totalQuestions = isWeakSession ? settings.weakSessionLength : settings.questionsPerSession;
+
+  // In weak-session mode, restrict the candidate pool to the top weak items
+  // (by mode). The factory uses this as a filter — falls back to full pool
+  // when the user has no recorded weakness yet.
+  const weakItemKeys = useMemo(() => {
+    if (!isWeakSession) return null;
+    const modeStats = stats[modeKey] ?? {};
+    const top = topWeakItems(modeStats, 8).filter((w) => modeStats[w.key]?.attempts > 0);
+    return new Set(top.map((w) => w.key));
+  }, [isWeakSession, modeKey, stats]);
+  const candidateFilter = weakItemKeys
+    ? (k: string) => weakItemKeys.has(k)
+    : undefined;
 
   // ─── Audio Init ─────────────────────────────────────────────────────────────
   async function handleAudioStart() {
@@ -154,17 +171,20 @@ export function Train() {
   function generateQuestion(idx: number): Question {
     const k = settings.keyMode;
     const fk = settings.fixedKey;
+    const last = session?.questions[idx - 1]?.itemKey;
+    const modeSrs = srs[modeKey];
+    const modeStats = stats[modeKey];
     switch (modeKey) {
-      case 'interval': return makeIntervalQuestion(level, k, fk, session?.questions[idx - 1]?.itemKey);
-      case 'chord': return makeChordQuestion(level, k, fk, false);
-      case 'solfege': return makeSolfegeQuestion(level, k, fk);
+      case 'interval': return makeIntervalQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter);
+      case 'chord': return makeChordQuestion(level, k, fk, false, last, modeSrs, modeStats, candidateFilter);
+      case 'solfege': return makeSolfegeQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter);
       case 'progression': return makeProgressionQuestion(level, k, fk, progressionSource);
       case 'melody': return makeMelodyQuestion(level, k, fk);
-      case 'transpose': return makeIntervalQuestion(level, k, fk); // simplified
+      case 'transpose': return makeIntervalQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter);
       case 'rhythm': return makeRhythmQuestion(level);
       case 'tempo': return makeTempoQuestion(level);
       case 'bpm': return makeBpmQuestion(level);
-      default: return makeIntervalQuestion(level, k, fk);
+      default: return makeIntervalQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter);
     }
   }
 
@@ -461,8 +481,13 @@ export function Train() {
         </div>
 
         <div className="flex-1 flex flex-col items-center justify-center px-4 gap-6">
-          <div className="text-6xl">{modeInfo.emoji}</div>
-          <h2 className="text-xl font-bold text-slate-800">{modeInfo.name}</h2>
+          <div className="text-6xl" aria-hidden>{modeInfo.emoji}</div>
+          <h1 className="text-xl font-bold text-slate-800">{modeInfo.name}</h1>
+          {isWeakSession && (
+            <div className="badge-accent text-xs">
+              ⚡ 약점 집중 세션 · {totalQuestions}문항
+            </div>
+          )}
 
           {/* Level selector */}
           <div className="card w-full max-w-sm">
@@ -540,10 +565,15 @@ export function Train() {
       <div className="bg-white border-b border-slate-100 px-4 py-3">
         <div className="max-w-lg mx-auto">
           <div className="flex items-center gap-3 mb-2">
-            <button className="btn-ghost py-1 px-2 text-sm" onClick={() => navigate('/')}>← 나가기</button>
+            <button className="btn-ghost py-1 px-2 text-sm focus-ring" onClick={() => navigate('/')}>← 나가기</button>
             <span className="font-semibold text-slate-700 text-sm">
               {modeInfo.emoji} {modeInfo.name} · Lv{level}
             </span>
+            {isWeakSession && (
+              <span className="badge-accent text-[10px] ml-auto" aria-label="약점 집중 세션">
+                약점 집중
+              </span>
+            )}
           </div>
           <ProgressBar current={currentIdx + (phase === 'feedback' ? 1 : 0)} total={totalQuestions} correct={correctCount} />
           {audioQuality === 'synth-fallback' && (

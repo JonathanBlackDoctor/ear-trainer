@@ -4,6 +4,9 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  // Class-based dark mode hook is wired but no dark variants are styled yet —
+  // toggling `<html class="dark">` is a future PR.
+  darkMode: 'class',
   theme: {
     extend: {
       fontFamily: {

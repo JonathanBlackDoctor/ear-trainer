@@ -1,21 +1,28 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
+import { toast } from '../store/useToast';
 
 export function Settings() {
   const navigate = useNavigate();
   const { settings, updateSettings, resetData, exportData, importData } = useStore();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   function handleExport() {
-    const json = exportData();
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `ear-trainer-backup-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const json = exportData();
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ear-trainer-backup-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('백업 파일을 내려받았습니다.');
+    } catch {
+      toast.error('백업 파일을 만들지 못했습니다.');
+    }
   }
 
   function handleImportClick() {
@@ -29,24 +36,33 @@ export function Settings() {
     reader.onload = (ev) => {
       const json = ev.target?.result as string;
       const ok = importData(json);
-      alert(ok ? '✅ 데이터 가져오기 완료!' : '❌ 파일 형식이 올바르지 않습니다.');
+      if (ok) toast.success('데이터 가져오기를 완료했어요.');
+      else toast.error('파일 형식이 올바르지 않습니다.');
     };
+    reader.onerror = () => toast.error('파일을 읽지 못했습니다.');
     reader.readAsText(file);
+    // input value 초기화 — 같은 파일 다시 선택 시에도 onChange 트리거되게.
+    e.target.value = '';
   }
 
   function handleReset() {
-    if (confirm('모든 학습 기록을 초기화하시겠습니까? 되돌릴 수 없습니다.')) {
-      resetData();
-      alert('초기화 완료.');
+    if (!confirmReset) {
+      setConfirmReset(true);
+      // 5초 안에 한 번 더 누르면 실행 — 모달 없이 안전한 더블 컨펌.
+      window.setTimeout(() => setConfirmReset(false), 5000);
+      return;
     }
+    resetData();
+    setConfirmReset(false);
+    toast.success('학습 기록을 초기화했습니다.');
   }
 
   return (
     <div className="min-h-screen bg-slate-50 pb-10">
       <div className="bg-white border-b border-slate-100 px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center gap-3">
-          <button className="btn-ghost" onClick={() => navigate('/')}>← 뒤로</button>
-          <span className="font-semibold text-slate-700">⚙️ 설정</span>
+          <button className="btn-ghost focus-ring" onClick={() => navigate('/')} aria-label="홈으로 돌아가기">← 뒤로</button>
+          <h1 className="font-semibold text-slate-700">⚙️ 설정</h1>
         </div>
       </div>
 
@@ -151,10 +167,34 @@ export function Settings() {
             value={settings.questionsPerSession}
             onChange={(e) => updateSettings({ questionsPerSession: Number(e.target.value) })}
             className="w-full accent-primary-600"
+            aria-label="세션 문항 수"
           />
           <div className="flex justify-between text-xs text-slate-400 mt-1">
             <span>5</span><span>10</span><span>15</span><span>20</span><span>25</span><span>30</span>
           </div>
+        </div>
+
+        {/* Weak-session length */}
+        <div className="card">
+          <div className="text-sm font-semibold text-slate-600 mb-3">
+            약점 집중 세션 문항 수: <span className="text-accent-600 font-bold">{settings.weakSessionLength}</span>
+          </div>
+          <input
+            type="range"
+            min={5}
+            max={20}
+            step={5}
+            value={settings.weakSessionLength}
+            onChange={(e) => updateSettings({ weakSessionLength: Number(e.target.value) })}
+            className="w-full accent-accent-500"
+            aria-label="약점 집중 세션 문항 수"
+          />
+          <div className="flex justify-between text-xs text-slate-400 mt-1">
+            <span>5</span><span>10</span><span>15</span><span>20</span>
+          </div>
+          <p className="text-xs text-slate-400 mt-2">
+            홈 화면에서 약점 항목을 누르면 이 길이만큼 집중 연습합니다.
+          </p>
         </div>
 
         {/* Difficulty */}
@@ -212,8 +252,16 @@ export function Settings() {
             <button className="w-full btn-secondary text-sm" onClick={handleImportClick}>
               📥 기록 가져오기 (JSON)
             </button>
-            <button className="w-full text-red-500 border-2 border-red-200 bg-red-50 rounded-xl py-3 text-sm font-semibold" onClick={handleReset}>
-              🗑️ 기록 초기화
+            <button
+              className={`w-full rounded-xl py-3 text-sm font-semibold border-2 transition-colors focus-ring ${
+                confirmReset
+                  ? 'bg-danger-500 text-white border-danger-600 animate-pulse motion-reduce:animate-none'
+                  : 'text-danger-600 border-danger-200 bg-danger-50 hover:bg-danger-100'
+              }`}
+              onClick={handleReset}
+              aria-label={confirmReset ? '한 번 더 눌러 초기화 확정' : '학습 기록 초기화'}
+            >
+              {confirmReset ? '⚠️ 한 번 더 눌러 확정 (5초)' : '🗑️ 기록 초기화'}
             </button>
           </div>
           <p className="text-xs text-slate-400 mt-3">

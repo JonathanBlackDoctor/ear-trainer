@@ -11,7 +11,7 @@ import {
   TEMPO_MODE_INFO,
   BPM_MODE_INFO,
 } from '../modes/progressionMode';
-import type { ModeKey } from '../types';
+import type { ModeKey, ModeStats } from '../types';
 import { useStore } from '../store/useStore';
 import { topWeakItems } from '../engine/weakness';
 
@@ -55,10 +55,18 @@ export function Home() {
     navigate(`/train/${key}`);
   }
 
-  // Get top weak items across all modes
-  const weakItems = Object.entries(stats)
+  function startWeakSession(mode: string) {
+    navigate(`/train/${mode}?focus=weak`);
+  }
+
+  // Get top weak items across all modes — only include items the user has
+  // actually attempted, so brand-new users don't see a "weakness" card that's
+  // really just unseen items.
+  const weakItems = (Object.entries(stats) as [string, ModeStats][])
     .flatMap(([mode, modeStats]) =>
-      topWeakItems(modeStats as any, 2).map((w) => ({ ...w, mode }))
+      topWeakItems(modeStats, 2)
+        .filter((w) => (modeStats[w.key]?.attempts ?? 0) > 0)
+        .map((w) => ({ ...w, mode })),
     )
     .sort((a, b) => b.score - a.score)
     .slice(0, 3);
@@ -134,15 +142,21 @@ export function Home() {
             </div>
             <div className="space-y-1.5">
               {weakItems.map((w) => (
-                <div
+                <button
                   key={w.key + w.mode}
-                  className="flex items-center justify-between text-sm bg-white/60 rounded-lg px-3 py-2"
+                  className="w-full flex items-center justify-between text-sm bg-white/60 rounded-lg px-3 py-2 hover:bg-white active:scale-95 transition-all focus-ring text-left"
+                  onClick={() => startWeakSession(w.mode)}
+                  aria-label={`${w.key} 약점 집중 연습 시작`}
                 >
-                  <span className="text-slate-700 font-medium">{w.key}</span>
-                  <span className="text-accent-700 font-semibold tabular-nums text-xs">
-                    약점 {Math.round(w.score * 100)}점
+                  <span className="text-slate-700 font-medium flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider">{w.mode}</span>
+                    <span>{w.key}</span>
                   </span>
-                </div>
+                  <span className="text-accent-700 font-semibold tabular-nums text-xs flex items-center gap-1">
+                    약점 {Math.round(w.score * 100)}점
+                    <span aria-hidden>→</span>
+                  </span>
+                </button>
               ))}
             </div>
           </div>

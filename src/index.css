@@ -22,10 +22,29 @@
   }
   #root {
     min-height: 100%;
+    /* iOS PWA 안전 영역 (notch) */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
   }
   /* 큰 숫자에 자연스럽게 tabular numerals 적용 */
   .font-display, .tabular-nums {
     font-feature-settings: 'tnum' 1, 'ss01' 1;
+  }
+  /* 접근성: 키보드 포커스만 강조 (마우스 클릭은 깔끔하게) */
+  :focus { outline: none; }
+  :focus-visible {
+    outline: 3px solid theme('colors.primary.500');
+    outline-offset: 2px;
+    border-radius: 8px;
+  }
+  /* prefers-reduced-motion 사용자에게는 keyframe 애니메이션 비활성화 */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
@@ -132,6 +151,11 @@
 }
 
 @layer utilities {
+  /* 키보드 포커스 강조 유틸리티 — choice-btn 등에 직접 적용 */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary-300 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas-50;
+  }
+
   /* 모드 카드별 색상 띠 변수 헬퍼 */
   .accent-solfege     { --mode-accent: #f59e0b; } /* 골드 */
   .accent-interval    { --mode-accent: #6366f1; } /* 인디고 */

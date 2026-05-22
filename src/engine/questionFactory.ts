@@ -1,10 +1,23 @@
 import { Note, Scale } from 'tonal';
-import type { Question, ChordStep, ProgressionAnswer, ModeKey } from '../types';
+import type { Question, ChordStep, ProgressionAnswer, ModeKey, ModeSrs, ModeStats } from '../types';
 import { INTERVAL_LEVELS, type IntervalDirection, randomNote, pickRandom } from '../theory/intervals';
 import { CHORD_LEVELS, buildChord } from '../theory/chords';
 import { COMMON_KEYS, randomDiatonicProgression, randomPraiseProgression, degreeToNote, getScaleNotes } from '../theory/progressions';
 import { semitoneToSolfege } from '../theory/solfege';
 import { transposeNote } from '../theory/transpose';
+import { pickDue } from './srs';
+
+/** SRS-aware target picker. Falls back to a random item when SRS is empty. */
+export function nextTarget(
+  candidates: string[],
+  srs: ModeSrs | undefined,
+  stats: ModeStats | undefined,
+  lastKey?: string
+): string {
+  if (candidates.length === 0) return '';
+  if (!srs || !stats) return pickRandom(candidates);
+  return pickDue(srs, stats, candidates, Date.now(), lastKey);
+}
 
 function randomKey(keyMode: 'fixed' | 'random', fixedKey: string): string {
   if (keyMode === 'fixed') return fixedKey;
@@ -21,16 +34,24 @@ export function makeIntervalQuestion(
   level: number,
   keyMode: 'fixed' | 'random',
   fixedKey: string,
-  lastItemKey?: string
+  lastItemKey?: string,
+  srs?: ModeSrs,
+  stats?: ModeStats,
+  candidateFilter?: (key: string) => boolean
 ): Question {
   const intervals = INTERVAL_LEVELS[level] ?? INTERVAL_LEVELS[1];
-  const available = intervals.filter((i) => i !== lastItemKey);
-  const intervalName = available.length > 0 ? pickRandom(available) : pickRandom(intervals);
-
   const directions: IntervalDirection[] = level >= 2
     ? ['up', 'down', 'harmonic']
     : ['up', 'harmonic'];
-  const direction = pickRandom(directions);
+  // Build all itemKey candidates as `${name}_${direction}` so SRS can pick the
+  // most overdue. Apply caller-supplied filter (e.g. weak-only sessions).
+  const allItemKeys = intervals.flatMap((n) => directions.map((d) => `${n}_${d}`));
+  const filteredKeys = candidateFilter
+    ? allItemKeys.filter(candidateFilter)
+    : allItemKeys;
+  const itemKeys = filteredKeys.length > 0 ? filteredKeys : allItemKeys;
+  const chosenItemKey = nextTarget(itemKeys, srs, stats, lastItemKey);
+  const [intervalName, direction] = chosenItemKey.split('_') as [string, IntervalDirection];
 
   // Pick a root note that keeps both notes in range
   const rootNote = randomNote('C3', 'G4');
@@ -39,7 +60,7 @@ export function makeIntervalQuestion(
   const secondNote = Note.fromMidi(secondMidi) ?? 'C4';
 
   const notes = direction === 'down' ? [rootNote, secondNote] : [rootNote, secondNote];
-  const itemKey = `${intervalName}_${direction}`;
+  const itemKey = chosenItemKey;
 
   return {
     id: genId(),
@@ -65,16 +86,22 @@ export function makeChordQuestion(
   keyMode: 'fixed' | 'random',
   fixedKey: string,
   arpeggio: boolean,
-  lastItemKey?: string
+  lastItemKey?: string,
+  srs?: ModeSrs,
+  stats?: ModeStats,
+  candidateFilter?: (key: string) => boolean
 ): Question {
   const qualities = CHORD_LEVELS[level] ?? CHORD_LEVELS[1];
-  const available = qualities.filter((q) => q !== lastItemKey);
-  const quality = available.length > 0 ? pickRandom(available) : pickRandom(qualities);
+  const inversions = level >= 4 ? [0, 1] : [0];
+  const allItemKeys = qualities.flatMap((q) => inversions.map((inv) => `${q}_inv${inv}`));
+  const filtered = candidateFilter ? allItemKeys.filter(candidateFilter) : allItemKeys;
+  const itemKeys = filtered.length > 0 ? filtered : allItemKeys;
+  const itemKey = nextTarget(itemKeys, srs, stats, lastItemKey);
+  const [quality, invStr] = itemKey.split('_inv');
+  const inversion = parseInt(invStr, 10) || 0;
 
-  const inversion = level >= 4 ? Math.floor(Math.random() * 2) : 0;
   const rootNote = randomNote('C3', 'G4');
   const notes = buildChord(rootNote, quality, inversion);
-  const itemKey = `${quality}_inv${inversion}`;
 
   return {
     id: genId(),
@@ -189,13 +216,16 @@ export function makeSolfegeQuestion(
   level: number,
   keyMode: 'fixed' | 'random',
   fixedKey: string,
-  lastItemKey?: string
+  lastItemKey?: string,
+  srs?: ModeSrs,
+  stats?: ModeStats,
+  candidateFilter?: (key: string) => boolean
 ): Question {
   const key = level >= 3 ? randomKey(keyMode, fixedKey) : fixedKey;
   const scale = getScaleNotes(key, 4);
 
-  // Level 1: diatonic only; Level 2+: include chromatic
-  const candidates = level <= 1 ? scale : [
+  // Level 1: diatonic only; Level 2+: include chromatic.
+  const noteCandidates = level <= 1 ? scale : [
     ...scale,
     ...[1, 3, 6, 8, 10].map((st) => {
       const midi = (Note.midi(scale[0]) ?? 60) + st;
@@ -203,8 +233,21 @@ export function makeSolfegeQuestion(
     }),
   ];
 
-  const available = candidates.filter((n) => n !== lastItemKey);
-  const note = available.length > 0 ? pickRandom(available) : pickRandom(candidates);
+  // Build itemKey-indexed pool so SRS can pick by syllable. Itemkey →
+  // representative note, then we let SRS select among unique itemKeys.
+  const keyToNote = new Map<string, string>();
+  for (const n of noteCandidates) {
+    const noteMidi = Note.midi(n) ?? 60;
+    const tonicMidi = Note.midi(key + '4') ?? 60;
+    const semis = ((noteMidi - tonicMidi) % 12 + 12) % 12;
+    const ik = `solfege_${semitoneToSolfege(semis)}`;
+    if (!keyToNote.has(ik)) keyToNote.set(ik, n);
+  }
+  const allItemKeys = Array.from(keyToNote.keys());
+  const filtered = candidateFilter ? allItemKeys.filter(candidateFilter) : allItemKeys;
+  const itemKeys = filtered.length > 0 ? filtered : allItemKeys;
+  const itemKey = nextTarget(itemKeys, srs, stats, lastItemKey);
+  const note = keyToNote.get(itemKey) ?? noteCandidates[0];
 
   const tonicMidi = Note.midi(key + '4') ?? 60;
   const noteMidi = Note.midi(note) ?? 60;
@@ -215,7 +258,7 @@ export function makeSolfegeQuestion(
     id: genId(),
     mode: 'solfege',
     level,
-    itemKey: `solfege_${solfegeAnswer}`,
+    itemKey,
     data: { type: 'solfege', note, solfege: solfegeAnswer, key },
     answer: solfegeAnswer,
     context: { key, referenceToneNote: key + '4' },

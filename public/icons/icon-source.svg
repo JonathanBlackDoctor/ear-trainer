@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Brand: deep indigo background, gold accent treble clef -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4338ca"/>
+      <stop offset="1" stop-color="#312e81"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fcd34d"/>
+      <stop offset="1" stop-color="#d97706"/>
+    </linearGradient>
+  </defs>
+  <!-- App-shaped rounded square (~24% safe area inset for maskable) -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <!-- Inner card -->
+  <rect x="56" y="56" width="400" height="400" rx="64" fill="none" stroke="#a5b4fc" stroke-width="3" opacity="0.35"/>
+  <!-- Stylized ear training: 5-line staff -->
+  <g stroke="#fde68a" stroke-width="4" opacity="0.7">
+    <line x1="112" y1="180" x2="400" y2="180"/>
+    <line x1="112" y1="210" x2="400" y2="210"/>
+    <line x1="112" y1="240" x2="400" y2="240"/>
+    <line x1="112" y1="270" x2="400" y2="270"/>
+    <line x1="112" y1="300" x2="400" y2="300"/>
+  </g>
+  <!-- Note head + stem -->
+  <ellipse cx="300" cy="270" rx="34" ry="26" fill="url(#gold)" transform="rotate(-22 300 270)"/>
+  <rect x="328" y="160" width="8" height="120" fill="url(#gold)"/>
+  <!-- Sound waves emanating from note -->
+  <g fill="none" stroke="#fde68a" stroke-width="6" stroke-linecap="round" opacity="0.85">
+    <path d="M 370 230 q 28 16 28 50"/>
+    <path d="M 392 210 q 42 26 42 78"/>
+  </g>
+  <!-- Bottom label area: dot grid for piano keys -->
+  <g fill="#e0e7ff">
+    <rect x="120" y="350" width="40" height="68" rx="6"/>
+    <rect x="168" y="350" width="40" height="68" rx="6"/>
+    <rect x="216" y="350" width="40" height="68" rx="6"/>
+    <rect x="264" y="350" width="40" height="68" rx="6"/>
+    <rect x="312" y="350" width="40" height="68" rx="6"/>
+    <rect x="360" y="350" width="40" height="68" rx="6"/>
+  </g>
+  <g fill="#1e1b4b">
+    <rect x="148" y="350" width="20" height="42" rx="3"/>
+    <rect x="196" y="350" width="20" height="42" rx="3"/>
+    <rect x="292" y="350" width="20" height="42" rx="3"/>
+    <rect x="340" y="350" width="20" height="42" rx="3"/>
+    <rect x="388" y="350" width="20" height="42" rx="3"/>
+  </g>
+</svg>

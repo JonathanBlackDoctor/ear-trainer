@@ -1,6 +1,17 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Note } from 'tonal';
 import { startAudio, playNote } from '../audio/piano';
+
+// Computer-keyboard → piano-key map. Two rows:
+//   Lower row (a..k)  = white keys C..C (one octave + tonic).
+//   Upper row (w..u)  = black keys interleaved (C#, D#, F#, G#, A#).
+// Keys outside this set are ignored. The mapping is anchored to the
+// `startOctave + 1` octave so the visible keyboard's middle range is reachable.
+const KEYBOARD_MAP_RELATIVE: Record<string, [string, number]> = {
+  a: ['C', 0], s: ['D', 0], d: ['E', 0], f: ['F', 0],
+  g: ['G', 0], h: ['A', 0], j: ['B', 0], k: ['C', 1],
+  w: ['C#', 0], e: ['D#', 0], t: ['F#', 0], y: ['G#', 0], u: ['A#', 0],
+};
 
 interface PianoProps {
   startOctave?: number;
@@ -64,6 +75,29 @@ export function Piano({
     onNotePress?.(note);
   }
 
+  // Keyboard input — anchored one octave above startOctave so the typical
+  // C4-region is reachable on the home row.
+  useEffect(() => {
+    if (disabled) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.target instanceof HTMLElement) {
+        const tag = e.target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable) return;
+      }
+      const mapping = KEYBOARD_MAP_RELATIVE[e.key.toLowerCase()];
+      if (!mapping) return;
+      const [pc, octOffset] = mapping;
+      const oct = startOctave + 1 + octOffset;
+      if (oct < startOctave || oct > endOctave) return;
+      e.preventDefault();
+      handlePress(`${pc}${oct}`);
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [disabled, startOctave, endOctave]);
+
   return (
     <div className="overflow-x-auto w-full pb-2">
       <div
@@ -90,9 +124,10 @@ export function Piano({
                   height: keyHeight,
                 }}
                 onPointerDown={() => handlePress(note)}
-                aria-label={note}
+                aria-label={`${note} 건반`}
+                type="button"
               >
-                <span className="absolute bottom-1 left-0 right-0 text-center text-xs text-slate-400">
+                <span className="absolute bottom-1 left-0 right-0 text-center text-xs text-slate-400" aria-hidden>
                   {pc}{oct}
                 </span>
               </button>
@@ -117,7 +152,8 @@ export function Piano({
                   height: blackHeight,
                 }}
                 onPointerDown={() => handlePress(note)}
-                aria-label={note}
+                aria-label={`${note} 검은 건반`}
+                type="button"
               />
             );
           })

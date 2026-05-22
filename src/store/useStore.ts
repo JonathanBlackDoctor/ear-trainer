@@ -4,23 +4,25 @@ import type {
   AppSettings,
   ModeStats,
   SessionSummary,
-  StatsItem,
   ModeKey,
   SessionResult,
+  ModeSrs,
 } from '../types';
+import { CURRENT_SCHEMA_VERSION, migrate, migrateImport } from './migrate';
+import { ensureCard, updateCard } from '../engine/srs';
 
 interface Store {
   settings: AppSettings;
   stats: Record<ModeKey, ModeStats>;
   sessions: SessionSummary[];
   customPatterns: string[][];
+  srs: Record<ModeKey, ModeSrs>;
 
   // Settings
   updateSettings: (patch: Partial<AppSettings>) => void;
 
-  // Stats
+  // Stats / SRS
   recordResult: (result: SessionResult) => void;
-  getItem: (mode: ModeKey, itemKey: string) => StatsItem;
   addSession: (summary: SessionSummary) => void;
 
   // Export / Import
@@ -38,9 +40,12 @@ const defaultSettings: AppSettings = {
   difficultyMode: 'adaptive',
   questionsPerSession: 10,
   showStaffFeedback: true,
+  weakSessionLength: 10,
+  reducedMotion: 'system',
 };
 
 const emptyModeStats = (): ModeStats => ({});
+const emptyModeSrs = (): ModeSrs => ({});
 
 const defaultStats = (): Record<ModeKey, ModeStats> => ({
   interval: emptyModeStats(),
@@ -54,11 +59,16 @@ const defaultStats = (): Record<ModeKey, ModeStats> => ({
   bpm: emptyModeStats(),
 });
 
-const defaultItem = (): StatsItem => ({
-  attempts: 0,
-  correct: 0,
-  recent: [],
-  lastSeen: 0,
+const defaultSrs = (): Record<ModeKey, ModeSrs> => ({
+  interval: emptyModeSrs(),
+  chord: emptyModeSrs(),
+  progression: emptyModeSrs(),
+  melody: emptyModeSrs(),
+  solfege: emptyModeSrs(),
+  transpose: emptyModeSrs(),
+  rhythm: emptyModeSrs(),
+  tempo: emptyModeSrs(),
+  bpm: emptyModeSrs(),
 });
 
 const RECENT_WINDOW = 8;
@@ -71,6 +81,7 @@ export const useStore = create<Store>()(
       stats: defaultStats(),
       sessions: [],
       customPatterns: [],
+      srs: defaultSrs(),
 
       updateSettings: (patch) => {
         set((s) => ({ settings: { ...s.settings, ...patch } }));
@@ -78,8 +89,11 @@ export const useStore = create<Store>()(
 
       recordResult: (result) => {
         set((s) => {
+          // Stats update (rolling 8-window)
           const modeStats = { ...s.stats[result.mode] };
-          const existing = modeStats[result.itemKey] ?? defaultItem();
+          const existing = modeStats[result.itemKey] ?? {
+            attempts: 0, correct: 0, recent: [], lastSeen: 0,
+          };
           const recent = [
             ...existing.recent.slice(-(RECENT_WINDOW - 1)),
             result.correct ? 1 : 0,
@@ -90,15 +104,18 @@ export const useStore = create<Store>()(
             recent,
             lastSeen: Date.now(),
           };
+
+          // SRS update — uses the freshly-updated stats so a newly-created
+          // card seeds its ease from the latest weakness score.
+          const modeSrs = { ...s.srs[result.mode] };
+          const card = ensureCard(modeSrs, modeStats, result.itemKey);
+          modeSrs[result.itemKey] = updateCard(card, result.correct ? 1 : 0);
+
           return {
             stats: { ...s.stats, [result.mode]: modeStats },
+            srs: { ...s.srs, [result.mode]: modeSrs },
           };
         });
-      },
-
-      getItem: (mode, itemKey) => {
-        const s = get();
-        return s.stats[mode]?.[itemKey] ?? defaultItem();
       },
 
       addSession: (summary) => {
@@ -109,9 +126,9 @@ export const useStore = create<Store>()(
       },
 
       exportData: () => {
-        const { settings, stats, sessions, customPatterns } = get();
+        const { settings, stats, sessions, customPatterns, srs } = get();
         return JSON.stringify(
-          { schemaVersion: 1, settings, stats, sessions, customPatterns },
+          { schemaVersion: CURRENT_SCHEMA_VERSION, settings, stats, sessions, customPatterns, srs },
           null,
           2
         );
@@ -119,13 +136,21 @@ export const useStore = create<Store>()(
 
       importData: (json) => {
         try {
-          const data = JSON.parse(json);
-          if (!data.schemaVersion) return false;
+          const raw = JSON.parse(json);
+          if (typeof raw !== 'object' || raw === null) return false;
+          const data = migrateImport(raw) as Partial<{
+            settings: Partial<AppSettings>;
+            stats: Record<ModeKey, ModeStats>;
+            sessions: SessionSummary[];
+            customPatterns: string[][];
+            srs: Record<ModeKey, ModeSrs>;
+          }>;
           set({
             settings: { ...defaultSettings, ...(data.settings ?? {}) },
             stats: { ...defaultStats(), ...(data.stats ?? {}) },
             sessions: data.sessions ?? [],
             customPatterns: data.customPatterns ?? [],
+            srs: { ...defaultSrs(), ...(data.srs ?? {}) },
           });
           return true;
         } catch {
@@ -134,11 +159,13 @@ export const useStore = create<Store>()(
       },
 
       resetData: () => {
-        set({ stats: defaultStats(), sessions: [] });
+        set({ stats: defaultStats(), sessions: [], srs: defaultSrs() });
       },
     }),
     {
       name: 'eartrainer_state_v1',
+      version: CURRENT_SCHEMA_VERSION,
+      migrate: (persistedState, version) => migrate(persistedState, version),
     }
   )
 );

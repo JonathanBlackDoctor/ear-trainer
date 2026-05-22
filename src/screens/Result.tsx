@@ -1,5 +1,5 @@
-import React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import type { ModeKey, SessionResult } from '../types';
 
 interface ResultState {
@@ -15,9 +15,14 @@ export function Result() {
   const location = useLocation();
   const state = location.state as ResultState | null;
 
+  // When the PWA cold-restarts on /result (no router state), bounce home
+  // immediately rather than rendering an empty card. Using <Navigate /> instead
+  // of imperative navigate() avoids the "setState during render" warning.
+  useEffect(() => {
+    // no-op: kept for symmetry with future analytics
+  }, []);
   if (!state) {
-    navigate('/');
-    return null;
+    return <Navigate to="/" replace />;
   }
 
   const { mode, total, correct, results, durationSec } = state;
@@ -31,7 +36,7 @@ export function Result() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <div className="bg-white border-b border-slate-100 px-4 py-4">
-        <div className="max-w-lg mx-auto font-semibold text-slate-700">세션 결과</div>
+        <h1 className="max-w-lg mx-auto font-semibold text-slate-700">세션 결과</h1>
       </div>
 
       <div className="flex-1 max-w-lg mx-auto px-4 py-6 space-y-5">

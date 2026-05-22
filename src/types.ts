@@ -155,7 +155,19 @@ export interface AppSettings {
   difficultyMode: 'manual' | 'adaptive';
   questionsPerSession: number;
   showStaffFeedback: boolean;
+  weakSessionLength: number;
+  reducedMotion: 'system' | 'on' | 'off';
 }
+
+// ─── SRS (Spaced Repetition) ───────────────────────────────────────────────────
+export interface SrsCard {
+  ease: number;      // 1.3 ~ 2.8, SM-2 ease factor
+  interval: number;  // current interval in minutes
+  due: number;       // timestamp ms when next due
+  reps: number;      // successful reps in a row
+}
+
+export type ModeSrs = Record<string, SrsCard>;
 
 // ─── App Store State ────────────────────────────────────────────────────────────
 export interface AppState {
@@ -163,6 +175,7 @@ export interface AppState {
   stats: Record<ModeKey, ModeStats>;
   sessions: SessionSummary[];
   customPatterns: string[][];
+  srs: Record<ModeKey, ModeSrs>;
 }
 
 export interface SessionSummary {

@@ -2,15 +2,36 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>&#xC74C;&#xAC10; &#xD6C8;&#xB828;</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <title>음감 훈련 — 교회 반주자를 위한 귀 훈련</title>
+    <meta name="description" content="인터벌·코드·진행·솔페지·멜로디·리듬·템포까지 9가지 모드로 매일 5분 음감 훈련. 오프라인 PWA, 약점 집중 학습, 간격 반복(SRS)." />
+    <meta name="theme-color" content="#3730a3" />
+    <meta name="color-scheme" content="light" />
+
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+
+    <!-- iOS PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="음감 훈련" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="음감 훈련" />
+    <meta property="og:description" content="교회 반주자를 위한 귀 훈련 — 9가지 모드, 약점 집중, 오프라인 PWA" />
+    <meta property="og:image" content="./og.png" />
+    <meta property="og:locale" content="ko_KR" />
+    <meta name="twitter:card" content="summary_large_image" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;900&family=Noto+Serif+KR:wght@500;700;900&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div id="root"></div>
+    <noscript>이 앱을 사용하려면 자바스크립트를 활성화해 주세요.</noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

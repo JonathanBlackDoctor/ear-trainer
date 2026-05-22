@@ -65,8 +65,8 @@ export function Stats() {
     <div className="min-h-screen bg-slate-50 pb-8">
       <div className="bg-white border-b border-slate-100 px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center gap-3">
-          <button className="btn-ghost" onClick={() => navigate('/')}>← 뒤로</button>
-          <span className="font-semibold text-slate-700">📊 통계</span>
+          <button className="btn-ghost focus-ring" onClick={() => navigate('/')} aria-label="홈으로 돌아가기">← 뒤로</button>
+          <h1 className="font-semibold text-slate-700">📊 통계</h1>
         </div>
       </div>
 
