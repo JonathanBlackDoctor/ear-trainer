@@ -8,8 +8,11 @@ let outputGain: Tone.Gain | null = null;
 let audioStarted = false;
 let samplerReady = false;
 let samplerFailed = false;
-// Salamander Grand Piano samples (public CDN) — used as a quality upgrade only.
-const SALAMANDER_BASE = 'https://tonejs.github.io/audio/salamander/';
+// Salamander Grand Piano samples bundled locally under public/samples/piano/.
+// Serving from the same origin removes the CDN round-trip so the sampler is
+// ready before the first question plays — the synth fallback below is only a
+// safety net for the brief window before decoding completes.
+const SALAMANDER_BASE = `${import.meta.env.BASE_URL}samples/piano/`;
 const SAMPLE_NOTES: Record<string, string> = {
   A0: 'A0.mp3',  C1: 'C1.mp3',  Ds1: 'Ds1.mp3', Fs1: 'Fs1.mp3',
   A1: 'A1.mp3',  C2: 'C2.mp3',  Ds2: 'Ds2.mp3', Fs2: 'Fs2.mp3',
@@ -41,14 +44,20 @@ function getOutputGain(): Tone.Gain {
 }
 
 // ─── Instrument setup ───────────────────────────────────────────────────────
-/** Built-in synth — no network needed, always works. */
+// FMSynth mimics a piano better than a plain triangle: sharp transient,
+// long natural decay to silence (sustain: 0), and a modulator envelope that
+// dies off fast so the bright "ping" only colors the attack.
 function getSynth(): Tone.PolySynth {
   if (!synth) {
-    synth = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: 'triangle' },
-      envelope: { attack: 0.005, decay: 0.3, sustain: 0.35, release: 1.4 },
+    synth = new Tone.PolySynth(Tone.FMSynth, {
+      harmonicity: 3,
+      modulationIndex: 14,
+      oscillator: { type: 'sine' },
+      envelope: { attack: 0.005, decay: 1.2, sustain: 0, release: 1.5 },
+      modulation: { type: 'square' },
+      modulationEnvelope: { attack: 0.002, decay: 0.4, sustain: 0, release: 0.5 },
     }).connect(getOutputGain());
-    synth.volume.value = -8;
+    synth.volume.value = -10;
   }
   return synth;
 }
