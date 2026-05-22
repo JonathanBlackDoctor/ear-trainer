@@ -142,11 +142,17 @@ export function Train() {
   // after samples actually finished loading.
   useEffect(() => {
     if (!audioReady) return;
+    let attempts = 0;
     const id = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      attempts++;
       const q = getAudioStatus();
       setAudioQuality((prev) => (prev === q ? prev : q));
-      if (q === 'piano') clearInterval(id);
-    }, 1000);
+      // Cap the polling: stop once the sampler reports ready, or after ~30s
+      // total. Without this cap a stalled sampler would keep the 1 Hz wake
+      // alive for the entire session, preventing mobile devices from idling.
+      if (q === 'piano' || attempts >= 15) clearInterval(id);
+    }, 2000);
     return () => clearInterval(id);
   }, [audioReady]);
 
@@ -229,7 +235,7 @@ export function Train() {
   }
 
   // ─── Playback ─────────────────────────────────────────────────────────────
-  async function playQuestion(q: Question, speed = 1.0) {
+  async function playQuestion(q: Question, speed = 1.0, includeReference = true) {
     // Cut any audio left over from the previous question (release tails,
     // notes still queued in the future) before starting the new one.
     stopAllAudio();
@@ -241,10 +247,13 @@ export function Train() {
     setLoading(true);
     try {
       // Play reference tone if enabled (skip entirely in absolute-pitch mode).
-      // Transpose mode forces the tonic — it's the anchor for the degree
-      // answer, so we play it even when the user has reference tones off.
+      // Transpose mode forces the tonic on the initial auto-play — it's the
+      // anchor for the degree answer — even if the user has reference tones
+      // off. The "듣기" button passes includeReference=false to keep replays
+      // from re-sounding the tonic (separate reference button is available).
       const forceReference = q.mode === 'transpose';
       if (
+        includeReference &&
         !q.context?.absoluteMode &&
         (forceReference || settings.referenceTone === 'perQuestion') &&
         q.context?.referenceToneNote
@@ -726,7 +735,7 @@ export function Train() {
         <div className="max-w-lg mx-auto px-4 py-5 space-y-5">
           {/* Playback */}
           <PlaybackControls
-            onPlay={(speed) => playQuestion(currentQuestion, speed)}
+            onPlay={(speed) => playQuestion(currentQuestion, speed, false)}
             onPlayReference={handlePlayReference}
             showReference={!isAbsolute && settings.referenceTone !== 'off' && !!currentQuestion?.context?.referenceToneNote}
             loading={loading}
