@@ -326,9 +326,9 @@ export function judge(question: Question, userAnswer: AnswerValue): JudgeResult 
     }
 
     case 'transpose': {
-      // For melody transposition: compare note arrays
-      const ua = userAnswer as string[];
-      const ca = correct as string[];
+      // Degree-sequence match: e.g. user taps [1,3,5], answer is [1,3,5].
+      const ua = userAnswer as number[];
+      const ca = correct as number[];
       if (!Array.isArray(ua) || ua.length !== ca.length) {
         return { correct: false, partialScore: 0, correctAnswer: correct };
       }

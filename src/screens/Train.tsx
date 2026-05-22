@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import type {
   Question, ModeKey, SessionResult, ProgressionAnswer,
   IntervalData, ChordData, SolfegeData, MelodyData, ProgressionData, RhythmData,
-  TempoData, BpmData,
+  TempoData, BpmData, TransposeData,
 } from '../types';
 import { useStore } from '../store/useStore';
 import {
@@ -25,7 +25,7 @@ import { ModeFeedback } from '../components/feedback';
 import { getIntervalChoices } from '../modes/intervalMode';
 import { getChordChoices } from '../modes/chordMode';
 import { getSolfegeChoices, getNoteNameChoices } from '../modes/solfegeMode';
-import { getDegreeChoices, getTransposeChoices } from '../modes/progressionMode';
+import { getDegreeChoices } from '../modes/progressionMode';
 import {
   LAB_SCALE_MODE_INFO, LAB_CADENCE_MODE_INFO, LAB_KEY_MODE_INFO, LAB_INVERSION_MODE_INFO,
   getScaleChoices, getCadenceChoices, getKeyChoices, getInversionChoices,
@@ -96,6 +96,7 @@ export function Train() {
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [pianoInput, setPianoInput] = useState<string[]>([]);
   const [progressionInput, setProgressionInput] = useState<ProgressionAnswer[]>([]);
+  const [transposeInput, setTransposeInput] = useState<number[]>([]);
   const [feedbackResult, setFeedbackResult] = useState<ReturnType<typeof judge> | null>(null);
   const [loading, setLoading] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
@@ -194,6 +195,7 @@ export function Train() {
     setSelectedAnswer(null);
     setPianoInput([]);
     setProgressionInput([]);
+    setTransposeInput([]);
     setRhythmTaps([]);
     setRhythmStartTime(0);
     setTempoTaps([]);
@@ -251,8 +253,18 @@ export function Train() {
     const gen = getPlaybackGen();
     setLoading(true);
     try {
-      // Play reference tone if enabled (skip entirely in absolute-pitch mode)
-      if (includeReference && !q.context?.absoluteMode && settings.referenceTone === 'perQuestion' && q.context?.referenceToneNote) {
+      // Play reference tone if enabled (skip entirely in absolute-pitch mode).
+      // Transpose mode forces the tonic on the initial auto-play — it's the
+      // anchor for the degree answer — even if the user has reference tones
+      // off. The "듣기" button passes includeReference=false to keep replays
+      // from re-sounding the tonic (separate reference button is available).
+      const forceReference = q.mode === 'transpose';
+      if (
+        includeReference &&
+        !q.context?.absoluteMode &&
+        (forceReference || settings.referenceTone === 'perQuestion') &&
+        q.context?.referenceToneNote
+      ) {
         await playReferenceTone(q.context.referenceToneNote, '2n');
         if (gen !== getPlaybackGen()) return;
         await delay(700 / speed);
@@ -301,6 +313,11 @@ export function Train() {
       }
       case 'melody': {
         const d = data as MelodyData;
+        await playSequence(d.notes, '4n', speed);
+        break;
+      }
+      case 'transpose': {
+        const d = data as TransposeData;
         await playSequence(d.notes, '4n', speed);
         break;
       }
@@ -424,6 +441,15 @@ export function Train() {
     const expected = (currentQuestion?.data as ProgressionData)?.chords ?? [];
     const next = [...progressionInput, { degree, quality }];
     setProgressionInput(next);
+    if (next.length >= expected.length) {
+      submitAnswer(next);
+    }
+  }
+
+  function handleTransposeSelect(degree: number) {
+    const expected = (currentQuestion?.data as TransposeData)?.degrees ?? [];
+    const next = [...transposeInput, degree];
+    setTransposeInput(next);
     if (next.length >= expected.length) {
       submitAnswer(next);
     }
@@ -872,15 +898,44 @@ export function Train() {
               )}
 
               {/* Choice-based modes */}
-              {(isInterval || isChord || isTranspose || (isSolfege && solfegeInputMethod === 'choice') || isLabChoice) && (
+              {(isInterval || isChord || (isSolfege && solfegeInputMethod === 'choice') || isLabChoice) && (
                 <ChoiceGrid
                   options={getChoiceOptions(modeKey, level, isAbsolute)}
                   selected={selectedAnswer ?? undefined}
                   answered={false}
                   onSelect={handleChoiceSelect}
-                  columns={isInterval || isTranspose ? 2 : isChord ? 2 : modeKey === 'lab-key' ? 4 : modeKey === 'lab-inversion' ? 2 : 3}
+                  columns={isInterval ? 2 : isChord ? 2 : modeKey === 'lab-key' ? 4 : modeKey === 'lab-inversion' ? 2 : 3}
                   disabled={loading}
                 />
+              )}
+
+              {/* Transpose: degree-sequence input */}
+              {isTranspose && (
+                <>
+                  <div className="text-sm text-center text-slate-500">
+                    {(currentQuestion.data as TransposeData).degrees.length}개 도수 입력
+                    {transposeInput.length > 0 && ` (${transposeInput.length}/${(currentQuestion.data as TransposeData).degrees.length})`}
+                  </div>
+                  {transposeInput.length > 0 && (
+                    <div className="flex gap-2 flex-wrap justify-center">
+                      {transposeInput.map((d, i) => (
+                        <span key={i} className="bg-primary-100 text-primary-700 px-3 py-1.5 rounded-lg font-semibold text-sm">
+                          {settings.notation === 'roman' ? (ROMAN[d] ?? String(d)) : d}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <TransposeInput
+                    notation={settings.notation}
+                    onSelect={handleTransposeSelect}
+                    disabled={loading}
+                  />
+                  {transposeInput.length > 0 && (
+                    <button className="btn-ghost text-sm text-slate-400" onClick={() => setTransposeInput([])}>
+                      ← 다시 입력
+                    </button>
+                  )}
+                </>
               )}
 
               {/* Solfege piano input */}
@@ -1067,15 +1122,43 @@ export function Train() {
           ) : (
             /* After feedback: show correct answer highlight for choice modes */
             <>
-              {(isInterval || isChord || isTranspose || (isSolfege && solfegeInputMethod === 'choice') || isLabChoice) && (
+              {(isInterval || isChord || (isSolfege && solfegeInputMethod === 'choice') || isLabChoice) && (
                 <ChoiceGrid
                   options={getChoiceOptions(modeKey, level, isAbsolute)}
                   selected={selectedAnswer ?? undefined}
                   correct={feedbackResult?.correctAnswer as string}
                   answered
                   onSelect={() => {}}
-                  columns={isInterval || isTranspose ? 2 : isChord ? 2 : modeKey === 'lab-key' ? 4 : modeKey === 'lab-inversion' ? 2 : 3}
+                  columns={isInterval ? 2 : isChord ? 2 : modeKey === 'lab-key' ? 4 : modeKey === 'lab-inversion' ? 2 : 3}
                 />
+              )}
+              {isTranspose && feedbackResult && (
+                <div className="space-y-2">
+                  <div className="text-xs text-slate-500 text-center">정답</div>
+                  <div className="flex gap-2 flex-wrap justify-center">
+                    {(feedbackResult.correctAnswer as number[]).map((d, i) => {
+                      const userVal = transposeInput[i];
+                      const isCorrect = userVal === d;
+                      return (
+                        <span
+                          key={i}
+                          className={`px-3 py-1.5 rounded-lg font-semibold text-sm ${
+                            isCorrect
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-red-100 text-red-700'
+                          }`}
+                        >
+                          {settings.notation === 'roman' ? (ROMAN[d] ?? String(d)) : d}
+                          {!isCorrect && userVal != null && (
+                            <span className="text-xs text-red-500 ml-1">
+                              (입력: {settings.notation === 'roman' ? (ROMAN[userVal] ?? String(userVal)) : userVal})
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
               {isSolfege && solfegeInputMethod === 'piano' && feedbackResult && (
                 <div className="space-y-2">
@@ -1148,7 +1231,6 @@ export function Train() {
 // ─── Helpers ────────────────────────────────────────────────────────────────
 function getChoiceOptions(mode: ModeKey, level: number, absolute = false): ChoiceOption[] {
   if (mode === 'interval') return getIntervalChoices(level);
-  if (mode === 'transpose') return getTransposeChoices(level);
   if (mode === 'chord') return getChordChoices(level);
   if (mode === 'solfege') return absolute ? getNoteNameChoices(level) : getSolfegeChoices(level);
   if (mode === 'lab-scale') return getScaleChoices(level);
@@ -1170,6 +1252,11 @@ function formatAnswer(answer: unknown, mode: ModeKey, notation: 'roman' | 'numbe
         .map((p) => notation === 'number'
           ? `${p.degree}${['m','dim','m7','m7b5'].includes(p.quality) ? 'm' : ''}`
           : romanize(p.degree, p.quality))
+        .join(' → ');
+    }
+    if (mode === 'transpose') {
+      return (answer as number[])
+        .map((d) => notation === 'roman' ? (ROMAN[d] ?? String(d)) : String(d))
         .join(' → ');
     }
     return (answer as string[]).join(', ');
@@ -1203,6 +1290,30 @@ function ProgressionInput({ notation, onSelect, disabled }: ProgInputProps) {
           disabled={disabled}
         >
           {c.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── Transpose Degree Input ─────────────────────────────────────────────────
+interface TransposeInputProps {
+  notation: 'roman' | 'number';
+  onSelect: (degree: number) => void;
+  disabled?: boolean;
+}
+
+function TransposeInput({ notation, onSelect, disabled }: TransposeInputProps) {
+  return (
+    <div className="grid grid-cols-7 gap-2">
+      {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+        <button
+          key={d}
+          className="choice-btn py-3 text-base font-bold"
+          onClick={() => !disabled && onSelect(d)}
+          disabled={disabled}
+        >
+          {notation === 'roman' ? (ROMAN[d] ?? String(d)) : d}
         </button>
       ))}
     </div>

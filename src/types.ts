@@ -89,11 +89,9 @@ export interface SolfegeData {
 
 export interface TransposeData {
   type: 'transpose';
-  subMode: 'A' | 'B';
-  chords?: ChordStep[];
-  melody?: string[];
-  fromKey: string;
-  toKey?: string;
+  notes: string[];       // actual notes played, e.g. ["G4","B4","D5"]
+  degrees: number[];     // 1-7 scale degrees aligned with notes
+  key: string;           // tonic of the chosen key, e.g. "G"
 }
 
 export interface RhythmData {

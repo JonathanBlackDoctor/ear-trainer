@@ -1,8 +1,8 @@
 import type { ModeKey } from '../types';
-import { INTERVAL_LEVELS, type IntervalDirection } from '../theory/intervals';
+import { INTERVAL_LEVELS } from '../theory/intervals';
 import { CHORD_LEVELS } from '../theory/chords';
 import { SOLFEGE_LEVELS } from '../theory/solfege';
-import { PROGRESSION_LEVELS, COMMON_KEYS } from '../theory/progressions';
+import { PROGRESSION_LEVELS } from '../theory/progressions';
 
 /** Single source of truth for the per-mode level count. */
 export const MAX_LEVEL = 10;
@@ -30,36 +30,40 @@ export const MELODY_LEVELS: Record<number, MelodyLevelConfig> = {
 };
 
 // ─── Transpose ────────────────────────────────────────────────────────────────
+// A "transposition" question plays a short melody in a randomly-picked key,
+// after first sounding the tonic of that key. The user answers with the
+// degree sequence (1..7) — same shape → same answer regardless of key.
+// That's the move-the-do skill the mode is supposed to train.
 export interface TransposeLevelConfig {
   label: string;
-  intervals: string[];
-  directions: IntervalDirection[];
+  noteCount: number;        // melody length (2..5)
+  degreePool: number[];     // allowed scale degrees (1..7)
+  maxJump: number;          // max scale-degree distance between adjacent notes
   keyPool: string[];        // length 1 = fixed; longer = random per question
 }
 
-const TR_CORE_4    = ['P5', 'P4', 'M3', 'm3'];
-const TR_CORE_5    = [...TR_CORE_4, 'P8'];
-const TR_PLUS_2    = [...TR_CORE_5, 'M2', 'm2'];
-const TR_PLUS_6    = [...TR_PLUS_2, 'M6', 'm6'];
-const TR_PLUS_A4   = [...TR_PLUS_6, 'A4'];
-const TR_ALL_12    = [...TR_PLUS_A4, 'M7', 'm7'];
+const DEG_TRIAD      = [1, 3, 5];
+const DEG_PENTA      = [1, 2, 3, 5, 6];
+const DEG_DIA_5      = [1, 2, 3, 4, 5];
+const DEG_DIA_7      = [1, 2, 3, 4, 5, 6, 7];
 
-const KEYS_SMALL  = ['C', 'G', 'F'];
-const KEYS_MID    = ['C', 'G', 'D', 'F', 'Bb'];
-const KEYS_LARGE  = ['C', 'G', 'D', 'A', 'F', 'Bb', 'Eb'];
-const KEYS_FULL12 = ['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
+const KEYS_1       = ['C'];
+const KEYS_SMALL   = ['C', 'G', 'F'];
+const KEYS_MID     = ['C', 'G', 'D', 'F', 'Bb'];
+const KEYS_LARGE   = ['C', 'G', 'D', 'A', 'F', 'Bb', 'Eb', 'E'];
+const KEYS_FULL12  = ['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
 
 export const TRANSPOSE_LEVELS: Record<number, TransposeLevelConfig> = {
-  1:  { label: '기본 4음정 · C장조',           intervals: TR_CORE_4,  directions: ['up', 'harmonic'],         keyPool: ['C']        },
-  2:  { label: '+ P8',                          intervals: TR_CORE_5,  directions: ['up', 'harmonic'],         keyPool: ['C']        },
-  3:  { label: '+ 하행',                        intervals: TR_CORE_5,  directions: ['up', 'down', 'harmonic'], keyPool: ['C']        },
-  4:  { label: '+ 키 3개 (C·G·F)',              intervals: TR_CORE_5,  directions: ['up', 'down', 'harmonic'], keyPool: KEYS_SMALL   },
-  5:  { label: '+ 2도 추가',                    intervals: TR_PLUS_2,  directions: ['up', 'down', 'harmonic'], keyPool: KEYS_SMALL   },
-  6:  { label: '+ 6도 + 키 5개',                intervals: TR_PLUS_6,  directions: ['up', 'down', 'harmonic'], keyPool: KEYS_MID     },
-  7:  { label: '+ 트라이톤 + 키 7개',           intervals: TR_PLUS_A4, directions: ['up', 'down', 'harmonic'], keyPool: KEYS_LARGE   },
-  8:  { label: '+ 7도 (전음정) · 8개 키',       intervals: TR_ALL_12,  directions: ['up', 'down', 'harmonic'], keyPool: COMMON_KEYS  },
-  9:  { label: '+ 12개 키 전체',                intervals: TR_ALL_12,  directions: ['up', 'down', 'harmonic'], keyPool: KEYS_FULL12  },
-  10: { label: '+ 화성만 (전 12키)',            intervals: TR_ALL_12,  directions: ['harmonic'],               keyPool: KEYS_FULL12  },
+  1:  { label: '2음 · 도·미·솔 · C장조',       noteCount: 2, degreePool: DEG_TRIAD, maxJump: 4, keyPool: KEYS_1      },
+  2:  { label: '3음 · 도·미·솔',                noteCount: 3, degreePool: DEG_TRIAD, maxJump: 4, keyPool: KEYS_1      },
+  3:  { label: '3음 · 펜타토닉 (1·2·3·5·6)',    noteCount: 3, degreePool: DEG_PENTA, maxJump: 4, keyPool: KEYS_1      },
+  4:  { label: '3음 · 다이아토닉 5음 (1~5)',    noteCount: 3, degreePool: DEG_DIA_5, maxJump: 3, keyPool: KEYS_1      },
+  5:  { label: '4음 · 다이아토닉 5음',          noteCount: 4, degreePool: DEG_DIA_5, maxJump: 3, keyPool: KEYS_1      },
+  6:  { label: '3음 · 키 3개 (C·G·F)',          noteCount: 3, degreePool: DEG_DIA_5, maxJump: 3, keyPool: KEYS_SMALL  },
+  7:  { label: '3음 · 전 7도 · 키 3개',         noteCount: 3, degreePool: DEG_DIA_7, maxJump: 3, keyPool: KEYS_SMALL  },
+  8:  { label: '4음 · 전 7도 · 키 5개',         noteCount: 4, degreePool: DEG_DIA_7, maxJump: 3, keyPool: KEYS_MID    },
+  9:  { label: '4음 · 키 8개',                  noteCount: 4, degreePool: DEG_DIA_7, maxJump: 4, keyPool: KEYS_LARGE  },
+  10: { label: '5음 · 12개 키 전체',            noteCount: 5, degreePool: DEG_DIA_7, maxJump: 4, keyPool: KEYS_FULL12 },
 };
 
 // ─── Rhythm ────────────────────────────────────────────────────────────────────
