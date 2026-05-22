@@ -8,6 +8,7 @@ let outputGain: Tone.Gain | null = null;
 let masterLimiter: Tone.Limiter | null = null;
 let metronomeSynth: Tone.Synth | null = null;
 let woodblockSynth: Tone.MembraneSynth | null = null;
+let referenceSynth: Tone.PolySynth | null = null;
 let audioStarted = false;
 let samplerReady = false;
 let samplerFailed = false;
@@ -327,6 +328,7 @@ export function stopAllAudio(): void {
   playbackGen++;
   try { sampler?.releaseAll(); } catch { /* ignore */ }
   try { synth?.releaseAll(); } catch { /* ignore */ }
+  try { referenceSynth?.releaseAll(); } catch { /* ignore */ }
   const gain = getOutputGain();
   const now = Tone.now();
   gain.gain.cancelScheduledValues(now);
@@ -348,6 +350,28 @@ export async function playNote(note: string, duration = '2n'): Promise<void> {
   if (!audioStarted) await startAudio();
   await ensureRunning();
   getInstrument().triggerAttackRelease(note, duration, scheduleStart());
+}
+
+// Reference-tone synth — soft sine pad, intentionally different timbre from the
+// piano sampler. The reference tone (기준음) and the question's listening notes
+// used to share the piano sample and blended together; using a pitch-pipe-like
+// sine makes the reference instantly recognizable as "the anchor."
+function getReferenceSynth(): Tone.PolySynth {
+  if (!referenceSynth) {
+    referenceSynth = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'sine' },
+      envelope: { attack: 0.02, decay: 0.1, sustain: 0.7, release: 0.4 },
+    }).connect(getOutputGain());
+    referenceSynth.volume.value = -10;
+  }
+  return referenceSynth;
+}
+
+/** Play the reference (key-center) tone with a distinct sine timbre. */
+export async function playReferenceTone(note: string, duration = '2n'): Promise<void> {
+  if (!audioStarted) await startAudio();
+  await ensureRunning();
+  getReferenceSynth().triggerAttackRelease(note, duration, scheduleStart());
 }
 
 /** Play multiple notes simultaneously (chord) */

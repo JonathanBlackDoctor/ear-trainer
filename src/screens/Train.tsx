@@ -25,6 +25,7 @@ import {
   startAudio, playNote, playChord, playSequence, playProgression, playArpeggio,
   playMetronomeClick, playRhythmClick,
   playMetronome, stopAllAudio, getAudioStatus, getPlaybackGen, type AudioQuality,
+  playReferenceTone,
 } from '../audio/piano';
 import { INTERVAL_MODE_INFO } from '../modes/intervalMode';
 import { CHORD_MODE_INFO } from '../modes/chordMode';
@@ -203,7 +204,7 @@ export function Train() {
     try {
       // Play reference tone if enabled
       if (settings.referenceTone === 'perQuestion' && q.context?.referenceToneNote) {
-        await playNote(q.context.referenceToneNote, '2n');
+        await playReferenceTone(q.context.referenceToneNote, '2n');
         if (gen !== getPlaybackGen()) return;
         await delay(700 / speed);
         if (gen !== getPlaybackGen()) return;
@@ -310,7 +311,7 @@ export function Train() {
     const q = currentQuestion;
     if (!q?.context?.referenceToneNote) return;
     stopAllAudio();
-    await playNote(q.context.referenceToneNote, '2n');
+    await playReferenceTone(q.context.referenceToneNote, '2n');
   }
 
   // ─── Answer Submission ───────────────────────────────────────────────────
