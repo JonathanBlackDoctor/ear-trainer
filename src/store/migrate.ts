@@ -55,12 +55,44 @@ function v2Tov3(state: AnyState | null | undefined): AnyState | null | undefined
   };
 }
 
-export const CURRENT_SCHEMA_VERSION = 3;
+// v3 → v4: introduce gamification slice (XP, achievements, combo tracking).
+// Backfill existing sessions with bestCombo=0 and xpEarned=0 so old summary
+// cards continue to render without conditionals. Stats/SRS are preserved.
+function v3Tov4(state: AnyState | null | undefined): AnyState | null | undefined {
+  if (!state) return state;
+  const sessions = Array.isArray(state.sessions) ? state.sessions : [];
+  const patchedSessions = sessions.map((s) => {
+    const ss = (s ?? {}) as Record<string, unknown>;
+    return {
+      ...ss,
+      bestCombo: typeof ss.bestCombo === 'number' ? ss.bestCombo : 0,
+      xpEarned:  typeof ss.xpEarned  === 'number' ? ss.xpEarned  : 0,
+    };
+  });
+  return {
+    ...state,
+    sessions: patchedSessions,
+    gamification: {
+      totalXp: 0,
+      achievements: {},
+      bestComboByMode: {},
+      lifetimeCorrect: 0,
+      lifetimeAnswers: 0,
+      perfectSessionCount: 0,
+      modesEverTried: {},
+      weaknessConqueredSnapshot: {},
+      lightningCount: 0,
+    },
+  };
+}
+
+export const CURRENT_SCHEMA_VERSION = 4;
 
 export function migrate(persistedState: unknown, fromVersion: number): unknown {
   let state = persistedState as AnyState | null | undefined;
   if (fromVersion < 2) state = v1Tov2(state);
   if (fromVersion < 3) state = v2Tov3(state);
+  if (fromVersion < 4) state = v3Tov4(state);
   return state;
 }
 
