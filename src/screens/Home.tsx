@@ -15,6 +15,8 @@ import { LAB_MODE_INFO } from '../modes/labModes';
 import type { ModeKey, ModeStats } from '../types';
 import { useStore } from '../store/useStore';
 import { topWeakItems } from '../engine/weakness';
+import { rankFor } from '../engine/xp';
+import { ACHIEVEMENTS_BY_ID } from '../engine/achievements';
 
 // 모드별 색상 띠 클래스 (mode-card의 ::before에 사용)
 const MODE_ACCENT_CLASS: Partial<Record<ModeKey, string>> = {
@@ -45,7 +47,7 @@ const ALL_MODES = [
 
 export function Home() {
   const navigate = useNavigate();
-  const { stats, sessions } = useStore();
+  const { stats, sessions, gamification } = useStore();
 
   const totalSessions = sessions.length;
   const totalQuestions = sessions.reduce((s, ss) => s + ss.total, 0);
@@ -53,6 +55,13 @@ export function Home() {
   const overallPct = totalQuestions > 0
     ? Math.round((totalCorrect / totalQuestions) * 100)
     : 0;
+
+  const rank = rankFor(gamification.totalXp);
+  const recentAchievements = Object.entries(gamification.achievements)
+    .map(([id, info]) => ({ id, ...info, def: ACHIEVEMENTS_BY_ID[id] }))
+    .filter((a) => a.def)
+    .sort((a, b) => b.unlockedAt - a.unlockedAt)
+    .slice(0, 3);
 
   function startMode(key: ModeKey) {
     if (key === 'lab') {
@@ -97,6 +106,79 @@ export function Home() {
       </header>
 
       <div className="max-w-lg mx-auto px-5 -mt-6 space-y-5">
+        {/* Rank & XP card — 등급/누적 XP 시각화 */}
+        {gamification.totalXp > 0 && (
+          <button
+            type="button"
+            onClick={() => navigate('/badges')}
+            className="w-full card-hero animate-slide-up text-left active:scale-[0.99] transition-transform"
+            aria-label="업적 화면 열기"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500">현재 등급</div>
+                <div className="font-display text-2xl font-bold text-primary-900 mt-0.5">
+                  {rank.tier.emoji} {rank.tier.name}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] uppercase tracking-wider text-slate-500">누적 XP</div>
+                <div className="font-display text-2xl font-bold text-primary-900 tabular-nums">
+                  {gamification.totalXp.toLocaleString()}
+                </div>
+              </div>
+            </div>
+            {rank.next && (
+              <>
+                <div className="mt-3 h-2 bg-canvas-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-primary-500 to-accent-500 rounded-full transition-all duration-500"
+                    style={{ width: `${rank.progress * 100}%` }}
+                  />
+                </div>
+                <div className="mt-1.5 flex justify-between text-[10px] text-slate-500">
+                  <span>{rank.tier.name}</span>
+                  <span className="tabular-nums">{rank.xpToNext} XP → {rank.next.name}</span>
+                </div>
+              </>
+            )}
+          </button>
+        )}
+
+        {/* Recent achievements strip */}
+        {recentAchievements.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-soft p-3 animate-slide-up">
+            <div className="flex items-center justify-between mb-2 px-1">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                최근 획득 업적
+              </h2>
+              <button
+                className="text-xs text-primary-600 font-semibold hover:text-primary-700"
+                onClick={() => navigate('/badges')}
+              >
+                전체 →
+              </button>
+            </div>
+            <div className="flex gap-2">
+              {recentAchievements.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => navigate('/badges')}
+                  className="flex-1 flex flex-col items-center gap-1 bg-accent-50 border border-accent-200 rounded-lg px-2 py-2 active:scale-95 transition-transform"
+                  title={a.def.description}
+                  aria-label={`${a.def.name} 업적`}
+                >
+                  <span className="text-2xl" aria-hidden>{a.def.emoji}</span>
+                  <span className="text-[10px] font-semibold text-accent-800 text-center leading-tight">
+                    {a.def.name}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Summary stats — hero number 스타일로 강조 */}
         {totalSessions > 0 && (
           <div className="card-hero animate-slide-up">

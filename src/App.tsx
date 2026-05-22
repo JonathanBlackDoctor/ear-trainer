@@ -12,6 +12,7 @@ const Result = lazy(() => import('./screens/Result').then((m) => ({ default: m.R
 const Stats = lazy(() => import('./screens/Stats').then((m) => ({ default: m.Stats })));
 const Settings = lazy(() => import('./screens/Settings').then((m) => ({ default: m.Settings })));
 const Lab = lazy(() => import('./screens/Lab').then((m) => ({ default: m.Lab })));
+const Badges = lazy(() => import('./screens/Badges').then((m) => ({ default: m.Badges })));
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
             <Route path="/stats" element={<Stats />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/lab" element={<Lab />} />
+            <Route path="/badges" element={<Badges />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

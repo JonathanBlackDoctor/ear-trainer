@@ -57,17 +57,17 @@ describe('migrate v2 → v3 (10-level curriculum reset)', () => {
     expect(out.srs.bpm).toEqual({});
   });
 
-  it('preserves sessions, settings, and customPatterns', () => {
+  it('preserves sessions (with v4 backfill), settings, and customPatterns', () => {
     const out = migrate(v2State, 2) as any;
-    expect(out.sessions).toEqual(v2State.sessions);
+    // v3→v4 adds bestCombo and xpEarned to each session — the original counts
+    // and date remain intact.
+    expect(out.sessions).toHaveLength(1);
+    expect(out.sessions[0]).toMatchObject({
+      date: 1, mode: 'interval', total: 5, correct: 4, durationSec: 30,
+      bestCombo: 0, xpEarned: 0,
+    });
     expect(out.settings).toEqual(v2State.settings);
     expect(out.customPatterns).toEqual(v2State.customPatterns);
-  });
-
-  it('is a no-op when already at v3', () => {
-    const v3 = migrate(v2State, 2) as any;
-    const again = migrate(v3, 3) as any;
-    expect(again).toBe(v3);
   });
 
   it('v1 state cascades through v2 → v3 and ends with empty stats/srs', () => {
@@ -85,10 +85,59 @@ describe('migrate v2 → v3 (10-level curriculum reset)', () => {
   });
 });
 
+describe('migrate v3 → v4 (gamification slice)', () => {
+  const v3State = {
+    settings: { weakSessionLength: 10, reducedMotion: 'system', notation: 'number' },
+    stats: { interval: {} },
+    sessions: [{ date: 1, mode: 'interval', total: 5, correct: 4, durationSec: 30 }],
+    customPatterns: [],
+    srs: { interval: {} },
+  };
+
+  it('adds default gamification slice with zeroed counters', () => {
+    const out = migrate(v3State, 3) as any;
+    expect(out.gamification).toBeDefined();
+    expect(out.gamification.totalXp).toBe(0);
+    expect(out.gamification.achievements).toEqual({});
+    expect(out.gamification.lifetimeCorrect).toBe(0);
+    expect(out.gamification.perfectSessionCount).toBe(0);
+    expect(out.gamification.modesEverTried).toEqual({});
+    expect(out.gamification.weaknessConqueredSnapshot).toEqual({});
+    expect(out.gamification.lightningCount).toBe(0);
+  });
+
+  it('backfills existing sessions with bestCombo=0 and xpEarned=0', () => {
+    const out = migrate(v3State, 3) as any;
+    expect(out.sessions[0].bestCombo).toBe(0);
+    expect(out.sessions[0].xpEarned).toBe(0);
+    // existing fields preserved
+    expect(out.sessions[0].total).toBe(5);
+    expect(out.sessions[0].durationSec).toBe(30);
+  });
+
+  it('preserves stats and srs on v3→v4', () => {
+    const stateWithStats = {
+      ...v3State,
+      stats: { interval: { P5_up: { attempts: 5, correct: 4, recent: [1,0,1,1], lastSeen: 1 } } },
+      srs: { interval: { P5_up: { ease: 2.5, interval: 5, due: 0, reps: 2 } } },
+    };
+    const out = migrate(stateWithStats, 3) as any;
+    expect(out.stats.interval.P5_up.attempts).toBe(5);
+    expect(out.srs.interval.P5_up.ease).toBe(2.5);
+  });
+
+  it('is a no-op when already at v4', () => {
+    const v4 = migrate(v3State, 3) as any;
+    const again = migrate(v4, 4) as any;
+    expect(again).toBe(v4);
+  });
+});
+
 describe('migrateImport', () => {
   it('treats missing schemaVersion as v1 and cascades to current', () => {
     const out = migrateImport({ settings: {}, stats: {}, sessions: [] }) as any;
     expect(out.srs).toBeDefined();
+    expect(out.gamification).toBeDefined();
     expect(out.settings.weakSessionLength).toBe(10);
   });
 
@@ -99,10 +148,22 @@ describe('migrateImport', () => {
       stats: {},
       sessions: [],
       srs: { interval: { foo: { ease: 2.0, interval: 5, due: 0, reps: 1 } } },
+      gamification: {
+        totalXp: 1234,
+        achievements: { first_correct: { unlockedAt: 1 } },
+        bestComboByMode: {},
+        lifetimeCorrect: 50,
+        lifetimeAnswers: 60,
+        perfectSessionCount: 2,
+        modesEverTried: { interval: true },
+        weaknessConqueredSnapshot: {},
+        lightningCount: 0,
+      },
     };
     const out = migrateImport(blob) as any;
     expect(out.srs.interval.foo.ease).toBe(2.0);
     expect(out.settings.weakSessionLength).toBe(25);
+    expect(out.gamification.totalXp).toBe(1234);
   });
 
   it('resets stats/srs when importing a v2 blob into the current schema', () => {
@@ -116,7 +177,10 @@ describe('migrateImport', () => {
     const out = migrateImport(v2blob) as any;
     expect(out.stats.chord).toEqual({});
     expect(out.srs.chord).toEqual({});
-    expect(out.sessions).toEqual(v2blob.sessions);
+    // v3→v4 backfills session shape
+    expect(out.sessions[0].bestCombo).toBe(0);
+    expect(out.sessions[0].xpEarned).toBe(0);
     expect(out.settings.weakSessionLength).toBe(12);
+    expect(out.gamification.totalXp).toBe(0);
   });
 });

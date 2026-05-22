@@ -13,12 +13,15 @@ import {
   makeScaleQuestion, makeCadenceQuestion, makeKeyIdQuestion, makeInversionQuestion,
 } from '../engine/questionFactory';
 import { MAX_LEVEL, getLevelLabel } from '../modes/levels';
-import { judge, type TempoJudgeDetails } from '../engine/judge';
+import { judge } from '../engine/judge';
+import { awardXp } from '../engine/xp';
 import { PlaybackControls } from '../components/PlaybackControls';
 import { ChoiceGrid, type ChoiceOption } from '../components/ChoiceGrid';
 import { Piano } from '../components/Piano';
 import { Staff } from '../components/Staff';
 import { ProgressBar } from '../components/ProgressBar';
+import { ComboOverlay } from '../components/ComboOverlay';
+import { ModeFeedback } from '../components/feedback';
 import { getIntervalChoices } from '../modes/intervalMode';
 import { getChordChoices } from '../modes/chordMode';
 import { getSolfegeChoices, getNoteNameChoices } from '../modes/solfegeMode';
@@ -77,6 +80,8 @@ interface SessionState {
   currentIdx: number;
   startTime: number;
   questionStartTime: number;
+  combo: number;       // current consecutive-correct streak
+  bestCombo: number;   // highest combo reached this session
 }
 
 export function Train() {
@@ -165,6 +170,8 @@ export function Train() {
       currentIdx: 0,
       startTime,
       questionStartTime: startTime,
+      combo: 0,
+      bestCombo: 0,
     });
     setPhase('playing');
     loadNextQuestion([], 0);
@@ -460,21 +467,44 @@ export function Train() {
     setFeedbackResult(result);
     setPhase('feedback');
 
+    // Combo: only a fully-correct answer extends the streak. Partial credit
+    // (e.g. melody with 2/3 notes) resets it — otherwise melody mode would
+    // keep a "combo" alive on near-misses.
+    const newCombo = result.correct ? session.combo + 1 : 0;
+    const newBestCombo = Math.max(session.bestCombo, newCombo);
+
+    const timeTaken = Date.now() - session.questionStartTime;
+    const xp = awardXp({
+      level: q.level,
+      partialScore: result.partialScore,
+      correct: result.correct,
+      timeTakenMs: timeTaken,
+      comboAfterAnswer: newCombo,
+    });
+
     const sessionResult: SessionResult = {
       questionId: q.id,
       itemKey: q.itemKey,
       mode: q.mode,
+      level: q.level,
       correct: result.correct,
       skipped: false,
       partialScore: result.partialScore,
-      timeTaken: Date.now() - session.questionStartTime,
+      timeTaken,
+      xpEarned: xp.total,
+      comboAtAnswer: newCombo,
     };
 
-    recordResult(sessionResult);
+    recordResult(sessionResult, newCombo);
 
     setSession((prev) => {
       if (!prev) return prev;
-      return { ...prev, results: [...prev.results, sessionResult] };
+      return {
+        ...prev,
+        results: [...prev.results, sessionResult],
+        combo: newCombo,
+        bestCombo: newBestCombo,
+      };
     });
 
     // Play correct answer audio on feedback
@@ -490,15 +520,18 @@ export function Train() {
       questionId: q.id,
       itemKey: q.itemKey,
       mode: q.mode,
+      level: q.level,
       correct: false,
       skipped: true,
       partialScore: 0,
       timeTaken: Date.now() - session.questionStartTime,
+      xpEarned: 0,
+      comboAtAnswer: 0,
     };
-    recordResult(sessionResult);
+    recordResult(sessionResult, 0);
     setSession((prev) => {
       if (!prev) return prev;
-      return { ...prev, results: [...prev.results, sessionResult] };
+      return { ...prev, results: [...prev.results, sessionResult], combo: 0 };
     });
     advanceQuestion();
   }
@@ -520,15 +553,36 @@ export function Train() {
     const results = session?.results ?? [];
     const correct = results.filter((r) => r.correct).length;
     const durationSec = Math.round((Date.now() - (session?.startTime ?? Date.now())) / 1000);
-    addSession({
-      date: Date.now(),
-      mode: modeKey,
-      total: results.length,
-      correct,
-      durationSec,
-    });
+    const xpEarned = results.reduce((s, r) => s + (r.xpEarned ?? 0), 0);
+    const bestCombo = session?.bestCombo ?? 0;
+    // totalXp before this session — Result reads this to detect rank-ups.
+    const previousTotalXp = useStore.getState().gamification.totalXp;
+
+    const newlyUnlocked = addSession(
+      {
+        date: Date.now(),
+        mode: modeKey,
+        total: results.length,
+        correct,
+        durationSec,
+        bestCombo,
+        xpEarned,
+      },
+      results,
+    );
+
     navigate('/result', {
-      state: { mode: modeKey, total: results.length, correct, results, durationSec },
+      state: {
+        mode: modeKey,
+        total: results.length,
+        correct,
+        results,
+        durationSec,
+        xpEarned,
+        bestCombo,
+        previousTotalXp,
+        sessionUnlockedIds: newlyUnlocked,
+      },
     });
   }
 
@@ -718,6 +772,11 @@ export function Train() {
             </div>
           )}
 
+          {/* Combo overlay — only renders at >=3 consecutive correct */}
+          {phase === 'feedback' && (session?.combo ?? 0) >= 3 && feedbackResult?.correct && (
+            <ComboOverlay combo={session?.combo ?? 0} />
+          )}
+
           {/* Feedback panel */}
           {phase === 'feedback' && feedbackResult && (
             <div
@@ -729,7 +788,7 @@ export function Train() {
             >
               <div className="flex items-center gap-2">
                 <span className="text-2xl">{feedbackResult.correct ? '✅' : '❌'}</span>
-                <div>
+                <div className="flex-1">
                   <div className={`font-bold ${feedbackResult.correct ? 'text-emerald-700' : 'text-red-700'}`}>
                     {feedbackResult.correct ? '정답!' : '오답'}
                   </div>
@@ -744,6 +803,19 @@ export function Train() {
                     </div>
                   )}
                 </div>
+                {/* XP floater — pop-in on every feedback render */}
+                {(() => {
+                  const last = session?.results[session.results.length - 1];
+                  if (!last || last.xpEarned <= 0) return null;
+                  return (
+                    <div className="text-right animate-pop motion-reduce:animate-none" key={last.questionId}>
+                      <div className="text-[10px] uppercase tracking-wider text-accent-700 font-semibold">+XP</div>
+                      <div className="text-lg font-bold text-accent-700 tabular-nums">
+                        +{last.xpEarned}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Staff feedback */}
@@ -753,10 +825,18 @@ export function Train() {
                 </div>
               )}
 
-              {/* Tempo detail feedback */}
-              {isTempo && feedbackResult.details?.kind === 'tempo' && (
-                <TempoFeedbackDetail details={feedbackResult.details} />
-              )}
+              {/* Per-mode detailed feedback (replaces the inline TempoFeedbackDetail) */}
+              <ModeFeedback
+                question={currentQuestion}
+                userAnswer={selectedAnswer ?? (
+                  pianoInput.length > 0 ? pianoInput
+                  : progressionInput.length > 0 ? progressionInput
+                  : null
+                )}
+                result={feedbackResult}
+                modeStats={stats[modeKey]}
+                notation={settings.notation}
+              />
             </div>
           )}
 
@@ -1123,132 +1203,3 @@ function ProgressionInput({ notation, onSelect, disabled }: ProgInputProps) {
   );
 }
 
-// ─── Tempo Feedback Detail ──────────────────────────────────────────────────
-function TempoFeedbackDetail({ details }: { details: TempoJudgeDetails }) {
-  const {
-    targetBpm, userBpm, bpmDelta, deviationPct, tolerancePct,
-    intervalBpms, jitterPct,
-  } = details;
-
-  const tolBpm = targetBpm * tolerancePct;
-  // Visual scale for bars: clamp to 3× tolerance so extreme outliers don't break layout.
-  const visualHalfRangeBpm = Math.max(tolBpm * 3, Math.abs(bpmDelta) + tolBpm);
-
-  const inTolerance = (bpm: number) => Math.abs(bpm - targetBpm) / targetBpm <= tolerancePct;
-  const fastSlowLabel =
-    Math.abs(bpmDelta) < 0.5 ? '딱 맞음'
-    : bpmDelta > 0 ? `${bpmDelta.toFixed(1)} BPM 빠름`
-    : `${Math.abs(bpmDelta).toFixed(1)} BPM 느림`;
-
-  // Consistency rating
-  const consistencyLabel =
-    jitterPct <= tolerancePct ? '매우 안정'
-    : jitterPct <= tolerancePct * 2 ? '약간 흔들림'
-    : '많이 흔들림';
-  const consistencyColor =
-    jitterPct <= tolerancePct ? 'text-emerald-700'
-    : jitterPct <= tolerancePct * 2 ? 'text-amber-700'
-    : 'text-red-700';
-
-  return (
-    <div className="mt-3 pt-3 border-t border-slate-200 space-y-3">
-      {/* Headline numbers */}
-      <div className="grid grid-cols-3 gap-2 text-center">
-        <div>
-          <div className="text-[10px] uppercase tracking-wide text-slate-500">목표</div>
-          <div className="text-lg font-bold text-slate-800 tabular-nums">
-            {Math.round(targetBpm)}
-          </div>
-          <div className="text-[10px] text-slate-400">BPM</div>
-        </div>
-        <div>
-          <div className="text-[10px] uppercase tracking-wide text-slate-500">내 템포</div>
-          <div className={`text-lg font-bold tabular-nums ${
-            deviationPct <= tolerancePct ? 'text-emerald-700' : 'text-red-700'
-          }`}>
-            {userBpm.toFixed(1)}
-          </div>
-          <div className="text-[10px] text-slate-400">BPM</div>
-        </div>
-        <div>
-          <div className="text-[10px] uppercase tracking-wide text-slate-500">편차</div>
-          <div className={`text-lg font-bold tabular-nums ${
-            deviationPct <= tolerancePct ? 'text-emerald-700' : 'text-red-700'
-          }`}>
-            {bpmDelta >= 0 ? '+' : ''}{bpmDelta.toFixed(1)}
-          </div>
-          <div className="text-[10px] text-slate-400">
-            {(deviationPct * 100).toFixed(1)}%
-          </div>
-        </div>
-      </div>
-
-      {/* Verbal summary */}
-      <div className="text-xs text-slate-600 text-center">
-        평균 <b>{fastSlowLabel}</b>
-        {' · '}
-        허용 ±{(tolerancePct * 100).toFixed(0)}%
-        {' · '}
-        일관성 <span className={`font-semibold ${consistencyColor}`}>{consistencyLabel}</span>
-        {' '}
-        <span className="text-slate-400">(흔들림 {(jitterPct * 100).toFixed(1)}%)</span>
-      </div>
-
-      {/* Per-tap BPM chart: each interval drawn as a bar from the target line */}
-      <div>
-        <div className="text-[10px] text-slate-500 mb-1 flex justify-between">
-          <span>탭별 BPM 변동</span>
-          <span className="text-slate-400">총 {intervalBpms.length}개 간격</span>
-        </div>
-        <div className="relative h-20 bg-slate-50 rounded border border-slate-200 overflow-hidden">
-          {/* Tolerance band */}
-          <div
-            className="absolute left-0 right-0 bg-emerald-100/70"
-            style={{
-              top: `${50 - (tolBpm / visualHalfRangeBpm) * 50}%`,
-              height: `${(tolBpm / visualHalfRangeBpm) * 100}%`,
-            }}
-          />
-          {/* Target line (center) */}
-          <div className="absolute left-0 right-0 top-1/2 border-t border-dashed border-slate-400" />
-          {/* Bars */}
-          <div className="absolute inset-0 flex items-stretch justify-around px-1">
-            {intervalBpms.map((bpm, i) => {
-              const offsetBpm = bpm - targetBpm; // signed
-              const pct = Math.max(-1, Math.min(1, offsetBpm / visualHalfRangeBpm));
-              const heightPct = Math.abs(pct) * 50;
-              const isOk = inTolerance(bpm);
-              return (
-                <div key={i} className="flex-1 flex flex-col justify-center mx-0.5 relative">
-                  <div
-                    className={`absolute left-0 right-0 mx-auto rounded-sm ${
-                      isOk ? 'bg-emerald-500' : 'bg-red-400'
-                    }`}
-                    style={
-                      pct >= 0
-                        ? { bottom: '50%', height: `${heightPct}%`, width: '70%' }
-                        : { top: '50%', height: `${heightPct}%`, width: '70%' }
-                    }
-                  />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-        {/* Per-tap BPM numbers */}
-        <div className="mt-1 flex justify-around gap-1 text-[10px] tabular-nums">
-          {intervalBpms.map((bpm, i) => (
-            <span
-              key={i}
-              className={`flex-1 text-center ${
-                inTolerance(bpm) ? 'text-emerald-700' : 'text-red-600'
-              }`}
-            >
-              {bpm.toFixed(0)}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
