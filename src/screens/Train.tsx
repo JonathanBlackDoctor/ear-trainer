@@ -3,11 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import type {
   Question, ModeKey, SessionResult, ProgressionAnswer,
   IntervalData, ChordData, SolfegeData, MelodyData, ProgressionData, RhythmData,
+  TempoData, BpmData,
 } from '../types';
 import { useStore } from '../store/useStore';
 import {
   makeIntervalQuestion, makeChordQuestion, makeMelodyQuestion,
   makeSolfegeQuestion, makeProgressionQuestion, makeRhythmQuestion,
+  makeTempoQuestion, makeBpmQuestion,
 } from '../engine/questionFactory';
 import { judge } from '../engine/judge';
 import { PlaybackControls } from '../components/PlaybackControls';
@@ -21,18 +23,20 @@ import { getSolfegeChoices } from '../modes/solfegeMode';
 import { getDegreeChoices } from '../modes/progressionMode';
 import {
   startAudio, playNote, playChord, playSequence, playProgression, playArpeggio, playClick,
-  stopAllAudio, getAudioStatus, type AudioQuality,
+  playMetronome, stopAllAudio, getAudioStatus, type AudioQuality,
 } from '../audio/piano';
 import { INTERVAL_MODE_INFO } from '../modes/intervalMode';
 import { CHORD_MODE_INFO } from '../modes/chordMode';
 import { SOLFEGE_MODE_INFO } from '../modes/solfegeMode';
 import {
   PROGRESSION_MODE_INFO, MELODY_MODE_INFO, TRANSPOSE_MODE_INFO, RHYTHM_MODE_INFO,
+  TEMPO_MODE_INFO, BPM_MODE_INFO,
 } from '../modes/progressionMode';
 import type { ChordStep } from '../types';
 import { Note } from 'tonal';
+import { semitoneToSolfege } from '../theory/solfege';
 
-const MODE_INFO: Record<string, { name: string; emoji: string }> = {
+const MODE_INFO: Record<string, { name: string; emoji: string; maxLevel?: number }> = {
   interval: INTERVAL_MODE_INFO,
   chord: CHORD_MODE_INFO,
   solfege: SOLFEGE_MODE_INFO,
@@ -40,6 +44,8 @@ const MODE_INFO: Record<string, { name: string; emoji: string }> = {
   melody: MELODY_MODE_INFO,
   transpose: TRANSPOSE_MODE_INFO,
   rhythm: RHYTHM_MODE_INFO,
+  tempo: TEMPO_MODE_INFO,
+  bpm: BPM_MODE_INFO,
 };
 
 type TrainPhase = 'setup' | 'playing' | 'answering' | 'feedback' | 'done';
@@ -69,8 +75,11 @@ export function Train() {
   const [progressionSource, setProgressionSource] = useState<'diatonic' | 'praise'>('diatonic');
   const [rhythmTaps, setRhythmTaps] = useState<number[]>([]);
   const [rhythmStartTime, setRhythmStartTime] = useState<number>(0);
+  const [tempoTaps, setTempoTaps] = useState<number[]>([]);
+  const [bpmSliderValue, setBpmSliderValue] = useState<number>(100);
   const [isCountingIn, setIsCountingIn] = useState(false);
   const [audioQuality, setAudioQuality] = useState<AudioQuality>('synth');
+  const [solfegeInputMethod, setSolfegeInputMethod] = useState<'choice' | 'piano'>('choice');
 
   const modeKey = mode as ModeKey;
   const modeInfo = MODE_INFO[modeKey] ?? { name: modeKey, emoji: '🎵' };
@@ -122,6 +131,10 @@ export function Train() {
     setSelectedAnswer(null);
     setPianoInput([]);
     setProgressionInput([]);
+    setRhythmTaps([]);
+    setRhythmStartTime(0);
+    setTempoTaps([]);
+    setBpmSliderValue(100);
     setFeedbackResult(null);
     setTimeout(() => playQuestion(q), 100);
   }
@@ -137,6 +150,8 @@ export function Train() {
       case 'melody': return makeMelodyQuestion(level, k, fk);
       case 'transpose': return makeIntervalQuestion(level, k, fk); // simplified
       case 'rhythm': return makeRhythmQuestion(level);
+      case 'tempo': return makeTempoQuestion(level);
+      case 'bpm': return makeBpmQuestion(level);
       default: return makeIntervalQuestion(level, k, fk);
     }
   }
@@ -201,6 +216,18 @@ export function Train() {
         playRhythmPattern(d);
         break;
       }
+      case 'tempo': {
+        const d = data as TempoData;
+        setIsCountingIn(true);
+        await playMetronome(d.bpm, d.countInBeats);
+        setIsCountingIn(false);
+        break;
+      }
+      case 'bpm': {
+        const d = data as BpmData;
+        await playMetronome(d.bpm, d.beats);
+        break;
+      }
     }
   }
 
@@ -242,6 +269,18 @@ export function Train() {
   }
 
   function handlePianoNote(note: string) {
+    if (modeKey === 'solfege') {
+      const q = currentQuestion;
+      if (!q) return;
+      const tonic = q.context.key || 'C';
+      const tonicMidi = Note.midi(tonic + '4') ?? 60;
+      const pressedMidi = Note.midi(note) ?? 60;
+      const semitones = ((pressedMidi - tonicMidi) % 12 + 12) % 12;
+      const syllable = semitoneToSolfege(semitones);
+      setPianoInput([note]);
+      submitAnswer(syllable);
+      return;
+    }
     if (modeKey !== 'melody') {
       submitAnswer(note);
       return;
@@ -278,6 +317,25 @@ export function Train() {
         return updated;
       });
     }
+  }
+
+  function handleTempoTap() {
+    if (isCountingIn) return; // ignore taps during count-in
+    const data = currentQuestion?.data as TempoData | undefined;
+    if (!data) return;
+    const now = Date.now();
+    setTempoTaps((prev) => {
+      const updated = [...prev, now];
+      // Need holdBeats+1 taps to compute holdBeats intervals
+      if (updated.length >= data.holdBeats + 1) {
+        submitAnswer(updated);
+      }
+      return updated;
+    });
+  }
+
+  function handleBpmSubmit(value: number) {
+    submitAnswer(value);
   }
 
   async function submitAnswer(value: unknown) {
@@ -385,7 +443,7 @@ export function Train() {
           <div className="card w-full max-w-sm">
             <div className="text-sm font-semibold text-slate-600 mb-3">레벨 선택</div>
             <div className="flex gap-2">
-              {[1, 2, 3, 4].slice(0, MODE_INFO[modeKey as string] ? 4 : 3).map((lv) => (
+              {Array.from({ length: MODE_INFO[modeKey as string]?.maxLevel ?? 3 }, (_, i) => i + 1).map((lv) => (
                 <button
                   key={lv}
                   className={`flex-1 py-2 rounded-lg font-semibold text-sm transition-colors ${
@@ -400,6 +458,31 @@ export function Train() {
               ))}
             </div>
           </div>
+
+          {/* Solfege input method */}
+          {modeKey === 'solfege' && (
+            <div className="card w-full max-w-sm">
+              <div className="text-sm font-semibold text-slate-600 mb-3">정답 입력 방식</div>
+              <div className="flex gap-2">
+                {[
+                  { value: 'choice', label: '🔤 계이름' },
+                  { value: 'piano', label: '🎹 피아노 건반' },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    className={`flex-1 py-2 rounded-lg font-semibold text-sm transition-colors ${
+                      solfegeInputMethod === opt.value
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}
+                    onClick={() => setSolfegeInputMethod(opt.value as 'choice' | 'piano')}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Progression source */}
           {modeKey === 'progression' && (
@@ -448,6 +531,8 @@ export function Train() {
   const isSolfege = modeKey === 'solfege';
   const isInterval = modeKey === 'interval';
   const isChord = modeKey === 'chord';
+  const isTempo = modeKey === 'tempo';
+  const isBpm = modeKey === 'bpm';
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -529,7 +614,7 @@ export function Train() {
           {phase !== 'feedback' ? (
             <>
               {/* Choice-based modes */}
-              {(isInterval || isChord || isSolfege) && (
+              {(isInterval || isChord || (isSolfege && solfegeInputMethod === 'choice')) && (
                 <ChoiceGrid
                   options={getChoiceOptions(modeKey, level)}
                   selected={selectedAnswer ?? undefined}
@@ -538,6 +623,20 @@ export function Train() {
                   columns={isInterval ? 2 : isChord ? 2 : 3}
                   disabled={loading}
                 />
+              )}
+
+              {/* Solfege piano input */}
+              {isSolfege && solfegeInputMethod === 'piano' && (
+                <>
+                  <div className="text-center text-sm text-slate-500">
+                    들은 음을 피아노 건반에서 눌러주세요
+                  </div>
+                  <Piano
+                    onNotePress={handlePianoNote}
+                    highlightNotes={pianoInput}
+                    disabled={loading}
+                  />
+                </>
               )}
 
               {/* Piano input modes */}
@@ -616,11 +715,100 @@ export function Train() {
                   </button>
                 </div>
               )}
+
+              {/* Tempo hold */}
+              {isTempo && (() => {
+                const td = currentQuestion.data as TempoData;
+                const targetTaps = td.holdBeats + 1;
+                return (
+                  <div className="text-center space-y-4">
+                    {isCountingIn ? (
+                      <div className="text-lg font-bold text-primary-600 animate-pulse">
+                        🎵 메트로놈 듣는 중...
+                      </div>
+                    ) : (
+                      <div className="text-sm text-slate-500">
+                        {tempoTaps.length === 0
+                          ? `같은 빠르기로 ${targetTaps}번 두드리세요`
+                          : `${tempoTaps.length}/${targetTaps} 탭`}
+                      </div>
+                    )}
+                    <button
+                      className="w-full h-32 bg-slate-800 text-white text-3xl font-bold rounded-2xl active:bg-slate-600 active:scale-95 transition-all disabled:opacity-40"
+                      onPointerDown={handleTempoTap}
+                      disabled={isCountingIn || loading}
+                    >
+                      🥁
+                    </button>
+                    <div className="text-xs text-slate-400">
+                      목표: {td.bpm} BPM
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* BPM guess */}
+              {isBpm && (() => {
+                const bd = currentQuestion.data as BpmData;
+                if (bd.inputMode === 'choice' && bd.choices) {
+                  return (
+                    <div className="space-y-3">
+                      <div className="text-sm text-slate-500 text-center">
+                        들려준 메트로놈의 BPM은?
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {bd.choices.map((c) => (
+                          <button
+                            key={c}
+                            className="choice-btn py-4 text-lg font-bold"
+                            onClick={() => handleBpmSubmit(c)}
+                            disabled={loading}
+                          >
+                            {c} BPM
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+                // Slider mode
+                return (
+                  <div className="space-y-4">
+                    <div className="text-sm text-slate-500 text-center">
+                      슬라이더로 BPM을 맞춰보세요 (±3 허용)
+                    </div>
+                    <div className="text-center text-4xl font-bold text-primary-600">
+                      {bpmSliderValue} BPM
+                    </div>
+                    <input
+                      type="range"
+                      min={40}
+                      max={180}
+                      step={1}
+                      value={bpmSliderValue}
+                      onChange={(e) => setBpmSliderValue(Number(e.target.value))}
+                      className="w-full"
+                      disabled={loading}
+                    />
+                    <div className="flex justify-between text-xs text-slate-400">
+                      <span>40</span>
+                      <span>180</span>
+                    </div>
+                    <button
+                      className="btn-primary w-full py-3"
+                      onClick={() => handleBpmSubmit(bpmSliderValue)}
+                      disabled={loading}
+                    >
+                      제출
+                    </button>
+                  </div>
+                );
+              })()}
             </>
           ) : (
             /* After feedback: show correct answer highlight for choice modes */
             <>
-              {(isInterval || isChord || isSolfege) && (
+              {(isInterval || isChord || (isSolfege && solfegeInputMethod === 'choice')) && (
                 <ChoiceGrid
                   options={getChoiceOptions(modeKey, level)}
                   selected={selectedAnswer ?? undefined}
@@ -629,6 +817,24 @@ export function Train() {
                   onSelect={() => {}}
                   columns={isInterval ? 2 : isChord ? 2 : 3}
                 />
+              )}
+              {isSolfege && solfegeInputMethod === 'piano' && feedbackResult && (
+                <div className="space-y-2">
+                  <div className="text-xs text-slate-500 text-center">
+                    정답: {feedbackResult.correctAnswer as string}
+                  </div>
+                  <Piano
+                    highlightNotes={[]}
+                    correctNotes={[(currentQuestion.data as SolfegeData).note]}
+                    wrongNotes={
+                      pianoInput.length > 0 &&
+                      Note.pitchClass(pianoInput[0]) !== Note.pitchClass((currentQuestion.data as SolfegeData).note)
+                        ? pianoInput
+                        : []
+                    }
+                    disabled
+                  />
+                </div>
               )}
               {isMelody && feedbackResult && (
                 <div className="space-y-2">
@@ -689,6 +895,10 @@ function getChoiceOptions(mode: ModeKey, level: number): ChoiceOption[] {
 }
 
 function formatAnswer(answer: unknown, mode: ModeKey, notation: 'roman' | 'number'): string {
+  if (typeof answer === 'number') {
+    if (mode === 'tempo' || mode === 'bpm') return `${answer} BPM`;
+    return String(answer);
+  }
   if (typeof answer === 'string') return answer;
   if (Array.isArray(answer)) {
     if (mode === 'progression') {
