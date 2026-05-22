@@ -3,40 +3,143 @@
 @tailwind utilities;
 
 @layer base {
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body, #root { height: 100%; margin: 0; padding: 0; }
+  * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
   body {
     font-family: 'Noto Sans KR', system-ui, sans-serif;
-    background-color: #f8fafc;
-    color: #1e293b;
+    /* 따뜻한 크림 톤 배경 — 순백 대신 종이/상아 느낌 */
+    background-color: #fdfcf8;
+    color: #1e1b4b; /* primary-950, 잉크 느낌의 짙은 인디고 */
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
-  #root { min-height: 100%; }
+  #root {
+    min-height: 100%;
+  }
+  /* 큰 숫자에 자연스럽게 tabular numerals 적용 */
+  .font-display, .tabular-nums {
+    font-feature-settings: 'tnum' 1, 'ss01' 1;
+  }
 }
 
 @layer components {
+  /* ─── 버튼 ─────────────────────────────────────────────────────────────── */
   .btn-primary {
     @apply bg-primary-600 text-white font-semibold py-3 px-6 rounded-xl
-           active:scale-95 transition-all duration-150 select-none
-           disabled:opacity-40 disabled:cursor-not-allowed;
+           shadow-soft
+           hover:bg-primary-700 hover:shadow-card
+           active:scale-95 active:bg-primary-800
+           transition-all duration-150 select-none
+           disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-primary-600;
   }
   .btn-secondary {
-    @apply bg-white text-primary-700 border-2 border-primary-200 font-semibold py-3 px-6 rounded-xl
-           active:scale-95 transition-all duration-150 select-none;
+    @apply bg-white text-primary-700 border border-primary-200 font-semibold py-3 px-6 rounded-xl
+           shadow-soft
+           hover:bg-primary-50 hover:border-primary-300
+           active:scale-95
+           transition-all duration-150 select-none;
+  }
+  .btn-accent {
+    @apply bg-accent-500 text-white font-semibold py-3 px-6 rounded-xl
+           shadow-soft
+           hover:bg-accent-600 hover:shadow-card
+           active:scale-95
+           transition-all duration-150 select-none;
   }
   .btn-ghost {
     @apply text-slate-500 font-medium py-2 px-4 rounded-lg
-           active:bg-slate-100 transition-all duration-150 select-none;
+           hover:bg-slate-100 hover:text-slate-700
+           active:bg-slate-200
+           transition-all duration-150 select-none;
   }
+
+  /* ─── 카드 ─────────────────────────────────────────────────────────────── */
   .card {
-    @apply bg-white rounded-2xl shadow-sm border border-slate-100 p-4;
+    @apply bg-white rounded-2xl shadow-card border border-canvas-200 p-4;
   }
+  .card-lifted {
+    @apply bg-white rounded-2xl shadow-lifted border border-canvas-200 p-5;
+  }
+  /* 메인 hero 카드 — 결과 화면, 통계 강조 등에 사용 */
+  .card-hero {
+    @apply bg-gradient-to-br from-white via-canvas-50 to-canvas-100
+           rounded-3xl shadow-lifted border border-canvas-200 p-6;
+  }
+
+  /* ─── 선택 버튼 (퀴즈 보기) ──────────────────────────────────────────── */
   .choice-btn {
-    @apply bg-white border-2 border-slate-200 rounded-xl font-semibold text-slate-700
-           active:scale-95 transition-all duration-150 select-none cursor-pointer
+    @apply bg-white border-2 border-canvas-200 rounded-xl font-semibold text-primary-900
+           shadow-soft
+           hover:border-primary-300 hover:bg-primary-50
+           active:scale-95
+           transition-all duration-150 select-none cursor-pointer
            flex items-center justify-center;
   }
-  .choice-btn-correct { @apply bg-emerald-50 border-emerald-400 text-emerald-700; }
-  .choice-btn-wrong   { @apply bg-red-50 border-red-400 text-red-700; }
-  .choice-btn-selected { @apply bg-primary-50 border-primary-400 text-primary-700; }
+  .choice-btn-correct {
+    @apply bg-success-50 border-success-500 text-success-700
+           shadow-card animate-pop;
+  }
+  .choice-btn-wrong {
+    @apply bg-danger-50 border-danger-500 text-danger-700
+           animate-shake;
+  }
+  .choice-btn-selected {
+    @apply bg-primary-50 border-primary-500 text-primary-700 shadow-glow-primary;
+  }
+
+  /* ─── 모드 카드 (Home의 훈련 선택) ─────────────────────────────────── */
+  .mode-card {
+    @apply relative bg-white rounded-2xl shadow-card border border-canvas-200 p-4 text-left
+           hover:shadow-lifted hover:-translate-y-0.5
+           active:scale-[0.97]
+           transition-all duration-200 select-none cursor-pointer
+           overflow-hidden;
+  }
+  /* 모드별 상단 색상 띠 — 인라인 스타일로 색상 지정 */
+  .mode-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--mode-accent, theme('colors.primary.500'));
+    border-radius: 1rem 1rem 0 0;
+  }
+
+  /* ─── 뱃지 ─────────────────────────────────────────────────────────────── */
+  .badge {
+    @apply inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold;
+  }
+  .badge-primary { @apply badge bg-primary-50 text-primary-700 border border-primary-200; }
+  .badge-accent  { @apply badge bg-accent-50  text-accent-700  border border-accent-200; }
+  .badge-muted   { @apply badge bg-canvas-100 text-slate-600   border border-canvas-200; }
+
+  /* ─── 큰 숫자 (정답률, 점수 등) ───────────────────────────────────── */
+  .hero-number {
+    @apply font-display font-bold text-primary-700 tabular-nums leading-none;
+  }
+  .hero-number-accent {
+    @apply font-display font-bold text-accent-600 tabular-nums leading-none;
+  }
+}
+
+@layer utilities {
+  /* 모드 카드별 색상 띠 변수 헬퍼 */
+  .accent-solfege     { --mode-accent: #f59e0b; } /* 골드 */
+  .accent-interval    { --mode-accent: #6366f1; } /* 인디고 */
+  .accent-chord       { --mode-accent: #8b5cf6; } /* 바이올렛 */
+  .accent-progression { --mode-accent: #ec4899; } /* 핑크 */
+  .accent-melody      { --mode-accent: #14b8a6; } /* 틸 */
+  .accent-transpose   { --mode-accent: #f97316; } /* 오렌지 */
+  .accent-rhythm      { --mode-accent: #06b6d4; } /* 시안 */
+  .accent-tempo       { --mode-accent: #10b981; } /* 에메랄드 */
+  .accent-bpm         { --mode-accent: #f43f5e; } /* 로즈 */
 }

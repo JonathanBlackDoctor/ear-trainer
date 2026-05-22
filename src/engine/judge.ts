@@ -67,6 +67,46 @@ export function judge(question: Question, userAnswer: AnswerValue): JudgeResult 
       return { correct: score >= 0.8, partialScore: score, correctAnswer: correct };
     }
 
+    case 'tempo': {
+      // Tempo hold: compute average inter-tap interval → BPM, compare to target.
+      const taps = userAnswer as number[];
+      const targetBpm = correct as number;
+      if (!Array.isArray(taps) || taps.length < 2) {
+        return { correct: false, partialScore: 0, correctAnswer: correct };
+      }
+      const intervals: number[] = [];
+      for (let i = 1; i < taps.length; i++) intervals.push(taps[i] - taps[i - 1]);
+      const meanMs = intervals.reduce((s, v) => s + v, 0) / intervals.length;
+      if (meanMs <= 0) {
+        return { correct: false, partialScore: 0, correctAnswer: correct };
+      }
+      const userBpm = 60_000 / meanMs;
+      const deviationPct = Math.abs(userBpm - targetBpm) / targetBpm;
+      // Tolerance: Lv1 ~8%, Lv2 ~6%, Lv3 ~5%
+      const tolerance = question.level <= 1 ? 0.08 : question.level <= 2 ? 0.06 : 0.05;
+      const score = Math.max(0, 1 - deviationPct / tolerance * 0.5);
+      return {
+        correct: deviationPct <= tolerance,
+        partialScore: Math.min(1, score),
+        correctAnswer: correct,
+      };
+    }
+
+    case 'bpm': {
+      const guess = userAnswer as number;
+      const targetBpm = correct as number;
+      if (typeof guess !== 'number' || Number.isNaN(guess)) {
+        return { correct: false, partialScore: 0, correctAnswer: correct };
+      }
+      // Lv1/2 use choices (must match exactly). Lv3 slider allows ±3 BPM.
+      const tolerance = question.level <= 2 ? 0 : 3;
+      const diff = Math.abs(guess - targetBpm);
+      const isCorrect = diff <= tolerance;
+      // Partial score: linearly decay over a 10-BPM band beyond tolerance.
+      const score = isCorrect ? 1 : Math.max(0, 1 - (diff - tolerance) / 10);
+      return { correct: isCorrect, partialScore: score, correctAnswer: correct };
+    }
+
     default:
       return { correct: false, partialScore: 0, correctAnswer: correct };
   }

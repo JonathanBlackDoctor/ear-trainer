@@ -15,6 +15,8 @@ const MODE_LABELS: Record<ModeKey, string> = {
   solfege: '계명',
   transpose: '조옮김',
   rhythm: '리듬',
+  tempo: '템포 유지',
+  bpm: 'BPM 맞히기',
 };
 
 export function Stats() {

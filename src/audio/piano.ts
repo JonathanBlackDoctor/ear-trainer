@@ -310,3 +310,19 @@ export function playClick(accent = false): void {
   synthClick.triggerAttackRelease('16n', scheduleStart());
   setTimeout(() => synthClick.dispose(), 500);
 }
+
+/**
+ * Play a steady metronome at `bpm` for `beats` beats.
+ * First beat is accented. Resolves when the last click has been fired.
+ */
+export async function playMetronome(bpm: number, beats: number): Promise<void> {
+  if (!audioStarted) await startAudio();
+  await ensureRunning();
+  const beatMs = 60_000 / bpm;
+  for (let i = 0; i < beats; i++) {
+    playClick(i === 0);
+    if (i < beats - 1) {
+      await new Promise<void>((resolve) => setTimeout(resolve, beatMs));
+    }
+  }
+}

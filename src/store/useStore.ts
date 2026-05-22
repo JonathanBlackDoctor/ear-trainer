@@ -50,6 +50,8 @@ const defaultStats = (): Record<ModeKey, ModeStats> => ({
   solfege: emptyModeStats(),
   transpose: emptyModeStats(),
   rhythm: emptyModeStats(),
+  tempo: emptyModeStats(),
+  bpm: emptyModeStats(),
 });
 
 const defaultItem = (): StatsItem => ({

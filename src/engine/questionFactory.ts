@@ -233,22 +233,35 @@ const RHYTHM_PATTERNS: Record<number, RhythmPattern[]> = {
     { beats: [0, 4, 8, 12], duration: 16 },
     { beats: [0, 8], duration: 16 },
     { beats: [0, 4, 8], duration: 12 },
+    { beats: [0, 4, 12], duration: 16 },
   ],
   2: [
     { beats: [0, 2, 4, 8, 10, 12], duration: 16 },
     { beats: [0, 4, 6, 8, 12], duration: 16 },
     { beats: [0, 2, 8, 10], duration: 16 },
+    { beats: [0, 4, 6, 10, 12], duration: 16 },     // 붙임줄 느낌
+    { beats: [0, 2, 6, 8, 14], duration: 16 },      // 8분 + 점음표
+    { beats: [0, 4, 10, 12], duration: 16 },        // 당김음 시작
   ],
   3: [
     { beats: [0, 1, 4, 6, 8, 9, 12, 14], duration: 16 },
     { beats: [0, 3, 4, 8, 11, 12], duration: 16 },
+    { beats: [0, 2, 5, 8, 10, 13], duration: 16 },  // 셋잇단 느낌 (5,13 = off-grid)
+    { beats: [0, 3, 6, 8, 11, 14], duration: 16 },  // 싱코페이션
+    { beats: [0, 1, 2, 8, 10, 12, 13, 14], duration: 16 }, // 16분 묶음
+  ],
+  4: [
+    { beats: [0, 3, 5, 8, 10, 11, 13, 15], duration: 16 },  // 강한 싱코페이션
+    { beats: [0, 1, 3, 5, 8, 9, 11, 13, 14], duration: 16 }, // 16분 + 셋잇단 혼합
+    { beats: [0, 2, 3, 6, 8, 11, 13, 14], duration: 16 },   // 당김음 풍성
+    { beats: [0, 1, 4, 5, 7, 8, 11, 12, 15], duration: 16 }, // 빠른 16분
   ],
 };
 
 export function makeRhythmQuestion(level: number): Question {
   const patterns = RHYTHM_PATTERNS[level] ?? RHYTHM_PATTERNS[1];
   const pattern = pickRandom(patterns);
-  const bpm = level <= 1 ? 80 : level <= 2 ? 90 : 100;
+  const bpm = level <= 1 ? 80 : level <= 2 ? 90 : level <= 3 ? 100 : 110;
   const sixteenthMs = (60_000 / bpm) / 4;
 
   const beatTimes = pattern.beats.map((b) => b * sixteenthMs);
@@ -271,4 +284,80 @@ export function makeRhythmQuestion(level: number): Question {
     answer: beatTimes,
     context: { key: 'C' },
   };
+}
+
+// ─── Tempo Hold ────────────────────────────────────────────────────────────────
+export function makeTempoQuestion(level: number): Question {
+  let bpm: number;
+  let countInBeats: number;
+  let holdBeats: number;
+  if (level <= 1) {
+    bpm = 90;
+    countInBeats = 4;
+    holdBeats = 4;
+  } else if (level <= 2) {
+    bpm = 60 + Math.floor(Math.random() * 61); // 60~120
+    countInBeats = 4;
+    holdBeats = 8;
+  } else {
+    bpm = 60 + Math.floor(Math.random() * 81); // 60~140
+    countInBeats = 2;
+    holdBeats = 8;
+  }
+
+  return {
+    id: genId(),
+    mode: 'tempo',
+    level,
+    itemKey: `tempo_lv${level}`,
+    data: { type: 'tempo', bpm, countInBeats, holdBeats },
+    answer: bpm,
+    context: { key: 'C' },
+  };
+}
+
+// ─── BPM Guess ─────────────────────────────────────────────────────────────────
+export function makeBpmQuestion(level: number): Question {
+  const beats = 8;
+  let bpm: number;
+  let inputMode: 'choice' | 'slider';
+  let choices: number[] | undefined;
+
+  if (level <= 1) {
+    inputMode = 'choice';
+    choices = [60, 80, 100, 120];
+    bpm = pickRandom(choices);
+  } else if (level <= 2) {
+    inputMode = 'choice';
+    const base = 60 + Math.floor(Math.random() * 7) * 10; // 60~120
+    bpm = base;
+    // 4지선다: 정답 + 인접 BPM 3개 (간격 10)
+    const pool = [base - 20, base - 10, base, base + 10, base + 20].filter(
+      (b) => b >= 40 && b <= 160
+    );
+    while (pool.length > 4) pool.pop();
+    choices = shuffle(pool);
+  } else {
+    inputMode = 'slider';
+    bpm = 50 + Math.floor(Math.random() * 121); // 50~170
+  }
+
+  return {
+    id: genId(),
+    mode: 'bpm',
+    level,
+    itemKey: `bpm_lv${level}`,
+    data: { type: 'bpm', bpm, beats, inputMode, choices },
+    answer: bpm,
+    context: { key: 'C' },
+  };
+}
+
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }

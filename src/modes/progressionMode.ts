@@ -32,6 +32,24 @@ export const RHYTHM_MODE_INFO = {
   name: '리듬 받아치기',
   emoji: '🥁',
   description: '들은 리듬을 탭으로 따라쳐 보세요',
+  maxLevel: 4,
+  defaultLevel: 1,
+};
+
+export const TEMPO_MODE_INFO = {
+  key: 'tempo' as ModeKey,
+  name: '템포 유지',
+  emoji: '⏱️',
+  description: '메트로놈을 듣고 같은 빠르기로 이어 치세요',
+  maxLevel: 3,
+  defaultLevel: 1,
+};
+
+export const BPM_MODE_INFO = {
+  key: 'bpm' as ModeKey,
+  name: 'BPM 맞히기',
+  emoji: '🎯',
+  description: '들려주는 메트로놈의 빠르기(BPM)를 맞혀보세요',
   maxLevel: 3,
   defaultLevel: 1,
 };

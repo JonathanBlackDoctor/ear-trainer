@@ -6,7 +6,9 @@ export type ModeKey =
   | 'melody'
   | 'solfege'
   | 'transpose'
-  | 'rhythm';
+  | 'rhythm'
+  | 'tempo'
+  | 'bpm';
 
 // ─── Question & Answer ────────────────────────────────────────────────────────
 export interface Question {
@@ -29,7 +31,9 @@ export type QuestionData =
   | MelodyData
   | SolfegeData
   | TransposeData
-  | RhythmData;
+  | RhythmData
+  | TempoData
+  | BpmData;
 
 export interface IntervalData {
   type: 'interval';
@@ -93,11 +97,27 @@ export interface RhythmBeat {
   duration: number; // in 16th notes
 }
 
+export interface TempoData {
+  type: 'tempo';
+  bpm: number;          // target BPM the user must maintain
+  countInBeats: number; // metronome lead-in beat count
+  holdBeats: number;    // beat count the user must sustain after the metronome stops
+}
+
+export interface BpmData {
+  type: 'bpm';
+  bpm: number;          // actual BPM played
+  beats: number;        // metronome beat count
+  inputMode: 'choice' | 'slider';
+  choices?: number[];   // populated only when inputMode === 'choice'
+}
+
 export type AnswerValue =
   | string               // interval name, chord quality, solfege syllable
   | string[]             // melody notes, progression degrees
   | ProgressionAnswer[]
-  | number[];            // rhythm tap timestamps (ms)
+  | number               // bpm guess
+  | number[];            // rhythm tap timestamps (ms) or tempo hold tap timestamps
 
 export interface ProgressionAnswer {
   degree: number;
