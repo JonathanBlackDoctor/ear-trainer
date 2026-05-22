@@ -44,18 +44,23 @@ function getOutputGain(): Tone.Gain {
 }
 
 // ─── Instrument setup ───────────────────────────────────────────────────────
-// FMSynth mimics a piano better than a plain triangle: sharp transient,
-// long natural decay to silence (sustain: 0), and a modulator envelope that
-// dies off fast so the bright "ping" only colors the attack.
+// FM synthesis tuned for piano-ish behavior that stays musical when voices
+// stack. Earlier we used modulationIndex 14 with a square modulator — that
+// gave a single note a convincing "ping," but with three notes the rich
+// sidebands clashed and produced a metallic clang that sounded worse than
+// the original triangle. Now the modulator is a sine wave at the same
+// frequency as the carrier (harmonicity 1 → octave-related overtones only)
+// with a modest modulation index, so polyphony stays clean. The percussive
+// shape still comes from `sustain: 0` plus a fast modulation envelope.
 function getSynth(): Tone.PolySynth {
   if (!synth) {
     synth = new Tone.PolySynth(Tone.FMSynth, {
-      harmonicity: 3,
-      modulationIndex: 14,
+      harmonicity: 1,
+      modulationIndex: 5,
       oscillator: { type: 'sine' },
-      envelope: { attack: 0.005, decay: 1.2, sustain: 0, release: 1.5 },
-      modulation: { type: 'square' },
-      modulationEnvelope: { attack: 0.002, decay: 0.4, sustain: 0, release: 0.5 },
+      envelope: { attack: 0.003, decay: 0.8, sustain: 0, release: 1.0 },
+      modulation: { type: 'sine' },
+      modulationEnvelope: { attack: 0.002, decay: 0.3, sustain: 0, release: 0.3 },
     }).connect(getOutputGain());
     synth.volume.value = -10;
   }
@@ -63,37 +68,71 @@ function getSynth(): Tone.PolySynth {
 }
 
 /**
- * Kick off loading of the high-quality piano sampler in the background.
- * Playback never waits on this — if it loads we upgrade to it, if it fails
- * we keep using the synth. Failures are recorded, not thrown.
+ * Load the piano sampler and resolve when every sample buffer is decoded.
+ *
+ * Earlier this ran in the background with a 10s "give up" timer so the first
+ * note could play instantly via the synth fallback. But samples are now
+ * bundled in `public/samples/piano/` and served same-origin, so the load is
+ * fast and reliable enough to await before unlocking playback. The race the
+ * old design had — timer fires, samplerFailed=true, UI polling stops, samples
+ * actually finish loading later but UI never recovers — meant users saw the
+ * "couldn't load piano samples" banner even when the sampler was working.
+ *
+ * The hard 30s emergency timeout below only exists so a stalled connection
+ * doesn't pin the start-audio button forever; it resolves the promise
+ * (does not reject) and we keep the synth fallback in that case.
  */
-function loadSamplerInBackground(): void {
-  if (sampler || samplerFailed) return;
-  // Safety timeout: if samples don't arrive in time, stay on the synth.
-  const timeout = setTimeout(() => {
-    if (!samplerReady) {
-      samplerFailed = true;
-    }
-  }, 10_000);
-  try {
-    sampler = new Tone.Sampler({
-      urls: SAMPLE_URLS,
-      onload: () => {
-        samplerReady = true;
-        clearTimeout(timeout);
-      },
-      onerror: (err) => {
-        samplerFailed = true;
-        samplerReady = false;
-        clearTimeout(timeout);
-        console.warn('[audio] piano samples failed to load, using built-in synth:', err);
-      },
-    }).connect(getOutputGain());
-  } catch (err) {
-    samplerFailed = true;
-    clearTimeout(timeout);
-    console.warn('[audio] could not create sampler, using built-in synth:', err);
+function loadSampler(): Promise<void> {
+  if (sampler && samplerReady) return Promise.resolve();
+  if (sampler) {
+    // A previous attempt is still in flight — wait until it settles.
+    return new Promise((resolve) => {
+      const t = setInterval(() => {
+        if (samplerReady || samplerFailed) {
+          clearInterval(t);
+          resolve();
+        }
+      }, 50);
+    });
   }
+  return new Promise((resolve) => {
+    let settled = false;
+    const settleOnce = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const emergencyTimeout = setTimeout(() => {
+      if (!samplerReady) {
+        samplerFailed = true;
+        console.warn('[audio] piano sampler timed out after 30s, using synth fallback');
+      }
+      settleOnce();
+    }, 30_000);
+    try {
+      sampler = new Tone.Sampler({
+        urls: SAMPLE_URLS,
+        onload: () => {
+          samplerReady = true;
+          samplerFailed = false;
+          clearTimeout(emergencyTimeout);
+          settleOnce();
+        },
+        onerror: (err) => {
+          samplerFailed = true;
+          samplerReady = false;
+          clearTimeout(emergencyTimeout);
+          console.warn('[audio] piano samples failed to load, using built-in synth:', err);
+          settleOnce();
+        },
+      }).connect(getOutputGain());
+    } catch (err) {
+      samplerFailed = true;
+      clearTimeout(emergencyTimeout);
+      console.warn('[audio] could not create sampler, using built-in synth:', err);
+      settleOnce();
+    }
+  });
 }
 
 /** Returns whichever instrument is currently ready to play. */
@@ -180,13 +219,23 @@ export async function startAudio(): Promise<void> {
   unlockIOSSilentSwitch();
   if (audioStarted) {
     await ensureRunning();
+    // If a previous start ended on synth fallback (e.g. emergency timeout
+    // fired) try to load the sampler again now that the user is back —
+    // network conditions may have improved.
+    if (samplerFailed && !sampler) {
+      samplerFailed = false;
+      await loadSampler();
+    }
     return;
   }
   await Tone.start();
   await ensureRunning();
   audioStarted = true;
-  getSynth();              // ensure guaranteed-sound instrument is ready now
-  loadSamplerInBackground(); // try to upgrade to real piano samples
+  getSynth();              // create synth eagerly so it can act as the safety net
+  // Block on sampler load so the very first question already plays the piano
+  // sample, not the FM synth fallback. Local bundling keeps this short
+  // (~1-2s) and the caller (handleAudioStart) already shows a loading state.
+  await loadSampler();
 }
 
 export function isAudioStarted(): boolean {

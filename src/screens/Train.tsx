@@ -95,13 +95,18 @@ export function Train() {
     beginSession();
   }
 
-  // Keep audio-quality indicator in sync as background sample loading resolves.
+  // Keep the audio-quality indicator in sync. startAudio() now awaits the
+  // sampler so by the time we get here the status is usually already 'piano',
+  // but on the slow-path (emergency timeout fired) the sampler may still
+  // resolve later — so we keep polling until we see 'piano' rather than
+  // bailing on 'synth-fallback'. Otherwise the banner would stick even
+  // after samples actually finished loading.
   useEffect(() => {
     if (!audioReady) return;
     const id = setInterval(() => {
       const q = getAudioStatus();
       setAudioQuality((prev) => (prev === q ? prev : q));
-      if (q !== 'synth') clearInterval(id);
+      if (q === 'piano') clearInterval(id);
     }, 1000);
     return () => clearInterval(id);
   }, [audioReady]);
