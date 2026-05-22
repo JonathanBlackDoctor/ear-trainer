@@ -81,8 +81,9 @@ export function Settings() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 mt-5 space-y-4">
-        {/* PWA install — 설치된 상태면 숨김 */}
-        {!isStandalone && (isIOS || canInstall) && (
+        {/* PWA install — standalone 모드에서는 숨김. 그 외엔 항상 노출하고
+            네이티브 프롬프트가 아직 준비되지 않았으면 click 시 안내한다. */}
+        {!isStandalone && (
           <div className="card">
             <div className="flex items-center justify-between gap-3">
               <div>
