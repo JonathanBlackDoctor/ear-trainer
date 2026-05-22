@@ -141,11 +141,17 @@ export function Train() {
   // after samples actually finished loading.
   useEffect(() => {
     if (!audioReady) return;
+    let attempts = 0;
     const id = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      attempts++;
       const q = getAudioStatus();
       setAudioQuality((prev) => (prev === q ? prev : q));
-      if (q === 'piano') clearInterval(id);
-    }, 1000);
+      // Cap the polling: stop once the sampler reports ready, or after ~30s
+      // total. Without this cap a stalled sampler would keep the 1 Hz wake
+      // alive for the entire session, preventing mobile devices from idling.
+      if (q === 'piano' || attempts >= 15) clearInterval(id);
+    }, 2000);
     return () => clearInterval(id);
   }, [audioReady]);
 
