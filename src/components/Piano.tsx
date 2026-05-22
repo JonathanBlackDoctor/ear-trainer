@@ -105,7 +105,7 @@ export function Piano({
           Object.entries(BLACK_KEY_OFFSETS).map(([pc, offset]) => {
             const note = `${pc}${oct}`;
             const baseX = octIdx * 7 * keyWidth;
-            const x = baseX + (offset - 0.5) * keyWidth - blackWidth / 2;
+            const x = baseX + offset * keyWidth - blackWidth / 2;
             return (
               <button
                 key={note}
