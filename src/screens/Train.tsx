@@ -459,31 +459,6 @@ export function Train() {
             </div>
           </div>
 
-          {/* Solfege input method */}
-          {modeKey === 'solfege' && (
-            <div className="card w-full max-w-sm">
-              <div className="text-sm font-semibold text-slate-600 mb-3">정답 입력 방식</div>
-              <div className="flex gap-2">
-                {[
-                  { value: 'choice', label: '🔤 계이름' },
-                  { value: 'piano', label: '🎹 피아노 건반' },
-                ].map((opt) => (
-                  <button
-                    key={opt.value}
-                    className={`flex-1 py-2 rounded-lg font-semibold text-sm transition-colors ${
-                      solfegeInputMethod === opt.value
-                        ? 'bg-primary-600 text-white'
-                        : 'bg-slate-100 text-slate-600'
-                    }`}
-                    onClick={() => setSolfegeInputMethod(opt.value as 'choice' | 'piano')}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Progression source */}
           {modeKey === 'progression' && (
             <div className="card w-full max-w-sm">
@@ -613,6 +588,28 @@ export function Train() {
           {/* Input area */}
           {phase !== 'feedback' ? (
             <>
+              {/* Solfege input-method toggle (shown above the input itself) */}
+              {isSolfege && (
+                <div className="flex justify-center gap-1 bg-slate-100 p-1 rounded-lg w-fit mx-auto">
+                  {[
+                    { value: 'choice', label: '🔤 계이름' },
+                    { value: 'piano', label: '🎹 건반' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                        solfegeInputMethod === opt.value
+                          ? 'bg-white text-primary-700 shadow-sm'
+                          : 'text-slate-500 active:text-slate-700'
+                      }`}
+                      onClick={() => setSolfegeInputMethod(opt.value as 'choice' | 'piano')}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {/* Choice-based modes */}
               {(isInterval || isChord || (isSolfege && solfegeInputMethod === 'choice')) && (
                 <ChoiceGrid
