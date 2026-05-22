@@ -20,3 +20,12 @@ export function getSolfegeChoices(level: number): ChoiceOption[] {
     label: s,
   }));
 }
+
+// Absolute-pitch mode: identify by note name (C/D/E…) without a reference tone.
+const NOTE_NAMES_DIATONIC = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+const NOTE_NAMES_CHROMATIC = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+export function getNoteNameChoices(level: number): ChoiceOption[] {
+  const names = level <= 1 ? NOTE_NAMES_DIATONIC : NOTE_NAMES_CHROMATIC;
+  return names.map((n) => ({ value: n, label: n }));
+}

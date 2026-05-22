@@ -17,6 +17,11 @@ const MODE_LABELS: Record<ModeKey, string> = {
   rhythm: '리듬',
   tempo: '템포 유지',
   bpm: 'BPM 맞히기',
+  lab: '실험실',
+  'lab-scale': '스케일 식별',
+  'lab-cadence': '종지 식별',
+  'lab-key': '조성 식별',
+  'lab-inversion': '자리바꿈',
 };
 
 export function Stats() {

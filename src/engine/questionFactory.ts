@@ -1,4 +1,4 @@
-import { Note } from 'tonal';
+import { Note, Scale } from 'tonal';
 import type { Question, ChordStep, ProgressionAnswer, ModeSrs, ModeStats } from '../types';
 import {
   INTERVAL_LEVELS,
@@ -13,6 +13,7 @@ import {
   randomProgressionFromConfig,
   randomPraiseProgression,
   getScaleNotes,
+  buildProgressionSteps,
 } from '../theory/progressions';
 import {
   SOLFEGE_LEVELS,
@@ -27,6 +28,9 @@ import {
   BPM_LEVELS,
 } from '../modes/levels';
 import { pickDue } from './srs';
+import {
+  SCALE_LEVELS, CADENCE_PATTERNS, CADENCE_LEVELS, KEY_LEVELS, INVERSION_LEVELS,
+} from '../modes/labModes';
 
 /** SRS-aware target picker. Falls back to a random item when SRS is empty. */
 export function nextTarget(
@@ -209,7 +213,8 @@ export function makeSolfegeQuestion(
   lastItemKey?: string,
   srs?: ModeSrs,
   stats?: ModeStats,
-  candidateFilter?: (key: string) => boolean
+  candidateFilter?: (key: string) => boolean,
+  absoluteMode = false,
 ): Question {
   const cfg = SOLFEGE_LEVELS[level] ?? SOLFEGE_LEVELS[1];
   const key = cfg.keyMode === 'random' ? pickRandom(cfg.keyPool) : fixedKey;
@@ -235,6 +240,22 @@ export function makeSolfegeQuestion(
     : baseOctave + (Math.random() < 0.5 ? -1 : Math.random() < 0.5 ? 0 : 1);
   const tonicMidi = Note.midi(key + octave) ?? 60;
   const note = Note.fromMidi(tonicMidi + semis) ?? key + octave;
+
+  // Absolute-pitch mode: answer is the note-name pitch class (C, D, E…) and
+  // no reference tone is supplied. itemKey is namespaced so stats don't mix
+  // with relative-do solfege.
+  if (absoluteMode) {
+    const pc = Note.pitchClass(note);
+    return {
+      id: genId(),
+      mode: 'solfege',
+      level,
+      itemKey: `abs_${pc}`,
+      data: { type: 'solfege', note, solfege: pc, key },
+      answer: pc,
+      context: { key, absoluteMode: true },
+    };
+  }
 
   return {
     id: genId(),
@@ -374,6 +395,107 @@ export function makeBpmQuestion(level: number): Question {
     },
     answer: bpm,
     context: { key: 'C' },
+  };
+}
+
+// ─── Lab: Scale ───────────────────────────────────────────────────────────────
+const SCALE_TONAL_NAMES: Record<string, string> = {
+  'major': 'major',
+  'natural minor': 'minor',
+  'harmonic minor': 'harmonic minor',
+  'melodic minor': 'melodic minor',
+  'dorian': 'dorian',
+  'phrygian': 'phrygian',
+  'lydian': 'lydian',
+  'mixolydian': 'mixolydian',
+};
+
+export function makeScaleQuestion(level: number): Question {
+  const choices = SCALE_LEVELS[level] ?? SCALE_LEVELS[1];
+  const scaleName = pickRandom(choices);
+  const tonic = pickRandom(COMMON_KEYS);
+  const tonalName = SCALE_TONAL_NAMES[scaleName] ?? 'major';
+  const scaleNotes = Scale.get(`${tonic}4 ${tonalName}`).notes;
+  // Add upper tonic (octave above) so it sounds like a complete scale
+  const upper = Note.transpose(tonic + '4', '8P');
+  const fullNotes = [...scaleNotes, upper];
+  const direction: 'up' | 'down' = level >= 3 && Math.random() < 0.5 ? 'down' : 'up';
+  const notes = direction === 'up' ? fullNotes : [...fullNotes].reverse();
+
+  return {
+    id: genId(),
+    mode: 'lab-scale',
+    level,
+    itemKey: `scale_${scaleName.replace(/\s+/g, '-')}`,
+    data: { type: 'scale', tonic, scaleName, notes, direction },
+    answer: scaleName,
+    context: { key: tonic, absoluteMode: true },
+  };
+}
+
+// ─── Lab: Cadence ─────────────────────────────────────────────────────────────
+export function makeCadenceQuestion(
+  level: number,
+  keyMode: 'fixed' | 'random',
+  fixedKey: string,
+): Question {
+  const choices = CADENCE_LEVELS[level] ?? CADENCE_LEVELS[1];
+  const cadenceType = pickRandom(choices);
+  const key = randomKey(keyMode, fixedKey);
+  const pattern = CADENCE_PATTERNS[cadenceType];
+  const chords = buildProgressionSteps(pattern, key, 3);
+
+  return {
+    id: genId(),
+    mode: 'lab-cadence',
+    level,
+    itemKey: `cadence_${cadenceType}`,
+    data: { type: 'cadence', cadenceType, key, chords },
+    answer: cadenceType,
+    context: { key, referenceToneNote: key + '4' },
+  };
+}
+
+// ─── Lab: Key Identification ──────────────────────────────────────────────────
+export function makeKeyIdQuestion(level: number): Question {
+  const choices = KEY_LEVELS[level] ?? KEY_LEVELS[1];
+  const key = pickRandom(choices);
+  // Always I-IV-V-I in the chosen key.
+  const pattern: Array<[number, string]> = [
+    [1, 'major'], [4, 'major'], [5, 'dominant7'], [1, 'major'],
+  ];
+  const steps = buildProgressionSteps(pattern, key, 3);
+  const chords = steps.map((s) => s.notes);
+
+  return {
+    id: genId(),
+    mode: 'lab-key',
+    level,
+    itemKey: `key_${key}`,
+    data: { type: 'key-id', key, mode: 'major', chords },
+    answer: key,
+    context: { key, absoluteMode: true },
+  };
+}
+
+// ─── Lab: Chord Inversion ─────────────────────────────────────────────────────
+export function makeInversionQuestion(level: number): Question {
+  const inversions = INVERSION_LEVELS[level] ?? INVERSION_LEVELS[1];
+  const inv = pickRandom(inversions);
+  // Use a triad for Lv1, possibly 7th for Lv2 with 3rd inversion
+  const useSeventh = level >= 2 && inv === 3;
+  const quality = useSeventh ? 'dominant7' : pickRandom(['major', 'minor']);
+  const rootNote = randomNote('C3', 'E4');
+  const notes = buildChord(rootNote, quality, inv);
+
+  return {
+    id: genId(),
+    mode: 'lab-inversion',
+    level,
+    itemKey: `inv_${inv}`,
+    data: { type: 'chord', notes, root: rootNote, quality, inversion: inv, arpeggio: false },
+    answer: String(inv),
+    context: { key: 'C', absoluteMode: true },
   };
 }
 

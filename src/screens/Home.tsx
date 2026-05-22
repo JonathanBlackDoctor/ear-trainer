@@ -11,6 +11,7 @@ import {
   TEMPO_MODE_INFO,
   BPM_MODE_INFO,
 } from '../modes/progressionMode';
+import { LAB_MODE_INFO } from '../modes/labModes';
 import type { ModeKey, ModeStats } from '../types';
 import { useStore } from '../store/useStore';
 import { topWeakItems } from '../engine/weakness';
@@ -26,6 +27,7 @@ const MODE_ACCENT_CLASS: Partial<Record<ModeKey, string>> = {
   rhythm:      'accent-rhythm',
   tempo:       'accent-tempo',
   bpm:         'accent-bpm',
+  lab:         'accent-interval',
 };
 
 const ALL_MODES = [
@@ -38,6 +40,7 @@ const ALL_MODES = [
   RHYTHM_MODE_INFO,
   TEMPO_MODE_INFO,
   BPM_MODE_INFO,
+  LAB_MODE_INFO,
 ];
 
 export function Home() {
@@ -52,6 +55,10 @@ export function Home() {
     : 0;
 
   function startMode(key: ModeKey) {
+    if (key === 'lab') {
+      navigate('/lab');
+      return;
+    }
     navigate(`/train/${key}`);
   }
 
