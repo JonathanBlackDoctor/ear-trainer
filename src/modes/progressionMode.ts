@@ -1,16 +1,5 @@
-import type { ChoiceOption } from '../components/ChoiceGrid';
-import { intervalLabel } from '../theory/intervals';
-import { MAX_LEVEL, TRANSPOSE_LEVELS } from './levels';
+import { MAX_LEVEL } from './levels';
 import type { ModeKey } from '../types';
-
-export function getTransposeChoices(level: number): ChoiceOption[] {
-  const cfg = TRANSPOSE_LEVELS[level] ?? TRANSPOSE_LEVELS[1];
-  return cfg.intervals.map((name) => ({
-    value: name,
-    label: name,
-    sublabel: intervalLabel(name),
-  }));
-}
 
 export const PROGRESSION_MODE_INFO = {
   key: 'progression' as ModeKey,
@@ -36,8 +25,8 @@ export const TRANSPOSE_MODE_INFO = {
   key: 'transpose' as ModeKey,
   name: '조옮김 연습',
   emoji: '🔄',
-  description: '다른 조로 들어도 같은 도수/계명을 인식하세요',
-  howTo: '매 문제마다 조성이 바뀌어 들립니다. 조가 달라져도 같은 도수/계명으로 인식해 답을 선택하세요.',
+  description: '키가 바뀌어도 같은 멜로디는 같은 도수로 듣기',
+  howTo: '먼저 으뜸음이 들리고, 이어 짧은 멜로디가 들립니다. 각 음의 도수(1~7)를 들은 순서대로 입력하세요. 키가 바뀌어도 같은 멜로디 모양이면 답은 동일합니다.',
   maxLevel: MAX_LEVEL,
   defaultLevel: 1,
 };
