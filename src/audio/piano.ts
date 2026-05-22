@@ -30,6 +30,29 @@ const SAMPLE_URLS: Record<string, string> = Object.fromEntries(
   Object.entries(SAMPLE_NOTES).map(([note, file]) => [note, SALAMANDER_BASE + file])
 );
 
+// ─── Diagnostics ────────────────────────────────────────────────────────────
+// loadSampler() populates this. Exposed via getSamplerDiagnostics() and
+// window.__pianoSampleReport so we (or the user on mobile) can see exactly
+// which sample failed and with what HTTP status / decode error.
+interface SampleLoadEntry {
+  key: string;
+  url: string;
+  status: number | null;        // HTTP status; null if fetch threw before a response
+  ok: boolean;                  // fetch + decode both succeeded
+  decodeError?: string;
+  bytes?: number;
+}
+interface SamplerDiagnostics {
+  base: string;
+  resolvedBase: string;         // SALAMANDER_BASE resolved against document.baseURI
+  startedAt: number;
+  finishedAt: number | null;
+  entries: SampleLoadEntry[];
+  loadedKeys: string[];
+  reason: 'pending' | 'ready' | 'failed' | 'timeout' | 'exception';
+}
+let diagnostics: SamplerDiagnostics | null = null;
+
 // 0.05s lookahead — mobile AudioContext clocks lag right after resume, and
 // scheduling at bare Tone.now() drops the note silently on iOS/Android.
 const SCHEDULE_LOOKAHEAD = 0.05;
@@ -125,49 +148,166 @@ function loadSampler(): Promise<void> {
       }, 50);
     });
   }
+
+  // Resolve base against document.baseURI so the logged URL is a real
+  // absolute URL — any BASE_URL / HashRouter resolution quirk shows up here
+  // instead of being hidden inside Tone.js's fetch.
+  const resolvedBase = new URL(SALAMANDER_BASE, document.baseURI).href;
+  diagnostics = {
+    base: SALAMANDER_BASE,
+    resolvedBase,
+    startedAt: performance.now(),
+    finishedAt: null,
+    entries: [],
+    loadedKeys: [],
+    reason: 'pending',
+  };
+  (window as unknown as { __pianoSampleReport?: SamplerDiagnostics }).__pianoSampleReport = diagnostics;
+  console.info('[audio] sampler load starting', {
+    base: SALAMANDER_BASE,
+    resolvedBase,
+    count: Object.keys(SAMPLE_URLS).length,
+  });
+
   return new Promise((resolve) => {
     let settled = false;
     const settleOnce = () => {
       if (settled) return;
       settled = true;
+      if (diagnostics) diagnostics.finishedAt = performance.now();
       resolve();
     };
+
+    // Hard cap. If individual fetches stall forever we still want
+    // startAudio() to return so the synth fallback is at least available.
+    // We only mark failed if NOTHING loaded by then — partial success still
+    // proceeds.
     const emergencyTimeout = setTimeout(() => {
       if (!samplerReady) {
-        samplerFailed = true;
-        console.warn('[audio] piano sampler timed out after 30s, using synth fallback');
+        const loaded = diagnostics?.loadedKeys.length ?? 0;
+        if (loaded === 0) {
+          samplerFailed = true;
+          if (diagnostics) diagnostics.reason = 'timeout';
+          console.warn('[audio] piano sampler timed out after 30s with 0 samples — using synth fallback');
+        } else {
+          console.warn(`[audio] piano sampler timed out after 30s with ${loaded} samples loaded — proceeding`);
+        }
       }
       settleOnce();
     }, 30_000);
-    try {
-      sampler = new Tone.Sampler({
-        urls: SAMPLE_URLS,
-        // Short release so releaseAll() during stopAllAudio() silences active
-        // notes inside the 50ms mute window. The natural ringing of the piano
-        // sample is baked into the buffer; this only controls the fade when
-        // we ask it to stop.
-        release: 0.05,
-        onload: () => {
-          samplerReady = true;
-          samplerFailed = false;
-          clearTimeout(emergencyTimeout);
-          settleOnce();
-        },
-        onerror: (err) => {
-          samplerFailed = true;
-          samplerReady = false;
-          clearTimeout(emergencyTimeout);
-          console.warn('[audio] piano samples failed to load, using built-in synth:', err);
-          settleOnce();
-        },
-      }).connect(getOutputGain());
-      sampler.volume.value = -3;
-    } catch (err) {
-      samplerFailed = true;
-      clearTimeout(emergencyTimeout);
-      console.warn('[audio] could not create sampler, using built-in synth:', err);
-      settleOnce();
-    }
+
+    void (async () => {
+      // @ts-expect-error — rawContext exposes the underlying AudioContext
+      const rawCtx: AudioContext | undefined = Tone.getContext().rawContext;
+      if (!rawCtx) {
+        samplerFailed = true;
+        if (diagnostics) diagnostics.reason = 'exception';
+        clearTimeout(emergencyTimeout);
+        console.warn('[audio] no AudioContext available — using synth fallback');
+        settleOnce();
+        return;
+      }
+
+      // Fetch + decode every URL in parallel. Per-key failure is captured in
+      // diagnostics but does NOT abort the whole load — that's the core
+      // resilience fix vs. Tone.Sampler.onerror's all-or-nothing semantics.
+      const results = await Promise.all(
+        Object.entries(SAMPLE_URLS).map(
+          async ([key, url]): Promise<[string, AudioBuffer | null, SampleLoadEntry]> => {
+            const entry: SampleLoadEntry = { key, url, status: null, ok: false };
+            try {
+              // force-cache lets workbox CacheFirst serve from cache when
+              // available; falls back to normal network fetch otherwise.
+              const res = await fetch(url, { cache: 'force-cache' });
+              entry.status = res.status;
+              if (!res.ok) {
+                console.warn(`[audio] sample ${key}: HTTP ${res.status} for ${url}`);
+                return [key, null, entry];
+              }
+              const buf = await res.arrayBuffer();
+              entry.bytes = buf.byteLength;
+              try {
+                const decoded = await rawCtx.decodeAudioData(buf.slice(0));
+                entry.ok = true;
+                return [key, decoded, entry];
+              } catch (decodeErr) {
+                entry.decodeError = String(decodeErr);
+                console.warn(`[audio] sample ${key}: decode failed`, decodeErr);
+                return [key, null, entry];
+              }
+            } catch (fetchErr) {
+              entry.decodeError = String(fetchErr);
+              console.warn(`[audio] sample ${key}: fetch failed`, fetchErr);
+              return [key, null, entry];
+            }
+          }
+        )
+      );
+
+      if (settled) return; // emergency timeout already won the race
+
+      const goodUrls: Record<string, AudioBuffer> = {};
+      const loadedKeys: string[] = [];
+      for (const [key, buf, entry] of results) {
+        diagnostics?.entries.push(entry);
+        if (buf) {
+          goodUrls[key] = buf;
+          loadedKeys.push(key);
+        }
+      }
+      if (diagnostics) diagnostics.loadedKeys = loadedKeys;
+
+      const total = Object.keys(SAMPLE_URLS).length;
+      console.info(`[audio] sampler fetch complete: ${loadedKeys.length}/${total} samples loaded`, { loadedKeys });
+
+      if (loadedKeys.length === 0) {
+        samplerFailed = true;
+        samplerReady = false;
+        if (diagnostics) diagnostics.reason = 'failed';
+        clearTimeout(emergencyTimeout);
+        console.warn('[audio] no piano samples loaded — using synth fallback');
+        settleOnce();
+        return;
+      }
+
+      // Hand the pre-decoded AudioBuffers to Tone.Sampler. Tone v14 accepts
+      // AudioBuffer values in `urls` and skips its own fetch+decode for those
+      // entries, so onerror won't fire for individual buffer failures.
+      try {
+        sampler = new Tone.Sampler({
+          urls: goodUrls as unknown as Record<string, string>,
+          // Short release so releaseAll() during stopAllAudio() silences active
+          // notes inside the 50ms mute window.
+          release: 0.05,
+          onload: () => {
+            samplerReady = true;
+            samplerFailed = false;
+            if (diagnostics) diagnostics.reason = 'ready';
+            clearTimeout(emergencyTimeout);
+            console.info(`[audio] sampler ready with ${loadedKeys.length}/${total} samples`);
+            settleOnce();
+          },
+          onerror: (err) => {
+            // Shouldn't fire — we passed pre-decoded buffers. Treat as a
+            // construction-time failure if it does.
+            if (!samplerReady) {
+              samplerFailed = true;
+              if (diagnostics) diagnostics.reason = 'failed';
+            }
+            clearTimeout(emergencyTimeout);
+            console.warn('[audio] unexpected sampler.onerror after pre-decode:', err);
+            settleOnce();
+          },
+        }).connect(getOutputGain());
+        sampler.volume.value = -3;
+      } catch (err) {
+        samplerFailed = true;
+        if (diagnostics) diagnostics.reason = 'exception';
+        clearTimeout(emergencyTimeout);
+        console.warn('[audio] could not create sampler, using built-in synth:', err);
+        settleOnce();
+      }
+    })();
   });
 }
 
@@ -260,6 +400,7 @@ export async function startAudio(): Promise<void> {
     // network conditions may have improved.
     if (samplerFailed && !sampler) {
       samplerFailed = false;
+      diagnostics = null;
       await loadSampler();
     }
     return;
@@ -295,6 +436,11 @@ export function getAudioStatus(): AudioQuality {
   if (sampler && samplerReady) return 'piano';
   if (samplerFailed) return 'synth-fallback';
   return 'synth';
+}
+
+/** Snapshot of the last sampler load attempt — for debugging in the console. */
+export function getSamplerDiagnostics(): SamplerDiagnostics | null {
+  return diagnostics ? { ...diagnostics, entries: [...diagnostics.entries] } : null;
 }
 
 // ─── Stop / scheduling helpers ──────────────────────────────────────────────
