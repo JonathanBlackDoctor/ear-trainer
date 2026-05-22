@@ -8,7 +8,12 @@ export type ModeKey =
   | 'transpose'
   | 'rhythm'
   | 'tempo'
-  | 'bpm';
+  | 'bpm'
+  | 'lab'
+  | 'lab-scale'
+  | 'lab-cadence'
+  | 'lab-key'
+  | 'lab-inversion';
 
 // ─── Question & Answer ────────────────────────────────────────────────────────
 export interface Question {
@@ -21,6 +26,7 @@ export interface Question {
   context: {
     key: string;         // tonic, e.g. "C"
     referenceToneNote?: string; // full note to play as reference, e.g. "C4"
+    absoluteMode?: boolean;     // session-flag: absolute-pitch mode (no reference)
   };
 }
 
@@ -33,7 +39,10 @@ export type QuestionData =
   | TransposeData
   | RhythmData
   | TempoData
-  | BpmData;
+  | BpmData
+  | ScaleData
+  | CadenceData
+  | KeyIdData;
 
 export interface IntervalData {
   type: 'interval';
@@ -103,6 +112,28 @@ export interface TempoData {
   bpm: number;          // target BPM the user must maintain
   countInBeats: number; // metronome lead-in beat count
   holdBeats: number;    // beat count the user must sustain after the metronome stops
+}
+
+export interface ScaleData {
+  type: 'scale';
+  tonic: string;         // e.g. "C"
+  scaleName: string;     // e.g. "major", "natural-minor", "dorian"
+  notes: string[];       // full notes including upper tonic
+  direction: 'up' | 'down';
+}
+
+export interface CadenceData {
+  type: 'cadence';
+  cadenceType: string;   // e.g. "authentic", "plagal", "half", "deceptive"
+  key: string;
+  chords: ChordStep[];
+}
+
+export interface KeyIdData {
+  type: 'key-id';
+  key: string;           // e.g. "C", "F#"
+  mode: 'major' | 'minor';
+  chords: string[][];    // sequence of chord note arrays (I-IV-V-I)
 }
 
 export interface BpmData {

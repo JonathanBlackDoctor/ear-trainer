@@ -10,6 +10,7 @@ import {
   makeIntervalQuestion, makeChordQuestion, makeMelodyQuestion,
   makeSolfegeQuestion, makeProgressionQuestion, makeRhythmQuestion,
   makeTempoQuestion, makeBpmQuestion, makeTransposeQuestion,
+  makeScaleQuestion, makeCadenceQuestion, makeKeyIdQuestion, makeInversionQuestion,
 } from '../engine/questionFactory';
 import { MAX_LEVEL, getLevelLabel } from '../modes/levels';
 import { judge, type TempoJudgeDetails } from '../engine/judge';
@@ -20,8 +21,13 @@ import { Staff } from '../components/Staff';
 import { ProgressBar } from '../components/ProgressBar';
 import { getIntervalChoices } from '../modes/intervalMode';
 import { getChordChoices } from '../modes/chordMode';
-import { getSolfegeChoices } from '../modes/solfegeMode';
+import { getSolfegeChoices, getNoteNameChoices } from '../modes/solfegeMode';
 import { getDegreeChoices, getTransposeChoices } from '../modes/progressionMode';
+import {
+  LAB_SCALE_MODE_INFO, LAB_CADENCE_MODE_INFO, LAB_KEY_MODE_INFO, LAB_INVERSION_MODE_INFO,
+  getScaleChoices, getCadenceChoices, getKeyChoices, getInversionChoices,
+} from '../modes/labModes';
+import type { ScaleData, CadenceData, KeyIdData } from '../types';
 import {
   startAudio, playNote, playChord, playSequence, playProgression, playArpeggio,
   playMetronomeClick, playRhythmClick,
@@ -50,7 +56,18 @@ const MODE_INFO: Record<string, { name: string; emoji: string; maxLevel?: number
   rhythm: RHYTHM_MODE_INFO,
   tempo: TEMPO_MODE_INFO,
   bpm: BPM_MODE_INFO,
+  'lab-scale': LAB_SCALE_MODE_INFO,
+  'lab-cadence': LAB_CADENCE_MODE_INFO,
+  'lab-key': LAB_KEY_MODE_INFO,
+  'lab-inversion': LAB_INVERSION_MODE_INFO,
 };
+
+// Modes for which the absolute-pitch toggle should be available
+// (pitch-based modes; excludes rhythm/tempo/bpm).
+const ABSOLUTE_TOGGLE_MODES = new Set<ModeKey>([
+  'interval', 'chord', 'solfege', 'progression', 'melody', 'transpose',
+  'lab-scale', 'lab-cadence', 'lab-key', 'lab-inversion',
+]);
 
 type TrainPhase = 'setup' | 'playing' | 'answering' | 'feedback' | 'done';
 
@@ -86,6 +103,7 @@ export function Train() {
   const [isCountingIn, setIsCountingIn] = useState(false);
   const [audioQuality, setAudioQuality] = useState<AudioQuality>('synth');
   const [solfegeInputMethod, setSolfegeInputMethod] = useState<'choice' | 'piano'>('choice');
+  const [absoluteMode, setAbsoluteMode] = useState(false);
 
   const modeKey = mode as ModeKey;
   const modeInfo = MODE_INFO[modeKey] ?? { name: modeKey, emoji: '🎵' };
@@ -172,23 +190,40 @@ export function Train() {
   }
 
   function generateQuestion(idx: number): Question {
-    const k = settings.keyMode;
+    // Force random keys when in absolute mode so the user can't infer the
+    // tonic from a fixed-key session.
+    const k = absoluteMode ? 'random' : settings.keyMode;
     const fk = settings.fixedKey;
     const last = session?.questions[idx - 1]?.itemKey;
     const modeSrs = srs[modeKey];
     const modeStats = stats[modeKey];
+    let q: Question;
     switch (modeKey) {
-      case 'interval': return makeIntervalQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter);
-      case 'chord': return makeChordQuestion(level, k, fk, false, last, modeSrs, modeStats, candidateFilter);
-      case 'solfege': return makeSolfegeQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter);
-      case 'progression': return makeProgressionQuestion(level, k, fk, progressionSource);
-      case 'melody': return makeMelodyQuestion(level, k, fk);
-      case 'transpose': return makeTransposeQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter);
+      case 'interval': q = makeIntervalQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter); break;
+      case 'chord': q = makeChordQuestion(level, k, fk, false, last, modeSrs, modeStats, candidateFilter); break;
+      case 'solfege': q = makeSolfegeQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter, absoluteMode); break;
+      case 'progression': q = makeProgressionQuestion(level, k, fk, progressionSource); break;
+      case 'melody': q = makeMelodyQuestion(level, k, fk); break;
+      case 'transpose': q = makeTransposeQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter); break;
       case 'rhythm': return makeRhythmQuestion(level);
       case 'tempo': return makeTempoQuestion(level);
       case 'bpm': return makeBpmQuestion(level);
-      default: return makeIntervalQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter);
+      case 'lab-scale': return makeScaleQuestion(level);
+      case 'lab-cadence': q = makeCadenceQuestion(level, k, fk); break;
+      case 'lab-key': return makeKeyIdQuestion(level);
+      case 'lab-inversion': return makeInversionQuestion(level);
+      default: q = makeIntervalQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter);
     }
+    // Stamp absoluteMode flag on the question so downstream playback/UI
+    // (reference-tone gate, key badge) honours the session-level toggle even
+    // for factories that don't accept the flag explicitly.
+    if (absoluteMode) {
+      q = {
+        ...q,
+        context: { ...q.context, absoluteMode: true, referenceToneNote: undefined },
+      };
+    }
+    return q;
   }
 
   // ─── Playback ─────────────────────────────────────────────────────────────
@@ -203,8 +238,8 @@ export function Train() {
     const gen = getPlaybackGen();
     setLoading(true);
     try {
-      // Play reference tone if enabled
-      if (settings.referenceTone === 'perQuestion' && q.context?.referenceToneNote) {
+      // Play reference tone if enabled (skip entirely in absolute-pitch mode)
+      if (!q.context?.absoluteMode && settings.referenceTone === 'perQuestion' && q.context?.referenceToneNote) {
         await playReferenceTone(q.context.referenceToneNote, '2n');
         if (gen !== getPlaybackGen()) return;
         await delay(700 / speed);
@@ -278,6 +313,21 @@ export function Train() {
         await playMetronome(d.bpm, d.beats);
         break;
       }
+      case 'scale': {
+        const d = data as ScaleData;
+        await playSequence(d.notes, '8n', speed);
+        break;
+      }
+      case 'cadence': {
+        const d = data as CadenceData;
+        await playProgression(d.chords.map((c) => c.notes), '2n', speed);
+        break;
+      }
+      case 'key-id': {
+        const d = data as KeyIdData;
+        await playProgression(d.chords, '2n', speed);
+        break;
+      }
     }
   }
 
@@ -331,12 +381,17 @@ export function Train() {
     if (modeKey === 'solfege') {
       const q = currentQuestion;
       if (!q) return;
+      setPianoInput([note]);
+      if (q.context?.absoluteMode) {
+        // Absolute mode: submit the pressed key's pitch class directly.
+        submitAnswer(Note.pitchClass(note));
+        return;
+      }
       const tonic = q.context.key || 'C';
       const tonicMidi = Note.midi(tonic + '4') ?? 60;
       const pressedMidi = Note.midi(note) ?? 60;
       const semitones = ((pressedMidi - tonicMidi) % 12 + 12) % 12;
       const syllable = semitoneToSolfege(semitones);
-      setPianoInput([note]);
       submitAnswer(syllable);
       return;
     }
@@ -535,6 +590,36 @@ export function Train() {
             </div>
           </div>
 
+          {/* Absolute-pitch toggle (pitch-based modes only) */}
+          {ABSOLUTE_TOGGLE_MODES.has(modeKey) && (
+            <div className="card w-full max-w-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-slate-700">
+                    🎯 절대음감 모드
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1 leading-snug">
+                    기준음 없이 음이름만 듣고 맞히기
+                  </div>
+                </div>
+                <button
+                  role="switch"
+                  aria-checked={absoluteMode}
+                  onClick={() => setAbsoluteMode((v) => !v)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                    absoluteMode ? 'bg-primary-600' : 'bg-slate-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                      absoluteMode ? 'translate-x-5' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Progression source */}
           {modeKey === 'progression' && (
             <div className="card w-full max-w-sm">
@@ -585,6 +670,9 @@ export function Train() {
   const isTranspose = modeKey === 'transpose';
   const isTempo = modeKey === 'tempo';
   const isBpm = modeKey === 'bpm';
+  const isLabChoice = modeKey === 'lab-scale' || modeKey === 'lab-cadence'
+    || modeKey === 'lab-key' || modeKey === 'lab-inversion';
+  const isAbsolute = !!currentQuestion?.context?.absoluteMode;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -617,12 +705,12 @@ export function Train() {
           <PlaybackControls
             onPlay={(speed) => playQuestion(currentQuestion, speed)}
             onPlayReference={handlePlayReference}
-            showReference={settings.referenceTone !== 'off' && !!currentQuestion?.context?.referenceToneNote}
+            showReference={!isAbsolute && settings.referenceTone !== 'off' && !!currentQuestion?.context?.referenceToneNote}
             loading={loading}
           />
 
           {/* Key badge */}
-          {currentQuestion.context.key && !isInterval && (
+          {currentQuestion.context.key && !isInterval && !isAbsolute && (
             <div className="text-center">
               <span className="inline-block bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1 rounded-full">
                 조성: {currentQuestion.context.key}장조
@@ -698,13 +786,13 @@ export function Train() {
               )}
 
               {/* Choice-based modes */}
-              {(isInterval || isChord || isTranspose || (isSolfege && solfegeInputMethod === 'choice')) && (
+              {(isInterval || isChord || isTranspose || (isSolfege && solfegeInputMethod === 'choice') || isLabChoice) && (
                 <ChoiceGrid
-                  options={getChoiceOptions(modeKey, level)}
+                  options={getChoiceOptions(modeKey, level, isAbsolute)}
                   selected={selectedAnswer ?? undefined}
                   answered={false}
                   onSelect={handleChoiceSelect}
-                  columns={isInterval || isTranspose ? 2 : isChord ? 2 : 3}
+                  columns={isInterval || isTranspose ? 2 : isChord ? 2 : modeKey === 'lab-key' ? 4 : modeKey === 'lab-inversion' ? 2 : 3}
                   disabled={loading}
                 />
               )}
@@ -893,14 +981,14 @@ export function Train() {
           ) : (
             /* After feedback: show correct answer highlight for choice modes */
             <>
-              {(isInterval || isChord || isTranspose || (isSolfege && solfegeInputMethod === 'choice')) && (
+              {(isInterval || isChord || isTranspose || (isSolfege && solfegeInputMethod === 'choice') || isLabChoice) && (
                 <ChoiceGrid
-                  options={getChoiceOptions(modeKey, level)}
+                  options={getChoiceOptions(modeKey, level, isAbsolute)}
                   selected={selectedAnswer ?? undefined}
                   correct={feedbackResult?.correctAnswer as string}
                   answered
                   onSelect={() => {}}
-                  columns={isInterval || isTranspose ? 2 : isChord ? 2 : 3}
+                  columns={isInterval || isTranspose ? 2 : isChord ? 2 : modeKey === 'lab-key' ? 4 : modeKey === 'lab-inversion' ? 2 : 3}
                 />
               )}
               {isSolfege && solfegeInputMethod === 'piano' && feedbackResult && (
@@ -972,11 +1060,15 @@ export function Train() {
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-function getChoiceOptions(mode: ModeKey, level: number): ChoiceOption[] {
+function getChoiceOptions(mode: ModeKey, level: number, absolute = false): ChoiceOption[] {
   if (mode === 'interval') return getIntervalChoices(level);
   if (mode === 'transpose') return getTransposeChoices(level);
   if (mode === 'chord') return getChordChoices(level);
-  if (mode === 'solfege') return getSolfegeChoices(level);
+  if (mode === 'solfege') return absolute ? getNoteNameChoices(level) : getSolfegeChoices(level);
+  if (mode === 'lab-scale') return getScaleChoices(level);
+  if (mode === 'lab-cadence') return getCadenceChoices(level);
+  if (mode === 'lab-key') return getKeyChoices(level);
+  if (mode === 'lab-inversion') return getInversionChoices(level);
   return [];
 }
 

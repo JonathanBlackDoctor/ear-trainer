@@ -30,7 +30,11 @@ export function judge(question: Question, userAnswer: AnswerValue): JudgeResult 
   switch (question.mode) {
     case 'interval':
     case 'chord':
-    case 'solfege': {
+    case 'solfege':
+    case 'lab-scale':
+    case 'lab-cadence':
+    case 'lab-key':
+    case 'lab-inversion': {
       // String comparison
       const isCorrect = (userAnswer as string) === (correct as string);
       return { correct: isCorrect, partialScore: isCorrect ? 1 : 0, correctAnswer: correct };

@@ -57,6 +57,11 @@ const defaultStats = (): Record<ModeKey, ModeStats> => ({
   rhythm: emptyModeStats(),
   tempo: emptyModeStats(),
   bpm: emptyModeStats(),
+  lab: emptyModeStats(),
+  'lab-scale': emptyModeStats(),
+  'lab-cadence': emptyModeStats(),
+  'lab-key': emptyModeStats(),
+  'lab-inversion': emptyModeStats(),
 });
 
 const defaultSrs = (): Record<ModeKey, ModeSrs> => ({
@@ -69,6 +74,11 @@ const defaultSrs = (): Record<ModeKey, ModeSrs> => ({
   rhythm: emptyModeSrs(),
   tempo: emptyModeSrs(),
   bpm: emptyModeSrs(),
+  lab: emptyModeSrs(),
+  'lab-scale': emptyModeSrs(),
+  'lab-cadence': emptyModeSrs(),
+  'lab-key': emptyModeSrs(),
+  'lab-inversion': emptyModeSrs(),
 });
 
 const RECENT_WINDOW = 8;

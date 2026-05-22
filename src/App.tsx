@@ -11,6 +11,7 @@ const Train = lazy(() => import('./screens/Train').then((m) => ({ default: m.Tra
 const Result = lazy(() => import('./screens/Result').then((m) => ({ default: m.Result })));
 const Stats = lazy(() => import('./screens/Stats').then((m) => ({ default: m.Stats })));
 const Settings = lazy(() => import('./screens/Settings').then((m) => ({ default: m.Settings })));
+const Lab = lazy(() => import('./screens/Lab').then((m) => ({ default: m.Lab })));
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
             <Route path="/result" element={<Result />} />
             <Route path="/stats" element={<Stats />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/lab" element={<Lab />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
