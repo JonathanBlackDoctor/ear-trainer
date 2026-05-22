@@ -22,7 +22,8 @@ import { getChordChoices } from '../modes/chordMode';
 import { getSolfegeChoices } from '../modes/solfegeMode';
 import { getDegreeChoices } from '../modes/progressionMode';
 import {
-  startAudio, playNote, playChord, playSequence, playProgression, playArpeggio, playClick,
+  startAudio, playNote, playChord, playSequence, playProgression, playArpeggio,
+  playMetronomeClick, playRhythmClick,
   playMetronome, stopAllAudio, getAudioStatus, getPlaybackGen, type AudioQuality,
 } from '../audio/piano';
 import { INTERVAL_MODE_INFO } from '../modes/intervalMode';
@@ -276,23 +277,28 @@ export function Train() {
     const gen = getPlaybackGen();
     const bpm = data.bpm;
     const sixteenthMs = (60_000 / bpm) / 4;
-    // Count-in
+    // Count-in: sine metronome — distinct timbre from the woodblock pattern
+    // below, so the user hears "beep beep beep beep → tok tok tok" and knows
+    // exactly where the answer starts.
     setIsCountingIn(true);
     for (let i = 0; i < 4; i++) {
       if (gen !== getPlaybackGen()) { setIsCountingIn(false); return; }
-      playClick(i === 0);
+      playMetronomeClick(i === 0);
       await delay(sixteenthMs * 4);
     }
     if (gen !== getPlaybackGen()) { setIsCountingIn(false); return; }
     setIsCountingIn(false);
-    // Play pattern
+    // Pattern: woodblock. Accent every quarter-note position (time % 4 === 0)
+    // so the listener can lock onto the 4-beat grid and locate 16th positions
+    // relative to it. % 16 only accents the very first note of the bar, which
+    // gives no grid cue inside the bar.
     const startT = Date.now();
     for (const beat of data.pattern) {
       if (gen !== getPlaybackGen()) return;
       const targetTime = startT + beat.time * sixteenthMs;
       const wait = targetTime - Date.now();
       if (wait > 0) await delay(wait);
-      playClick(beat.time % 16 === 0);
+      playRhythmClick(beat.time % 4 === 0);
     }
   }
 

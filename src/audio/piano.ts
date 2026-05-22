@@ -5,6 +5,9 @@ import * as Tone from 'tone';
 let sampler: Tone.Sampler | null = null;
 let synth: Tone.PolySynth | null = null;
 let outputGain: Tone.Gain | null = null;
+let masterLimiter: Tone.Limiter | null = null;
+let metronomeSynth: Tone.Synth | null = null;
+let woodblockSynth: Tone.MembraneSynth | null = null;
 let audioStarted = false;
 let samplerReady = false;
 let samplerFailed = false;
@@ -56,7 +59,11 @@ function trackTimeout(fn: () => void, ms: number): number {
 // triggerAttackRelease(..., futureTime) bleed into the next question.
 function getOutputGain(): Tone.Gain {
   if (!outputGain) {
-    outputGain = new Tone.Gain(1).toDestination();
+    // Limiter at -1dB before destination so the +6dB master boost below cannot
+    // clip when a 3-voice FM chord stacks with a click. Without it, raw gain=2
+    // distorts on polyphonic playback.
+    masterLimiter = new Tone.Limiter(-1).toDestination();
+    outputGain = new Tone.Gain(2).connect(masterLimiter);
   }
   return outputGain;
 }
@@ -85,7 +92,7 @@ function getSynth(): Tone.PolySynth {
       modulation: { type: 'sine' },
       modulationEnvelope: { attack: 0.002, decay: 0.3, sustain: 0, release: 0.05 },
     }).connect(getOutputGain());
-    synth.volume.value = -10;
+    synth.volume.value = -6;
   }
   return synth;
 }
@@ -154,6 +161,7 @@ function loadSampler(): Promise<void> {
           settleOnce();
         },
       }).connect(getOutputGain());
+      sampler.volume.value = -3;
     } catch (err) {
       samplerFailed = true;
       clearTimeout(emergencyTimeout);
@@ -408,18 +416,44 @@ export async function playArpeggio(
   firePlayback(notes, noteDuration, Tone.Time(noteDuration).toSeconds() / speedFactor, '4n');
 }
 
-/** Play metronome click (built-in, no network) */
-export function playClick(accent = false): void {
-  const synthClick = new Tone.MetalSynth({
-    envelope: { attack: 0.001, decay: 0.1, release: 0.1 },
-    harmonicity: 5.1,
-    modulationIndex: 32,
-    resonance: 4000,
-    octaves: 1.5,
-  }).connect(getOutputGain());
-  synthClick.frequency.value = accent ? 800 : 400;
-  synthClick.triggerAttackRelease('16n', scheduleStart());
-  setTimeout(() => synthClick.dispose(), 500);
+// ─── Metronome click (count-in, tempo/bpm modes) ──────────────────────────
+// Clean sine beep — accent one octave above (G5) so the downbeat is obvious
+// without any timbral confusion with the rhythm-pattern woodblock that follows.
+function getMetronomeSynth(): Tone.Synth {
+  if (!metronomeSynth) {
+    metronomeSynth = new Tone.Synth({
+      oscillator: { type: 'sine' },
+      envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.02 },
+    }).connect(getOutputGain());
+    metronomeSynth.volume.value = -8;
+  }
+  return metronomeSynth;
+}
+
+export function playMetronomeClick(accent = false): void {
+  const m = getMetronomeSynth();
+  m.triggerAttackRelease(accent ? 'G5' : 'G4', '32n', scheduleStart());
+}
+
+// ─── Rhythm woodblock (the answer pattern in rhythm mode) ─────────────────
+// MembraneSynth gives a short pitched impulse — woodblock-ish "tok". Distinct
+// timbre from the count-in sine so the user instantly hears where the answer
+// begins. Accent on C5, weak beats on G4.
+function getWoodblockSynth(): Tone.MembraneSynth {
+  if (!woodblockSynth) {
+    woodblockSynth = new Tone.MembraneSynth({
+      pitchDecay: 0.008,
+      octaves: 2,
+      envelope: { attack: 0.0001, decay: 0.06, sustain: 0, release: 0.02 },
+    }).connect(getOutputGain());
+    woodblockSynth.volume.value = -3;
+  }
+  return woodblockSynth;
+}
+
+export function playRhythmClick(accent = false): void {
+  const w = getWoodblockSynth();
+  w.triggerAttackRelease(accent ? 'C5' : 'G4', '32n', scheduleStart());
 }
 
 /**
@@ -439,7 +473,7 @@ export async function playMetronome(bpm: number, beats: number): Promise<void> {
   const gen = playbackGen;
   for (let i = 0; i < beats; i++) {
     if (gen !== playbackGen) return;
-    playClick(i === 0);
+    playMetronomeClick(i === 0);
     if (i < beats - 1) {
       await new Promise<void>((resolve) => setTimeout(resolve, beatMs));
     }
