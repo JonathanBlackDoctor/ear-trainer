@@ -32,8 +32,28 @@ const SAMPLE_NOTES: Record<string, string> = {
   A6:    'A6.mp3',  C7:    'C7.mp3',
 };
 
+// Mobile devices (and any browser reporting saveData) get a sparser sample set
+// so the parallel fetch+decode storm at startup doesn't peg the CPU. Tone.js
+// pitch-shifts the nearest sample to fill the gaps; the quality cost is
+// negligible compared to the heat / battery savings on phones.
+const isMobileLike: boolean = (() => {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) return true;
+  const conn = (navigator as unknown as { connection?: { saveData?: boolean } }).connection;
+  return Boolean(conn?.saveData);
+})();
+
+const MOBILE_SAMPLE_KEYS = ['A1', 'A2', 'C3', 'A3', 'C4', 'A4', 'C5', 'A5', 'C6'];
+
+const ACTIVE_SAMPLE_NOTES: Record<string, string> = isMobileLike
+  ? Object.fromEntries(
+      Object.entries(SAMPLE_NOTES).filter(([k]) => MOBILE_SAMPLE_KEYS.includes(k))
+    )
+  : SAMPLE_NOTES;
+
 const SAMPLE_URLS: Record<string, string> = Object.fromEntries(
-  Object.entries(SAMPLE_NOTES).map(([note, file]) => [note, SALAMANDER_BASE + file])
+  Object.entries(ACTIVE_SAMPLE_NOTES).map(([note, file]) => [note, SALAMANDER_BASE + file])
 );
 
 // ─── Diagnostics ────────────────────────────────────────────────────────────
@@ -188,19 +208,24 @@ function loadSampler(): Promise<void> {
     // startAudio() to return so the synth fallback is at least available.
     // We only mark failed if NOTHING loaded by then — partial success still
     // proceeds.
+    // Tighter timeout on mobile so a stalled 3G connection doesn't lock the
+    // UI behind the loading spinner. The synth fallback is good enough to
+    // start the session; the sampler can finish loading in the background and
+    // be swapped in via the getAudioStatus() polling on the Train screen.
+    const emergencyTimeoutMs = isMobileLike ? 8_000 : 30_000;
     const emergencyTimeout = setTimeout(() => {
       if (!samplerReady) {
         const loaded = diagnostics?.loadedKeys.length ?? 0;
         if (loaded === 0) {
           samplerFailed = true;
           if (diagnostics) diagnostics.reason = 'timeout';
-          console.warn('[audio] piano sampler timed out after 30s with 0 samples — using synth fallback');
+          console.warn(`[audio] piano sampler timed out after ${emergencyTimeoutMs}ms with 0 samples — using synth fallback`);
         } else {
-          console.warn(`[audio] piano sampler timed out after 30s with ${loaded} samples loaded — proceeding`);
+          console.warn(`[audio] piano sampler timed out after ${emergencyTimeoutMs}ms with ${loaded} samples loaded — proceeding`);
         }
       }
       settleOnce();
-    }, 30_000);
+    }, emergencyTimeoutMs);
 
     void (async () => {
       // @ts-expect-error — rawContext exposes the underlying AudioContext
@@ -380,6 +405,45 @@ function unlockIOSSilentSwitch(): void {
   }
 }
 
+// Pause the silent track so the audio decoder doesn't keep the device awake
+// between playbacks. The element stays in memory so a later play() can resume
+// without needing another user gesture (the original gesture already promoted
+// the audio session category).
+function pauseIOSSilentSwitch(): void {
+  try { silentUnlockAudio?.pause(); } catch { /* ignore */ }
+}
+
+// Resume the silent track at the start of a new playback window so iOS keeps
+// honoring the audio session through the mute switch.
+function resumeIOSSilentSwitch(): void {
+  if (!silentUnlockAudio) return;
+  if (!silentUnlockAudio.paused) return;
+  void silentUnlockAudio.play().catch(() => { /* ignore — gesture may have lapsed */ });
+}
+
+// Register once: pause everything when the tab is hidden so backgrounded
+// sessions stop heating the device. Re-registration is a no-op because the
+// listener identity is stable.
+let visibilityHandlerRegistered = false;
+function registerVisibilityPause(): void {
+  if (visibilityHandlerRegistered) return;
+  if (typeof document === 'undefined') return;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      pauseIOSSilentSwitch();
+      try {
+        for (const id of pendingTimeouts) clearTimeout(id);
+        pendingTimeouts.clear();
+        playbackGen++;
+        sampler?.releaseAll();
+        synth?.releaseAll();
+        referenceSynth?.releaseAll();
+      } catch { /* ignore */ }
+    }
+  });
+  visibilityHandlerRegistered = true;
+}
+
 /** Make sure the underlying AudioContext is in `running` state. */
 async function ensureRunning(): Promise<void> {
   const ctx = Tone.getContext();
@@ -399,6 +463,7 @@ export async function startAudio(): Promise<void> {
   // iOS silent-switch unlock must run inside the user gesture every time
   // (idempotent — bails out if already unlocked).
   unlockIOSSilentSwitch();
+  registerVisibilityPause();
   if (audioStarted) {
     await ensureRunning();
     // If a previous start ended on synth fallback (e.g. emergency timeout
@@ -484,10 +549,14 @@ export function stopAllAudio(): void {
   const now = Tone.now();
   gain.gain.cancelScheduledValues(now);
   gain.gain.setValueAtTime(0, now);
+  // Park the iOS silent-switch track too. scheduleStart() resumes it before
+  // the next note so the mute-switch workaround still works.
+  pauseIOSSilentSwitch();
 }
 
 /** Compute a start time for new playback and arm the gain to 1 at that moment. */
 function scheduleStart(): number {
+  resumeIOSSilentSwitch();
   const start = Tone.now() + SCHEDULE_LOOKAHEAD;
   const gain = getOutputGain();
   gain.gain.cancelScheduledValues(start);

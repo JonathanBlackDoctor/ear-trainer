@@ -8,6 +8,15 @@ interface StaffProps {
   clef?: 'treble' | 'bass';
 }
 
+// Cache the dynamic import at module scope so every question doesn't re-parse
+// the (~hundreds of KB) vexflow chunk. Without this, mid-tier Android phones
+// thrash the GC and stall the UI for ~200ms each Staff render.
+let vexPromise: Promise<typeof import('vexflow')> | null = null;
+function getVex(): Promise<typeof import('vexflow')> {
+  if (!vexPromise) vexPromise = import('vexflow');
+  return vexPromise;
+}
+
 /**
  * Simple SVG-based staff notation using VexFlow.
  * Falls back to text display if VexFlow fails.
@@ -20,8 +29,7 @@ export function Staff({ notes, width = 400, height = 100, clef = 'treble' }: Sta
     const el = containerRef.current;
     el.innerHTML = '';
 
-    // Dynamic import to avoid SSR issues
-    import('vexflow').then(({ Renderer, Stave, StaveNote, Voice, Formatter }) => {
+    getVex().then(({ Renderer, Stave, StaveNote, Voice, Formatter }) => {
       try {
         const renderer = new Renderer(el, Renderer.Backends.SVG);
         renderer.resize(width, height);
