@@ -54,7 +54,7 @@ describe('judge — progression', () => {
   const ques = q({
     mode: 'progression',
     answer,
-    data: { type: 'progression', chords: [], key: 'C', source: 'diatonic' },
+    data: { type: 'progression', chords: [], key: 'C', source: 'diatonic', playback: 'block' },
   });
   it('partial: matches by both degree AND quality', () => {
     const r = judge(ques, [

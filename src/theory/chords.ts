@@ -20,12 +20,33 @@ export const CHORD_TYPES: ChordInfo[] = [
   { quality: 'm7b5',    label: '반감화음 (m7b5)',     symbol: 'ø',   intervals: ['1P','3m','5d','7m'],  semitones: [0,3,6,10] },
 ];
 
-// Levels for chord training
-export const CHORD_LEVELS: Record<number, string[]> = {
-  1: ['major', 'minor'],
-  2: ['major', 'minor', 'dim', 'aug', 'sus4'],
-  3: ['major', 'minor', 'dim', 'aug', 'sus4', 'major7', 'dominant7', 'minor7', 'm7b5'],
-  4: ['major', 'minor', 'dim', 'aug', 'sus4', 'major7', 'dominant7', 'minor7', 'm7b5'], // + inversions
+export interface ChordLevelConfig {
+  label: string;
+  qualities: string[];
+  inversions: number[];
+  arpeggio: boolean;
+}
+
+const BASIC_2 = ['major', 'minor'];
+const PLUS_DIM = [...BASIC_2, 'dim'];
+const PLUS_AUG = [...PLUS_DIM, 'aug'];
+const PLUS_SUS4 = [...PLUS_AUG, 'sus4'];
+const PLUS_DOM7 = [...PLUS_SUS4, 'dominant7'];
+const PLUS_MAJ7 = [...PLUS_DOM7, 'major7'];
+const PLUS_MIN7 = [...PLUS_MAJ7, 'minor7'];
+const ALL_9 = [...PLUS_MIN7, 'm7b5'];
+
+export const CHORD_LEVELS: Record<number, ChordLevelConfig> = {
+  1:  { label: '장·단화음',          qualities: BASIC_2,    inversions: [0],    arpeggio: true  },
+  2:  { label: '감화음 추가',         qualities: PLUS_DIM,   inversions: [0],    arpeggio: true  },
+  3:  { label: '증화음 추가',         qualities: PLUS_AUG,   inversions: [0],    arpeggio: true  },
+  4:  { label: 'Sus4 추가',           qualities: PLUS_SUS4,  inversions: [0],    arpeggio: true  },
+  5:  { label: '블록 코드 (동시발음)', qualities: PLUS_SUS4,  inversions: [0],    arpeggio: false },
+  6:  { label: '속7화음(Dom7) 추가',   qualities: PLUS_DOM7,  inversions: [0],    arpeggio: false },
+  7:  { label: '장7화음(Major7) 추가', qualities: PLUS_MAJ7,  inversions: [0],    arpeggio: false },
+  8:  { label: '단7화음(Minor7) 추가', qualities: PLUS_MIN7,  inversions: [0],    arpeggio: false },
+  9:  { label: '반감화음(ø7) 추가',    qualities: ALL_9,      inversions: [0],    arpeggio: false },
+  10: { label: '1전위 추가',          qualities: ALL_9,      inversions: [0, 1], arpeggio: false },
 };
 
 /** Build chord notes from root and quality */

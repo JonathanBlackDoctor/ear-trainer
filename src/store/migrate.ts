@@ -9,9 +9,9 @@ const MODE_KEYS: ModeKey[] = [
   'transpose', 'rhythm', 'tempo', 'bpm',
 ];
 
-function emptySrs(): Record<ModeKey, Record<string, never>> {
-  const out = {} as Record<ModeKey, Record<string, never>>;
-  for (const k of MODE_KEYS) out[k] = {};
+function emptyPerMode<T extends Record<string, unknown>>(): Record<ModeKey, T> {
+  const out = {} as Record<ModeKey, T>;
+  for (const k of MODE_KEYS) out[k] = {} as T;
   return out;
 }
 
@@ -21,6 +21,7 @@ function emptySrs(): Record<ModeKey, Record<string, never>> {
 type AnyState = Record<string, unknown> & {
   settings?: Record<string, unknown>;
   srs?: unknown;
+  stats?: unknown;
 };
 
 // v1 → v2: add `srs` per mode, add `weakSessionLength` + `reducedMotion`
@@ -30,7 +31,7 @@ function v1Tov2(state: AnyState | null | undefined): AnyState | null | undefined
   const oldSettings = (state.settings ?? {}) as Record<string, unknown>;
   return {
     ...state,
-    srs: state.srs ?? emptySrs(),
+    srs: state.srs ?? emptyPerMode(),
     settings: {
       ...oldSettings,
       weakSessionLength: oldSettings.weakSessionLength ?? 10,
@@ -39,11 +40,27 @@ function v1Tov2(state: AnyState | null | undefined): AnyState | null | undefined
   };
 }
 
-export const CURRENT_SCHEMA_VERSION = 2;
+// v2 → v3: reset per-mode stats and SRS. The 10-level curriculum changes
+// what each itemKey means (chord qualities reorganized, solfege candidates
+// per level, rhythm pattern buckets re-sliced), so cards trained on the old
+// semantics would mis-schedule and weakness scores would mix incompatible
+// pools. Sessions are kept as-is — SessionSummary has no level field and the
+// aggregate counts remain comparable across schemas.
+function v2Tov3(state: AnyState | null | undefined): AnyState | null | undefined {
+  if (!state) return state;
+  return {
+    ...state,
+    stats: emptyPerMode(),
+    srs: emptyPerMode(),
+  };
+}
+
+export const CURRENT_SCHEMA_VERSION = 3;
 
 export function migrate(persistedState: unknown, fromVersion: number): unknown {
   let state = persistedState as AnyState | null | undefined;
   if (fromVersion < 2) state = v1Tov2(state);
+  if (fromVersion < 3) state = v2Tov3(state);
   return state;
 }
 

@@ -56,6 +56,7 @@ export interface ProgressionData {
   chords: ChordStep[];   // ordered list of chord steps
   key: string;
   source: 'diatonic' | 'praise';
+  playback: 'block' | 'arpeggio';
 }
 
 export interface ChordStep {
@@ -110,6 +111,7 @@ export interface BpmData {
   beats: number;        // metronome beat count
   inputMode: 'choice' | 'slider';
   choices?: number[];   // populated only when inputMode === 'choice'
+  sliderRange?: [number, number]; // populated only when inputMode === 'slider'
 }
 
 export type AnswerValue =
