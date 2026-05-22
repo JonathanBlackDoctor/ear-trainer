@@ -18,13 +18,18 @@ let samplerFailed = false;
 // safety net for the brief window before decoding completes.
 const SALAMANDER_BASE = `${import.meta.env.BASE_URL}samples/piano/`;
 const SAMPLE_NOTES: Record<string, string> = {
-  A0: 'A0.mp3',  C1: 'C1.mp3',  Ds1: 'Ds1.mp3', Fs1: 'Fs1.mp3',
-  A1: 'A1.mp3',  C2: 'C2.mp3',  Ds2: 'Ds2.mp3', Fs2: 'Fs2.mp3',
-  A2: 'A2.mp3',  C3: 'C3.mp3',  Ds3: 'Ds3.mp3', Fs3: 'Fs3.mp3',
-  A3: 'A3.mp3',  C4: 'C4.mp3',  Ds4: 'Ds4.mp3', Fs4: 'Fs4.mp3',
-  A4: 'A4.mp3',  C5: 'C5.mp3',  Ds5: 'Ds5.mp3', Fs5: 'Fs5.mp3',
-  A5: 'A5.mp3',  C6: 'C6.mp3',  Ds6: 'Ds6.mp3', Fs6: 'Fs6.mp3',
-  A6: 'A6.mp3',  C7: 'C7.mp3',
+  // KEYS must be note names Tone.js can parse (`#` for sharps, NOT `s` — Tone's
+  // isNote regex only accepts /[a-g](b|#|x|bb)?\d+/i, so "Ds1" silently throws
+  // an assertion inside Sampler's constructor and the whole sampler dies even
+  // though the URL string itself is fine). Filenames keep the `s` notation
+  // because that's the on-disk naming convention from Tonejs/audio Salamander.
+  A0:    'A0.mp3',  C1:    'C1.mp3',  'D#1': 'Ds1.mp3', 'F#1': 'Fs1.mp3',
+  A1:    'A1.mp3',  C2:    'C2.mp3',  'D#2': 'Ds2.mp3', 'F#2': 'Fs2.mp3',
+  A2:    'A2.mp3',  C3:    'C3.mp3',  'D#3': 'Ds3.mp3', 'F#3': 'Fs3.mp3',
+  A3:    'A3.mp3',  C4:    'C4.mp3',  'D#4': 'Ds4.mp3', 'F#4': 'Fs4.mp3',
+  A4:    'A4.mp3',  C5:    'C5.mp3',  'D#5': 'Ds5.mp3', 'F#5': 'Fs5.mp3',
+  A5:    'A5.mp3',  C6:    'C6.mp3',  'D#6': 'Ds6.mp3', 'F#6': 'Fs6.mp3',
+  A6:    'A6.mp3',  C7:    'C7.mp3',
 };
 
 const SAMPLE_URLS: Record<string, string> = Object.fromEntries(
