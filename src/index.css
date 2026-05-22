@@ -156,6 +156,22 @@
     @apply focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary-300 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas-50;
   }
 
+  /* 피아노 건반 가로 스크롤 — 항상 보이는 얇은 스크롤바 (macOS/iOS 대응) */
+  .piano-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #6366f1 #e0e7ff;
+  }
+  .piano-scroll::-webkit-scrollbar { height: 10px; }
+  .piano-scroll::-webkit-scrollbar-track {
+    background: #e0e7ff;
+    border-radius: 5px;
+  }
+  .piano-scroll::-webkit-scrollbar-thumb {
+    background: #6366f1;
+    border-radius: 5px;
+  }
+  .piano-scroll::-webkit-scrollbar-thumb:hover { background: #4f46e5; }
+
   /* 모드 카드별 색상 띠 변수 헬퍼 */
   .accent-solfege     { --mode-accent: #f59e0b; } /* 골드 */
   .accent-interval    { --mode-accent: #6366f1; } /* 인디고 */

@@ -38,6 +38,11 @@ export function Piano({
   disabled = false,
 }: PianoProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  // Tracks where a pointer first landed on a key. On pointerup we only fire
+  // the note if the pointer barely moved — otherwise the user was scrolling
+  // the keyboard horizontally and we'd mis-trigger notes under their finger.
+  const pressOrigin = useRef<{ x: number; y: number; note: string } | null>(null);
+  const TAP_THRESHOLD = 8; // px
 
   const octaves = Array.from(
     { length: endOctave - startOctave + 1 },
@@ -48,6 +53,10 @@ export function Piano({
   const keyHeight = 120;
   const blackWidth = 28;
   const blackHeight = 75;
+
+  function scrollByOctave(dir: -1 | 1) {
+    containerRef.current?.scrollBy({ left: dir * keyWidth * 7, behavior: 'smooth' });
+  }
 
   function noteClass(note: string, isBlack: boolean): string {
     const pc = note.replace(/\d/, '');
@@ -99,66 +108,99 @@ export function Piano({
   }, [disabled, startOctave, endOctave]);
 
   return (
-    <div className="overflow-x-auto w-full pb-2">
-      <div
-        ref={containerRef}
-        className="relative select-none mx-auto"
-        style={{
-          width: octaves.length * 7 * keyWidth,
-          height: keyHeight,
-        }}
+    <div className="flex items-center w-full gap-1 pb-2">
+      <button
+        type="button"
+        onClick={() => scrollByOctave(-1)}
+        className="shrink-0 px-2 py-3 rounded-md bg-primary-100 hover:bg-primary-200 text-primary-700 font-bold text-lg select-none"
+        aria-label="왼쪽으로 스크롤"
       >
-        {/* White keys */}
-        {octaves.flatMap((oct) =>
-          WHITE_KEYS.map((pc, idx) => {
-            const note = `${pc}${oct}`;
-            const x = (octaves.indexOf(oct) * 7 + idx) * keyWidth;
-            return (
-              <button
-                key={note}
-                className={`absolute rounded-b-lg border border-slate-200 transition-colors duration-75 cursor-pointer ${noteClass(note, false)}`}
-                style={{
-                  left: x,
-                  top: 0,
-                  width: keyWidth - 2,
-                  height: keyHeight,
-                }}
-                onPointerDown={() => handlePress(note)}
-                aria-label={`${note} 건반`}
-                type="button"
-              >
-                <span className="absolute bottom-1 left-0 right-0 text-center text-xs text-slate-400" aria-hidden>
-                  {pc}{oct}
-                </span>
-              </button>
-            );
-          })
-        )}
+        ‹
+      </button>
+      <div ref={containerRef} className="piano-scroll overflow-x-auto flex-1">
+        <div
+          className="relative select-none"
+          style={{
+            width: octaves.length * 7 * keyWidth,
+            height: keyHeight,
+          }}
+        >
+          {/* White keys */}
+          {octaves.flatMap((oct) =>
+            WHITE_KEYS.map((pc, idx) => {
+              const note = `${pc}${oct}`;
+              const x = (octaves.indexOf(oct) * 7 + idx) * keyWidth;
+              return (
+                <button
+                  key={note}
+                  className={`absolute rounded-b-lg border border-slate-200 transition-colors duration-75 cursor-pointer ${noteClass(note, false)}`}
+                  style={{
+                    left: x,
+                    top: 0,
+                    width: keyWidth - 2,
+                    height: keyHeight,
+                  }}
+                  onPointerDown={(e) => { pressOrigin.current = { x: e.clientX, y: e.clientY, note }; }}
+                  onPointerUp={(e) => {
+                    const o = pressOrigin.current;
+                    pressOrigin.current = null;
+                    if (!o || o.note !== note) return;
+                    if (Math.hypot(e.clientX - o.x, e.clientY - o.y) < TAP_THRESHOLD) handlePress(note);
+                  }}
+                  onPointerCancel={() => { pressOrigin.current = null; }}
+                  onPointerLeave={() => { pressOrigin.current = null; }}
+                  aria-label={`${note} 건반`}
+                  type="button"
+                >
+                  <span className="absolute bottom-1 left-0 right-0 text-center text-xs text-slate-400" aria-hidden>
+                    {pc}{oct}
+                  </span>
+                </button>
+              );
+            })
+          )}
 
-        {/* Black keys */}
-        {octaves.flatMap((oct, octIdx) =>
-          Object.entries(BLACK_KEY_OFFSETS).map(([pc, offset]) => {
-            const note = `${pc}${oct}`;
-            const baseX = octIdx * 7 * keyWidth;
-            const x = baseX + offset * keyWidth - blackWidth / 2;
-            return (
-              <button
-                key={note}
-                className={`absolute z-10 rounded-b-md transition-colors duration-75 cursor-pointer text-white ${noteClass(note, true)}`}
-                style={{
-                  left: x,
-                  top: 0,
-                  width: blackWidth,
-                  height: blackHeight,
-                }}
-                onPointerDown={() => handlePress(note)}
-                aria-label={`${note} 검은 건반`}
-                type="button"
-              />
-            );
-          })
-        )}
+          {/* Black keys */}
+          {octaves.flatMap((oct, octIdx) =>
+            Object.entries(BLACK_KEY_OFFSETS).map(([pc, offset]) => {
+              const note = `${pc}${oct}`;
+              const baseX = octIdx * 7 * keyWidth;
+              const x = baseX + offset * keyWidth - blackWidth / 2;
+              return (
+                <button
+                  key={note}
+                  className={`absolute z-10 rounded-b-md transition-colors duration-75 cursor-pointer text-white ${noteClass(note, true)}`}
+                  style={{
+                    left: x,
+                    top: 0,
+                    width: blackWidth,
+                    height: blackHeight,
+                  }}
+                  onPointerDown={(e) => { pressOrigin.current = { x: e.clientX, y: e.clientY, note }; }}
+                  onPointerUp={(e) => {
+                    const o = pressOrigin.current;
+                    pressOrigin.current = null;
+                    if (!o || o.note !== note) return;
+                    if (Math.hypot(e.clientX - o.x, e.clientY - o.y) < TAP_THRESHOLD) handlePress(note);
+                  }}
+                  onPointerCancel={() => { pressOrigin.current = null; }}
+                  onPointerLeave={() => { pressOrigin.current = null; }}
+                  aria-label={`${note} 검은 건반`}
+                  type="button"
+                />
+              );
+            })
+          )}
+        </div>
       </div>
+      <button
+        type="button"
+        onClick={() => scrollByOctave(1)}
+        className="shrink-0 px-2 py-3 rounded-md bg-primary-100 hover:bg-primary-200 text-primary-700 font-bold text-lg select-none"
+        aria-label="오른쪽으로 스크롤"
+      >
+        ›
+      </button>
     </div>
   );
 }
