@@ -227,7 +227,7 @@ export function Train() {
   }
 
   // ─── Playback ─────────────────────────────────────────────────────────────
-  async function playQuestion(q: Question, speed = 1.0) {
+  async function playQuestion(q: Question, speed = 1.0, includeReference = true) {
     // Cut any audio left over from the previous question (release tails,
     // notes still queued in the future) before starting the new one.
     stopAllAudio();
@@ -239,7 +239,7 @@ export function Train() {
     setLoading(true);
     try {
       // Play reference tone if enabled (skip entirely in absolute-pitch mode)
-      if (!q.context?.absoluteMode && settings.referenceTone === 'perQuestion' && q.context?.referenceToneNote) {
+      if (includeReference && !q.context?.absoluteMode && settings.referenceTone === 'perQuestion' && q.context?.referenceToneNote) {
         await playReferenceTone(q.context.referenceToneNote, '2n');
         if (gen !== getPlaybackGen()) return;
         await delay(700 / speed);
@@ -703,7 +703,7 @@ export function Train() {
         <div className="max-w-lg mx-auto px-4 py-5 space-y-5">
           {/* Playback */}
           <PlaybackControls
-            onPlay={(speed) => playQuestion(currentQuestion, speed)}
+            onPlay={(speed) => playQuestion(currentQuestion, speed, false)}
             onPlayReference={handlePlayReference}
             showReference={!isAbsolute && settings.referenceTone !== 'off' && !!currentQuestion?.context?.referenceToneNote}
             loading={loading}
