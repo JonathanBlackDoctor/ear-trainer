@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>음감 훈련 — 디자인 시안 (G · I · J · M)</title>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet" />
+<style>
+  html, body { margin: 0; padding: 0; }
+  body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; -webkit-font-smoothing: antialiased; background: #f4f0e8; }
+  .pf, .pf * { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  .nav { position: sticky; top: 0; z-index: 100; background: #fff; border-bottom: 1px solid #ddd; padding: 14px 22px; display: flex; gap: 8px; align-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+  .nav h1 { font-size: 14px; font-weight: 700; margin: 0 12px 0 0; letter-spacing: -0.01em; }
+  .nav button { padding: 6px 12px; font-size: 12px; font-weight: 600; border: 1px solid #d0d4da; background: #fff; border-radius: 8px; cursor: pointer; }
+  .nav button.active { background: #0a0a0a; color: #fff; border-color: #0a0a0a; }
+
+  section { padding: 36px 22px 60px; }
+  section h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 6px; }
+  section .sub { font-size: 13px; color: #5a5a5a; margin-bottom: 24px; max-width: 720px; }
+
+  .row { display: flex; gap: 22px; overflow-x: auto; padding-bottom: 12px; }
+  .frame { flex: 0 0 auto; }
+  .frame .label { font-size: 11px; font-weight: 700; color: #5a5a5a; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<nav class="nav">
+  <h1>음감 훈련 시안</h1>
+  <button onclick="document.getElementById('g').scrollIntoView({behavior:'smooth',block:'start'})">G · 네오브루탈</button>
+  <button onclick="document.getElementById('i').scrollIntoView({behavior:'smooth',block:'start'})">I · 모눈/데이터</button>
+  <button onclick="document.getElementById('j').scrollIntoView({behavior:'smooth',block:'start'})">J · 카세트</button>
+  <button onclick="document.getElementById('m').scrollIntoView({behavior:'smooth',block:'start'})">M · 오로라</button>
+</nav>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="source/android-frame.jsx"></script>
+<script type="text/babel" src="source/shared.jsx"></script>
+<script type="text/babel" src="source/direction-g.jsx"></script>
+<script type="text/babel" src="source/direction-i.jsx"></script>
+<script type="text/babel" src="source/direction-j.jsx"></script>
+<script type="text/babel" src="source/direction-m.jsx"></script>
+
+<script type="text/babel">
+const SCREENS = [
+  { id: 'home',     label: 'Home · 홈' },
+  { id: 'setup',    label: 'Setup · 훈련 설정' },
+  { id: 'training', label: 'Training · 선다형' },
+  { id: 'result',   label: 'Result · 결과 / 랭크업' },
+  { id: 'stats',    label: 'Stats · 통계' },
+];
+
+const DIRECTIONS = [
+  { id: 'g', title: 'G · 네오 브루탈리즘',  subtitle: '두꺼운 검은 테두리(2.5–3px) + 하드 오프셋 그림자(4–8px 0 #0a0a0a) + 캔디 컬러 블록. 가장 펀치감 있고 게임화 된 안.', screens: { home: G_Home, setup: G_Setup, training: G_Training, result: G_Result, stats: G_Stats } },
+  { id: 'i', title: 'I · 모눈 / 데이터',   subtitle: '모눈 노트 + 모노 라벨(SESS·042, Lv 04) + 시그널 라임 액센트. 분석가/연구실 무드, 차트가 주인공.', screens: { home: I_Home, setup: I_Setup, training: I_Training, result: I_Result, stats: I_Stats } },
+  { id: 'j', title: 'J · 카세트 테이프',   subtitle: '핫핑크·틸·크롬 + 테이프 릴·VU 미터 + 사선 caution-tape 모티프. Y2K 노스탤지어, 가장 재미있는 안.', screens: { home: J_Home, setup: J_Setup, training: J_Training, result: J_Result, stats: J_Stats } },
+  { id: 'm', title: 'M · 오로라 / 홀로그래픽', subtitle: '진주빛 프리즘 그라데이션 + 유리질(글래스모피즘) 카드. 럭셔리·미래적 영적 분위기.', screens: { home: M_Home, setup: M_Setup, training: M_Training, result: M_Result, stats: M_Stats } },
+];
+
+function App() {
+  return (
+    <>
+      {DIRECTIONS.map(d => (
+        <section key={d.id} id={d.id}>
+          <h2>{d.title}</h2>
+          <div className="sub">{d.subtitle}</div>
+          <div className="row">
+            {SCREENS.map(s => {
+              const Screen = d.screens[s.id];
+              return (
+                <div className="frame" key={s.id}>
+                  <div className="label">{s.label}</div>
+                  <Screen/>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ))}
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
