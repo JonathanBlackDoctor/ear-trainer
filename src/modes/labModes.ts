@@ -7,6 +7,7 @@ export const LAB_SCALE_MODE_INFO = {
   name: '스케일 식별',
   emoji: '🪜',
   description: '스케일 종류를 맞혀보세요',
+  howTo: '음계가 처음부터 끝까지 차례로 들립니다. 어떤 종류의 스케일(장조·단조·선법 등)인지 아래 보기에서 고르세요.',
   maxLevel: 10,
   defaultLevel: 1,
 };
@@ -16,6 +17,7 @@ export const LAB_CADENCE_MODE_INFO = {
   name: '종지 식별',
   emoji: '🛑',
   description: '종지 형태를 맞혀보세요',
+  howTo: '짧은 화음 진행이 들립니다. 진행이 끝나는 종지의 형태(정격·변격·반·위장)를 아래 보기에서 고르세요.',
   maxLevel: 10,
   defaultLevel: 1,
 };
@@ -25,6 +27,7 @@ export const LAB_INVERSION_MODE_INFO = {
   name: '자리바꿈 식별',
   emoji: '🔄',
   description: '화음의 자리바꿈을 맞혀보세요',
+  howTo: '한 화음이 들립니다. 화음이 기본 위치인지, 1·2·3전위인지 아래 보기에서 고르세요.',
   maxLevel: 10,
   defaultLevel: 1,
 };
@@ -147,6 +150,7 @@ export const LAB_INTERVAL_COMPARE_MODE_INFO = {
   name: '음정 크기 비교',
   emoji: '🆚',
   description: '두 음정 중 더 넓은 쪽을 고르세요',
+  howTo: '두 개의 음정이 차례로 들립니다. 첫 번째와 두 번째 중 어느 쪽이 더 넓은지(또는 두 음정이 같은지) 아래 보기에서 고르세요.',
   maxLevel: 10,
   defaultLevel: 1,
 };
@@ -186,6 +190,7 @@ export const LAB_ODD_NOTE_MODE_INFO = {
   name: '틀린 음 찾기',
   emoji: '🔍',
   description: '음계 속 어긋난 음의 위치를 찾으세요',
+  howTo: '음계가 차례로 들리는데 그중 한 음만 음정이 어긋나 있습니다. 몇 번째 음이 틀렸는지 아래 보기에서 고르세요.',
   maxLevel: 10,
   defaultLevel: 1,
 };
@@ -218,6 +223,7 @@ export const LAB_CONTOUR_MODE_INFO = {
   name: '멜로디 윤곽',
   emoji: '〰️',
   description: '선율의 모양을 맞혀보세요',
+  howTo: '짧은 선율이 들립니다. 음높이가 그리는 전체 모양(상행·하행·아치·역아치·물결)을 아래 보기에서 고르세요.',
   maxLevel: 10,
   defaultLevel: 1,
 };
@@ -261,6 +267,7 @@ export const LAB_TUNING_MODE_INFO = {
   name: '음정 정확도',
   emoji: '🎯',
   description: '기준음 대비 높낮이를 판별하세요',
+  howTo: '기준음이 먼저 들리고, 이어서 같은 음이 다시 들립니다. 두 번째 음이 기준음보다 정확한지·높은지(♯)·낮은지(♭) 아래 보기에서 고르세요.',
   maxLevel: 10,
   defaultLevel: 1,
 };
@@ -297,6 +304,7 @@ export const LAB_FUNCTION_MODE_INFO = {
   name: '화성 기능 식별',
   emoji: '⚙️',
   description: '화음의 기능(T/S/D)을 맞혀보세요',
+  howTo: '으뜸화음으로 조성을 잡아준 뒤 한 화음이 들립니다. 그 화음의 기능이 으뜸(T)·버금딸림(S)·딸림(D) 중 무엇인지 아래 보기에서 고르세요.',
   maxLevel: 10,
   defaultLevel: 1,
 };
@@ -340,6 +348,7 @@ export const LAB_EXTENDED_MODE_INFO = {
   name: '확장 화음 식별',
   emoji: '🎨',
   description: '6·add9·9·sus 등 컬러 코드를 맞혀보세요',
+  howTo: '한 화음이 들립니다. 6·m6·sus2·sus4·add9·maj9·9·m9 등 어떤 확장 화음인지 아래 보기에서 고르세요.',
   maxLevel: 10,
   defaultLevel: 1,
 };
@@ -374,6 +383,7 @@ export const LAB_BASS_MODE_INFO = {
   name: '베이스 식별',
   emoji: '🔊',
   description: '화음의 최저음을 찾으세요',
+  howTo: '한 화음이 들립니다. 화음에서 가장 낮은 음(베이스)의 음이름을 아래 보기에서 고르세요.',
   maxLevel: 10,
   defaultLevel: 1,
 };
@@ -410,6 +420,7 @@ export const LAB_TENSION_MODE_INFO = {
   name: '텐션음 식별',
   emoji: '🌶️',
   description: '화음 위에 더해진 텐션을 맞혀보세요',
+  howTo: '기본 화음이 들린 뒤, 텐션이 더해진 화음이 이어서 들립니다. 더해진 텐션(9·♭9·♯9·11·♯11·13·♭13)이 무엇인지 아래 보기에서 고르세요.',
   maxLevel: 10,
   defaultLevel: 1,
 };
