@@ -47,6 +47,36 @@ describe('judge — melody', () => {
   });
 });
 
+describe('judge — transpose', () => {
+  const ques = q({
+    mode: 'transpose',
+    answer: ['G4', 'B4', 'D5'],
+    data: {
+      type: 'transpose', degrees: [1, 3, 5], fromKey: 'C', toKey: 'G',
+      fromNotes: ['C4', 'E4', 'G4'], toNotes: ['G4', 'B4', 'D5'],
+    },
+  });
+  it('exact transposed notes → correct', () => {
+    const r = judge(ques, ['G4', 'B4', 'D5']);
+    expect(r.correct).toBe(true);
+    expect(r.partialScore).toBe(1);
+  });
+  it('octave-shifted but same pitch classes → still correct', () => {
+    const r = judge(ques, ['G3', 'B3', 'D4']);
+    expect(r.correct).toBe(true);
+    expect(r.partialScore).toBe(1);
+  });
+  it('one wrong note → partial credit', () => {
+    const r = judge(ques, ['G4', 'B4', 'E5']);
+    expect(r.correct).toBe(false);
+    expect(r.partialScore).toBeCloseTo(2 / 3);
+  });
+  it('wrong length → 0', () => {
+    const r = judge(ques, ['G4', 'B4']);
+    expect(r.partialScore).toBe(0);
+  });
+});
+
 describe('judge — progression', () => {
   const answer: ProgressionAnswer[] = [
     { degree: 1, quality: 'M' }, { degree: 4, quality: 'M' }, { degree: 5, quality: 'M' },

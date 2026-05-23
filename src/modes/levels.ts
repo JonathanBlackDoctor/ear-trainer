@@ -30,16 +30,19 @@ export const MELODY_LEVELS: Record<number, MelodyLevelConfig> = {
 };
 
 // ─── Transpose ────────────────────────────────────────────────────────────────
-// A "transposition" question plays a short melody in a randomly-picked key,
-// after first sounding the tonic of that key. The user answers with the
-// degree sequence (1..7) — same shape → same answer regardless of key.
-// That's the move-the-do skill the mode is supposed to train.
+// A "transposition" question plays a short melody in one key (fromKey), then
+// asks the user to *transpose* it into a different key (toKey): they hear the
+// new key's tonic and re-enter the same melodic shape on the piano, shifted to
+// that key. This is the actual move-the-do skill — distinct from melody
+// dictation (reproduce the same notes) because the answer notes differ from
+// what was played. Every level uses ≥2 keys so a real key change always
+// happens.
 export interface TransposeLevelConfig {
   label: string;
   noteCount: number;        // melody length (2..5)
   degreePool: number[];     // allowed scale degrees (1..7)
   maxJump: number;          // max scale-degree distance between adjacent notes
-  keyPool: string[];        // length 1 = fixed; longer = random per question
+  keyPool: string[];        // fromKey and toKey are drawn (distinct) from here
 }
 
 const DEG_TRIAD      = [1, 3, 5];
@@ -47,22 +50,21 @@ const DEG_PENTA      = [1, 2, 3, 5, 6];
 const DEG_DIA_5      = [1, 2, 3, 4, 5];
 const DEG_DIA_7      = [1, 2, 3, 4, 5, 6, 7];
 
-const KEYS_1       = ['C'];
 const KEYS_SMALL   = ['C', 'G', 'F'];
 const KEYS_MID     = ['C', 'G', 'D', 'F', 'Bb'];
 const KEYS_LARGE   = ['C', 'G', 'D', 'A', 'F', 'Bb', 'Eb', 'E'];
 const KEYS_FULL12  = ['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
 
 export const TRANSPOSE_LEVELS: Record<number, TransposeLevelConfig> = {
-  1:  { label: '2음 · 도·미·솔 · C장조',       noteCount: 2, degreePool: DEG_TRIAD, maxJump: 4, keyPool: KEYS_1      },
-  2:  { label: '3음 · 도·미·솔',                noteCount: 3, degreePool: DEG_TRIAD, maxJump: 4, keyPool: KEYS_1      },
-  3:  { label: '3음 · 펜타토닉 (1·2·3·5·6)',    noteCount: 3, degreePool: DEG_PENTA, maxJump: 4, keyPool: KEYS_1      },
-  4:  { label: '3음 · 다이아토닉 5음 (1~5)',    noteCount: 3, degreePool: DEG_DIA_5, maxJump: 3, keyPool: KEYS_1      },
-  5:  { label: '4음 · 다이아토닉 5음',          noteCount: 4, degreePool: DEG_DIA_5, maxJump: 3, keyPool: KEYS_1      },
-  6:  { label: '3음 · 키 3개 (C·G·F)',          noteCount: 3, degreePool: DEG_DIA_5, maxJump: 3, keyPool: KEYS_SMALL  },
-  7:  { label: '3음 · 전 7도 · 키 3개',         noteCount: 3, degreePool: DEG_DIA_7, maxJump: 3, keyPool: KEYS_SMALL  },
-  8:  { label: '4음 · 전 7도 · 키 5개',         noteCount: 4, degreePool: DEG_DIA_7, maxJump: 3, keyPool: KEYS_MID    },
-  9:  { label: '4음 · 키 8개',                  noteCount: 4, degreePool: DEG_DIA_7, maxJump: 4, keyPool: KEYS_LARGE  },
+  1:  { label: '2음 · 도·미·솔 · 키 3개',       noteCount: 2, degreePool: DEG_TRIAD, maxJump: 4, keyPool: KEYS_SMALL  },
+  2:  { label: '3음 · 도·미·솔 · 키 3개',       noteCount: 3, degreePool: DEG_TRIAD, maxJump: 4, keyPool: KEYS_SMALL  },
+  3:  { label: '3음 · 펜타토닉 (1·2·3·5·6)',    noteCount: 3, degreePool: DEG_PENTA, maxJump: 4, keyPool: KEYS_SMALL  },
+  4:  { label: '3음 · 다이아토닉 5음 (1~5)',    noteCount: 3, degreePool: DEG_DIA_5, maxJump: 3, keyPool: KEYS_MID    },
+  5:  { label: '4음 · 다이아토닉 5음',          noteCount: 4, degreePool: DEG_DIA_5, maxJump: 3, keyPool: KEYS_MID    },
+  6:  { label: '3음 · 전 7도 · 키 5개',         noteCount: 3, degreePool: DEG_DIA_7, maxJump: 3, keyPool: KEYS_MID    },
+  7:  { label: '4음 · 전 7도 · 키 5개',         noteCount: 4, degreePool: DEG_DIA_7, maxJump: 3, keyPool: KEYS_MID    },
+  8:  { label: '4음 · 전 7도 · 키 8개',         noteCount: 4, degreePool: DEG_DIA_7, maxJump: 3, keyPool: KEYS_LARGE  },
+  9:  { label: '5음 · 키 8개',                  noteCount: 5, degreePool: DEG_DIA_7, maxJump: 4, keyPool: KEYS_LARGE  },
   10: { label: '5음 · 12개 키 전체',            noteCount: 5, degreePool: DEG_DIA_7, maxJump: 4, keyPool: KEYS_FULL12 },
 };
 

@@ -271,10 +271,11 @@ export function makeSolfegeQuestion(
 }
 
 // ─── Transpose ─────────────────────────────────────────────────────────────────
-// Plays a short melody in a random key (with the tonic sounded first as a
-// reference). Answer is the degree sequence, e.g. [1,3,5] — the same melodic
-// shape stays the same answer across all keys, which is what transposition
-// practice is for.
+// Plays a short melody in fromKey, then asks the user to transpose it into a
+// different toKey — they hear the new key's tonic and re-enter the same shape
+// shifted to that key. Answer is the toKey notes (compared by pitch class, so
+// octave doesn't matter). This is genuine transposition, distinct from melody
+// dictation where the answer is just the notes that were played.
 export function makeTransposeQuestion(
   level: number,
   _keyMode: 'fixed' | 'random',
@@ -285,9 +286,11 @@ export function makeTransposeQuestion(
   _candidateFilter?: (key: string) => boolean
 ): Question {
   const cfg = TRANSPOSE_LEVELS[level] ?? TRANSPOSE_LEVELS[1];
-  const key = cfg.keyPool.length <= 1
-    ? (cfg.keyPool[0] ?? fixedKey)
-    : pickRandom(cfg.keyPool);
+
+  // Pick two distinct keys. Fall back gracefully if the pool is tiny.
+  const fromKey = pickRandom(cfg.keyPool) || fixedKey;
+  const others = cfg.keyPool.filter((k) => k !== fromKey);
+  const toKey = (others.length > 0 ? pickRandom(others) : fromKey);
 
   const pool = cfg.degreePool;
   const degrees: number[] = [pickRandom(pool)];
@@ -297,23 +300,23 @@ export function makeTransposeQuestion(
     degrees.push(candidates.length > 0 ? pickRandom(candidates) : pickRandom(pool));
   }
 
-  // Convert degrees to actual notes in the chosen key. Degree 1 anchors at
-  // octave 4; higher degrees follow naturally, and we wrap to the next octave
-  // when the running pitch dips below the tonic (keeps the melody contiguous).
-  const tonicMidi = Note.midi(key + '4') ?? 60;
-  const notes: string[] = degrees.map((d) => {
-    const semis = degreeToSemitones(d);
-    return Note.fromMidi(tonicMidi + semis) ?? key + '4';
-  });
+  const notesInKey = (tonic: string): string[] => {
+    const tonicMidi = Note.midi(tonic + '4') ?? 60;
+    return degrees.map((d) => Note.fromMidi(tonicMidi + degreeToSemitones(d)) ?? tonic + '4');
+  };
+  const fromNotes = notesInKey(fromKey);
+  const toNotes = notesInKey(toKey);
 
   return {
     id: genId(),
     mode: 'transpose',
     level,
     itemKey: `transpose_lv${level}`,
-    data: { type: 'transpose', notes, degrees, key },
-    answer: degrees,
-    context: { key, referenceToneNote: key + '4' },
+    data: { type: 'transpose', degrees, fromKey, toKey, fromNotes, toNotes },
+    answer: toNotes,
+    // Reference tone for the manual button is the *target* key tonic — that's
+    // what the user needs while entering their answer.
+    context: { key: toKey, referenceToneNote: toKey + '4' },
   };
 }
 
