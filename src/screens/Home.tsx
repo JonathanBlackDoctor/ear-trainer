@@ -60,7 +60,7 @@ export function Home() {
             음감 훈련
           </h1>
           <p className="text-sm text-primary-200 mt-2">
-            교회 반주자를 위한 귀 훈련
+            매일 5분, 자라나는 음감
           </p>
         </div>
       </header>
