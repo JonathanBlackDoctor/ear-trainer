@@ -62,3 +62,29 @@ export function setupSwUpdateOnForeground(): void {
   // attached (i.e. the very first load).
   if (document.visibilityState === 'visible') checkForUpdate();
 }
+
+// Manual "refresh to the latest deployed build" trigger for a UI button.
+// Forces an immediate SW update check; if a new build is waiting it activates
+// and the controllerchange handler above reloads the page. When there's no SW
+// (or no new build), fall back to a plain reload so the user always ends up on
+// the freshest assets the network/cache can serve.
+export async function refreshToLatest(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  if ('serviceWorker' in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) {
+        await reg.update();
+        // A new build is installing/waiting → the autoUpdate SW skips waiting
+        // and controllerchange reloads us. Nudge any waiting worker too.
+        if (reg.waiting || reg.installing) {
+          reg.waiting?.postMessage({ type: 'SKIP_WAITING' });
+          return;
+        }
+      }
+    } catch {
+      // Fall through to a plain reload on any SW error.
+    }
+  }
+  window.location.reload();
+}
