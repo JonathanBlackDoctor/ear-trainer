@@ -60,14 +60,52 @@ export default {
         success: {
           50:  'rgb(var(--c-success-50) / <alpha-value>)',
           100: 'rgb(var(--c-success-100) / <alpha-value>)',
+          200: 'rgb(var(--c-success-200) / <alpha-value>)',
           400: 'rgb(var(--c-success-400) / <alpha-value>)',
           500: 'rgb(var(--c-success-500) / <alpha-value>)',
           600: 'rgb(var(--c-success-600) / <alpha-value>)',
           700: 'rgb(var(--c-success-700) / <alpha-value>)',
+          800: 'rgb(var(--c-success-800) / <alpha-value>)',
         },
         danger: {
           50:  'rgb(var(--c-danger-50) / <alpha-value>)',
           100: 'rgb(var(--c-danger-100) / <alpha-value>)',
+          200: 'rgb(var(--c-danger-200) / <alpha-value>)',
+          400: 'rgb(var(--c-danger-400) / <alpha-value>)',
+          500: 'rgb(var(--c-danger-500) / <alpha-value>)',
+          600: 'rgb(var(--c-danger-600) / <alpha-value>)',
+          700: 'rgb(var(--c-danger-700) / <alpha-value>)',
+        },
+        // Neutral grey ramp — themed so secondary text, dividers, and muted
+        // surfaces shift with the active design (warm for G/J, cool for I/M).
+        slate: {
+          50:  'rgb(var(--c-slate-50) / <alpha-value>)',
+          100: 'rgb(var(--c-slate-100) / <alpha-value>)',
+          200: 'rgb(var(--c-slate-200) / <alpha-value>)',
+          300: 'rgb(var(--c-slate-300) / <alpha-value>)',
+          400: 'rgb(var(--c-slate-400) / <alpha-value>)',
+          500: 'rgb(var(--c-slate-500) / <alpha-value>)',
+          600: 'rgb(var(--c-slate-600) / <alpha-value>)',
+          700: 'rgb(var(--c-slate-700) / <alpha-value>)',
+          800: 'rgb(var(--c-slate-800) / <alpha-value>)',
+          900: 'rgb(var(--c-slate-900) / <alpha-value>)',
+        },
+        // "correct" semantics → success token; "wrong" semantics → danger token.
+        // Lets the many emerald-*/red-* feedback usages re-skin per theme.
+        emerald: {
+          50:  'rgb(var(--c-success-50) / <alpha-value>)',
+          100: 'rgb(var(--c-success-100) / <alpha-value>)',
+          200: 'rgb(var(--c-success-200) / <alpha-value>)',
+          400: 'rgb(var(--c-success-400) / <alpha-value>)',
+          500: 'rgb(var(--c-success-500) / <alpha-value>)',
+          600: 'rgb(var(--c-success-600) / <alpha-value>)',
+          700: 'rgb(var(--c-success-700) / <alpha-value>)',
+          800: 'rgb(var(--c-success-800) / <alpha-value>)',
+        },
+        red: {
+          50:  'rgb(var(--c-danger-50) / <alpha-value>)',
+          100: 'rgb(var(--c-danger-100) / <alpha-value>)',
+          200: 'rgb(var(--c-danger-200) / <alpha-value>)',
           400: 'rgb(var(--c-danger-400) / <alpha-value>)',
           500: 'rgb(var(--c-danger-500) / <alpha-value>)',
           600: 'rgb(var(--c-danger-600) / <alpha-value>)',
