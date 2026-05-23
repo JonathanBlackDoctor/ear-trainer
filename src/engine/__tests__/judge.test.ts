@@ -45,6 +45,43 @@ describe('judge — melody', () => {
     const r = judge(ques, ['C4', 'D4']);
     expect(r.partialScore).toBe(0);
   });
+  it('enharmonic-equivalent input (A#4 vs Bb4) counts as correct', () => {
+    const fQues = q({
+      mode: 'melody',
+      answer: ['F4', 'A4', 'Bb4'],
+      data: { type: 'melody', notes: ['F4', 'A4', 'Bb4'], key: 'F' },
+    });
+    // Piano always emits sharp form, so the user's correct play of Bb4
+    // is reported as A#4 — judge must treat them as equivalent.
+    const r = judge(fQues, ['F4', 'A4', 'A#4']);
+    expect(r.correct).toBe(true);
+    expect(r.partialScore).toBe(1);
+  });
+});
+
+describe('judge — transpose', () => {
+  // Transpose mode answer is a degree sequence (e.g. [1,3,5]) matched against
+  // the user's degree-button taps.
+  const ques = q({
+    mode: 'transpose',
+    answer: [1, 3, 5],
+    data: { type: 'transpose', notes: ['G4', 'B4', 'D5'], degrees: [1, 3, 5], key: 'G' },
+  });
+  it('exact sequence → correct', () => {
+    const r = judge(ques, [1, 3, 5]);
+    expect(r.correct).toBe(true);
+    expect(r.partialScore).toBe(1);
+  });
+  it('wrong sequence → incorrect', () => {
+    const r = judge(ques, [1, 3, 4]);
+    expect(r.correct).toBe(false);
+    expect(r.partialScore).toBeCloseTo(2 / 3);
+  });
+  it('wrong length → 0', () => {
+    const r = judge(ques, [1, 3]);
+    expect(r.correct).toBe(false);
+    expect(r.partialScore).toBe(0);
+  });
 });
 
 describe('judge — progression', () => {

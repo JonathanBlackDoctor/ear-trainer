@@ -247,6 +247,14 @@ export function judge(question: Question, userAnswer: AnswerValue): JudgeResult 
     case 'melody': {
       const ua = userAnswer as string[];
       const ca = correct as string[];
+      // Compare by MIDI so the piano's sharp-form input (e.g. A#4) matches
+      // the scale's enharmonic spelling (e.g. Bb4 in F major).
+      const sameMidi = (a?: string, b?: string) => {
+        if (!a || !b) return false;
+        const ma = Note.midi(a);
+        const mb = Note.midi(b);
+        return ma != null && mb != null && ma === mb;
+      };
       if (!Array.isArray(ua) || ua.length !== ca.length) {
         // Even on length mismatch, include per-note details where we can so the
         // feedback UI can still render the expected sequence and what the user
@@ -263,7 +271,7 @@ export function judge(question: Question, userAnswer: AnswerValue): JudgeResult 
             expected,
             given,
             semitoneDelta: sem,
-            ok: !!given && expected === given,
+            ok: sameMidi(given, expected),
           };
         });
         return {
@@ -276,7 +284,7 @@ export function judge(question: Question, userAnswer: AnswerValue): JudgeResult 
         const sem = given && expected
           ? ((Note.midi(given) ?? 0) - (Note.midi(expected) ?? 0))
           : 0;
-        return { idx: i, expected, given, semitoneDelta: sem, ok: expected === given };
+        return { idx: i, expected, given, semitoneDelta: sem, ok: sameMidi(given, expected) };
       });
       const matches = perNote.filter((p) => p.ok).length;
       const score = matches / ca.length;
