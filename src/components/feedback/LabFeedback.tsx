@@ -10,6 +10,14 @@ const CATEGORY_LABEL: Record<LabJudgeDetails['category'], string> = {
   cadence: '종지',
   key: '조성',
   inversion: '전위',
+  'interval-compare': '음정 크기',
+  'odd-note': '틀린 음',
+  contour: '멜로디 윤곽',
+  tuning: '음정 정확도',
+  function: '화성 기능',
+  extended: '확장 화음',
+  bass: '베이스',
+  tension: '텐션',
 };
 
 export function LabFeedback({ details }: Props) {

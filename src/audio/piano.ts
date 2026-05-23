@@ -565,11 +565,14 @@ function scheduleStart(): number {
 }
 
 // ─── Playback helpers ─────────────────────────────────────────────────────────
-/** Play a single note */
-export async function playNote(note: string, duration = '2n'): Promise<void> {
+/** Play a single note, optionally detuned by `detuneCents` (+sharp, −flat). */
+export async function playNote(note: string, duration = '2n', detuneCents = 0): Promise<void> {
   if (!audioStarted) await startAudio();
   await ensureRunning();
-  getInstrument().triggerAttackRelease(note, duration, scheduleStart());
+  const target: string | number = detuneCents === 0
+    ? note
+    : Tone.Frequency(note).toFrequency() * Math.pow(2, detuneCents / 1200);
+  getInstrument().triggerAttackRelease(target as any, duration, scheduleStart());
 }
 
 // Reference-tone synth — soft sine pad, intentionally different timbre from the

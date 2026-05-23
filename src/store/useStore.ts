@@ -69,6 +69,14 @@ const defaultStats = (): Record<ModeKey, ModeStats> => ({
   'lab-cadence': emptyModeStats(),
   'lab-key': emptyModeStats(),
   'lab-inversion': emptyModeStats(),
+  'lab-interval-compare': emptyModeStats(),
+  'lab-odd-note': emptyModeStats(),
+  'lab-contour': emptyModeStats(),
+  'lab-tuning': emptyModeStats(),
+  'lab-function': emptyModeStats(),
+  'lab-extended': emptyModeStats(),
+  'lab-bass': emptyModeStats(),
+  'lab-tension': emptyModeStats(),
 });
 
 const defaultSrs = (): Record<ModeKey, ModeSrs> => ({
@@ -86,6 +94,14 @@ const defaultSrs = (): Record<ModeKey, ModeSrs> => ({
   'lab-cadence': emptyModeSrs(),
   'lab-key': emptyModeSrs(),
   'lab-inversion': emptyModeSrs(),
+  'lab-interval-compare': emptyModeSrs(),
+  'lab-odd-note': emptyModeSrs(),
+  'lab-contour': emptyModeSrs(),
+  'lab-tuning': emptyModeSrs(),
+  'lab-function': emptyModeSrs(),
+  'lab-extended': emptyModeSrs(),
+  'lab-bass': emptyModeSrs(),
+  'lab-tension': emptyModeSrs(),
 });
 
 const defaultGamification = (): GamificationState => ({

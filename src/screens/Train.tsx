@@ -11,6 +11,9 @@ import {
   makeSolfegeQuestion, makeProgressionQuestion, makeRhythmQuestion,
   makeTempoQuestion, makeBpmQuestion, makeTransposeQuestion,
   makeScaleQuestion, makeCadenceQuestion, makeKeyIdQuestion, makeInversionQuestion,
+  makeIntervalCompareQuestion, makeOddNoteQuestion, makeContourQuestion,
+  makeTuningQuestion, makeFunctionQuestion, makeExtendedQuestion,
+  makeBassQuestion, makeTensionQuestion,
 } from '../engine/questionFactory';
 import { MAX_LEVEL, getLevelLabel } from '../modes/levels';
 import { judge } from '../engine/judge';
@@ -28,9 +31,17 @@ import { getSolfegeChoices, getNoteNameChoices } from '../modes/solfegeMode';
 import { getDegreeChoices } from '../modes/progressionMode';
 import {
   LAB_SCALE_MODE_INFO, LAB_CADENCE_MODE_INFO, LAB_KEY_MODE_INFO, LAB_INVERSION_MODE_INFO,
+  LAB_INTERVAL_COMPARE_MODE_INFO, LAB_ODD_NOTE_MODE_INFO, LAB_CONTOUR_MODE_INFO,
+  LAB_TUNING_MODE_INFO, LAB_FUNCTION_MODE_INFO, LAB_EXTENDED_MODE_INFO,
+  LAB_BASS_MODE_INFO, LAB_TENSION_MODE_INFO,
   getScaleChoices, getCadenceChoices, getKeyChoices, getInversionChoices,
+  getIntervalCompareChoices, getOddNoteChoices, getContourChoices, getTuningChoices,
+  getFunctionChoices, getExtendedChoices, getBassChoices, getTensionChoices,
 } from '../modes/labModes';
-import type { ScaleData, CadenceData, KeyIdData } from '../types';
+import type {
+  ScaleData, CadenceData, KeyIdData,
+  IntervalCompareData, OddNoteData, ContourData, TuningData, FunctionData, TensionData,
+} from '../types';
 import {
   startAudio, playNote, playChord, playSequence, playProgression, playArpeggio,
   playMetronomeClick, playRhythmClick,
@@ -63,6 +74,14 @@ const MODE_INFO: Record<string, { name: string; emoji: string; maxLevel?: number
   'lab-cadence': LAB_CADENCE_MODE_INFO,
   'lab-key': LAB_KEY_MODE_INFO,
   'lab-inversion': LAB_INVERSION_MODE_INFO,
+  'lab-interval-compare': LAB_INTERVAL_COMPARE_MODE_INFO,
+  'lab-odd-note': LAB_ODD_NOTE_MODE_INFO,
+  'lab-contour': LAB_CONTOUR_MODE_INFO,
+  'lab-tuning': LAB_TUNING_MODE_INFO,
+  'lab-function': LAB_FUNCTION_MODE_INFO,
+  'lab-extended': LAB_EXTENDED_MODE_INFO,
+  'lab-bass': LAB_BASS_MODE_INFO,
+  'lab-tension': LAB_TENSION_MODE_INFO,
 };
 
 // Modes for which the absolute-pitch toggle should be available
@@ -225,6 +244,14 @@ export function Train() {
       case 'lab-cadence': q = makeCadenceQuestion(level, k, fk); break;
       case 'lab-key': return makeKeyIdQuestion(level);
       case 'lab-inversion': return makeInversionQuestion(level);
+      case 'lab-interval-compare': return makeIntervalCompareQuestion(level);
+      case 'lab-odd-note': return makeOddNoteQuestion(level);
+      case 'lab-contour': return makeContourQuestion(level);
+      case 'lab-tuning': return makeTuningQuestion(level);
+      case 'lab-function': return makeFunctionQuestion(level);
+      case 'lab-extended': return makeExtendedQuestion(level);
+      case 'lab-bass': return makeBassQuestion(level);
+      case 'lab-tension': return makeTensionQuestion(level);
       default: q = makeIntervalQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter);
     }
     // Stamp absoluteMode flag on the question so downstream playback/UI
@@ -359,6 +386,45 @@ export function Train() {
       case 'key-id': {
         const d = data as KeyIdData;
         await playProgression(d.chords, '2n', speed);
+        break;
+      }
+      case 'interval-compare': {
+        const d = data as IntervalCompareData;
+        await playSequence(d.pairA, '2n', speed);
+        await delay(900 / speed);
+        await playSequence(d.pairB, '2n', speed);
+        break;
+      }
+      case 'odd-note': {
+        const d = data as OddNoteData;
+        await playSequence(d.notes, '8n', speed);
+        break;
+      }
+      case 'contour': {
+        const d = data as ContourData;
+        await playSequence(d.notes, '4n', speed);
+        break;
+      }
+      case 'tuning': {
+        const d = data as TuningData;
+        await playReferenceTone(d.note, '2n');
+        await delay(650 / speed);
+        await playNote(d.note, '2n', d.cents);
+        break;
+      }
+      case 'function': {
+        const d = data as FunctionData;
+        // Establish the key with the tonic chord, then sound the target chord.
+        await playChord(d.tonicNotes, '2n');
+        await delay(800 / speed);
+        await playChord(d.chordNotes, '2n');
+        break;
+      }
+      case 'tension': {
+        const d = data as TensionData;
+        await playChord(d.baseNotes, '2n');
+        await delay(800 / speed);
+        await playChord(d.fullNotes, '2n');
         break;
       }
     }
@@ -652,7 +718,7 @@ export function Train() {
           <div className="card w-full max-w-sm">
             <div className="text-sm font-semibold text-slate-600 mb-3">레벨 선택</div>
             <div className="grid grid-cols-5 gap-2">
-              {Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map((lv) => (
+              {Array.from({ length: modeInfo.maxLevel ?? MAX_LEVEL }, (_, i) => i + 1).map((lv) => (
                 <button
                   key={lv}
                   className={`py-2 rounded-lg font-semibold text-sm transition-colors ${
@@ -752,9 +818,17 @@ export function Train() {
   const isTranspose = modeKey === 'transpose';
   const isTempo = modeKey === 'tempo';
   const isBpm = modeKey === 'bpm';
-  const isLabChoice = modeKey === 'lab-scale' || modeKey === 'lab-cadence'
-    || modeKey === 'lab-key' || modeKey === 'lab-inversion';
+  const isLabChoice = modeKey.startsWith('lab-');
   const isAbsolute = !!currentQuestion?.context?.absoluteMode;
+  const choiceColumns: 2 | 3 | 4 =
+    isInterval ? 2
+    : isChord ? 2
+    : modeKey === 'lab-key' ? 4
+    : modeKey === 'lab-odd-note' ? 4
+    : modeKey === 'lab-bass' ? 4
+    : modeKey === 'lab-inversion' ? 2
+    : modeKey === 'lab-extended' ? 2
+    : 3;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -900,7 +974,7 @@ export function Train() {
                   selected={selectedAnswer ?? undefined}
                   answered={false}
                   onSelect={handleChoiceSelect}
-                  columns={isInterval ? 2 : isChord ? 2 : modeKey === 'lab-key' ? 4 : modeKey === 'lab-inversion' ? 2 : 3}
+                  columns={choiceColumns}
                   disabled={loading}
                 />
               )}
@@ -1131,7 +1205,7 @@ export function Train() {
                   correct={feedbackResult?.correctAnswer as string}
                   answered
                   onSelect={() => {}}
-                  columns={isInterval ? 2 : isChord ? 2 : modeKey === 'lab-key' ? 4 : modeKey === 'lab-inversion' ? 2 : 3}
+                  columns={choiceColumns}
                 />
               )}
               {isTranspose && feedbackResult && (
@@ -1233,6 +1307,14 @@ function getChoiceOptions(mode: ModeKey, level: number, absolute = false): Choic
   if (mode === 'lab-cadence') return getCadenceChoices(level);
   if (mode === 'lab-key') return getKeyChoices(level);
   if (mode === 'lab-inversion') return getInversionChoices(level);
+  if (mode === 'lab-interval-compare') return getIntervalCompareChoices(level);
+  if (mode === 'lab-odd-note') return getOddNoteChoices();
+  if (mode === 'lab-contour') return getContourChoices(level);
+  if (mode === 'lab-tuning') return getTuningChoices();
+  if (mode === 'lab-function') return getFunctionChoices();
+  if (mode === 'lab-extended') return getExtendedChoices(level);
+  if (mode === 'lab-bass') return getBassChoices(level);
+  if (mode === 'lab-tension') return getTensionChoices(level);
   return [];
 }
 

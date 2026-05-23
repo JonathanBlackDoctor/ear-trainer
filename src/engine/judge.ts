@@ -98,7 +98,10 @@ export interface BpmJudgeDetails {
 
 export interface LabJudgeDetails {
   kind: 'lab';
-  category: 'scale' | 'cadence' | 'key' | 'inversion';
+  category:
+    | 'scale' | 'cadence' | 'key' | 'inversion'
+    | 'interval-compare' | 'odd-note' | 'contour' | 'tuning'
+    | 'function' | 'extended' | 'bass' | 'tension';
   userAnswer: string;
   correctAnswer: string;
 }
@@ -226,15 +229,19 @@ export function judge(question: Question, userAnswer: AnswerValue): JudgeResult 
     case 'lab-scale':
     case 'lab-cadence':
     case 'lab-key':
-    case 'lab-inversion': {
+    case 'lab-inversion':
+    case 'lab-interval-compare':
+    case 'lab-odd-note':
+    case 'lab-contour':
+    case 'lab-tuning':
+    case 'lab-function':
+    case 'lab-extended':
+    case 'lab-bass':
+    case 'lab-tension': {
       const ua = userAnswer as string;
       const ca = correct as string;
       const isCorrect = ua === ca;
-      const category =
-        question.mode === 'lab-scale' ? 'scale'
-        : question.mode === 'lab-cadence' ? 'cadence'
-        : question.mode === 'lab-key' ? 'key'
-        : 'inversion';
+      const category = question.mode.replace(/^lab-/, '') as LabJudgeDetails['category'];
       const details: LabJudgeDetails = {
         kind: 'lab',
         category,

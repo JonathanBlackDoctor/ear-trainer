@@ -22,6 +22,14 @@ const MODE_LABELS: Record<ModeKey, string> = {
   'lab-cadence': '종지 식별',
   'lab-key': '조성 식별',
   'lab-inversion': '자리바꿈',
+  'lab-interval-compare': '음정 크기 비교',
+  'lab-odd-note': '틀린 음 찾기',
+  'lab-contour': '멜로디 윤곽',
+  'lab-tuning': '음정 정확도',
+  'lab-function': '화성 기능',
+  'lab-extended': '확장 화음',
+  'lab-bass': '베이스 식별',
+  'lab-tension': '텐션음',
 };
 
 export function Stats() {
