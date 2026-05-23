@@ -49,17 +49,20 @@ describe('questionFactory — every mode × every level produces a valid questio
       expect(q.mode).toBe('transpose');
       expect(q.level).toBe(level);
       expect(q.itemKey).toBeTruthy();
-      const data = q.data as { type: string; notes: string[]; degrees: number[]; key: string };
+      const data = q.data as {
+        type: string; degrees: number[]; fromKey: string; toKey: string;
+        fromNotes: string[]; toNotes: string[];
+      };
       expect(data.type).toBe('transpose');
-      expect(data.notes.length).toBe(data.degrees.length);
-      expect(data.notes.length).toBeGreaterThanOrEqual(2);
-      // Reference tone must be the tonic of the picked key — without it, the
-      // degree answer is ambiguous.
-      expect(q.context.referenceToneNote).toBe(data.key + '4');
-      // Answer must be the degree sequence (numbers), not interval names —
-      // that's the fix that distinguishes this mode from interval mode.
-      expect(Array.isArray(q.answer)).toBe(true);
-      expect((q.answer as number[]).every((d) => typeof d === 'number')).toBe(true);
+      // A real key change always happens — that's what makes this transposition
+      // rather than melody dictation.
+      expect(data.fromKey).not.toBe(data.toKey);
+      expect(data.fromNotes.length).toBe(data.degrees.length);
+      expect(data.toNotes.length).toBe(data.degrees.length);
+      expect(data.degrees.length).toBeGreaterThanOrEqual(2);
+      // Answer is the transposed (toKey) notes; reference tone is the toKey tonic.
+      expect(q.answer).toEqual(data.toNotes);
+      expect(q.context.referenceToneNote).toBe(data.toKey + '4');
     });
     it(`rhythm Lv${level}`, () => {
       const q = makeRhythmQuestion(level);

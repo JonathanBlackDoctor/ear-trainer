@@ -60,26 +60,31 @@ describe('judge — melody', () => {
 });
 
 describe('judge — transpose', () => {
-  // Transpose mode answer is a degree sequence (e.g. [1,3,5]) matched against
-  // the user's degree-button taps.
   const ques = q({
     mode: 'transpose',
-    answer: [1, 3, 5],
-    data: { type: 'transpose', notes: ['G4', 'B4', 'D5'], degrees: [1, 3, 5], key: 'G' },
+    answer: ['G4', 'B4', 'D5'],
+    data: {
+      type: 'transpose', degrees: [1, 3, 5], fromKey: 'C', toKey: 'G',
+      fromNotes: ['C4', 'E4', 'G4'], toNotes: ['G4', 'B4', 'D5'],
+    },
   });
-  it('exact sequence → correct', () => {
-    const r = judge(ques, [1, 3, 5]);
+  it('exact transposed notes → correct', () => {
+    const r = judge(ques, ['G4', 'B4', 'D5']);
     expect(r.correct).toBe(true);
     expect(r.partialScore).toBe(1);
   });
-  it('wrong sequence → incorrect', () => {
-    const r = judge(ques, [1, 3, 4]);
+  it('octave-shifted but same pitch classes → still correct', () => {
+    const r = judge(ques, ['G3', 'B3', 'D4']);
+    expect(r.correct).toBe(true);
+    expect(r.partialScore).toBe(1);
+  });
+  it('one wrong note → partial credit', () => {
+    const r = judge(ques, ['G4', 'B4', 'E5']);
     expect(r.correct).toBe(false);
     expect(r.partialScore).toBeCloseTo(2 / 3);
   });
   it('wrong length → 0', () => {
-    const r = judge(ques, [1, 3]);
-    expect(r.correct).toBe(false);
+    const r = judge(ques, ['G4', 'B4']);
     expect(r.partialScore).toBe(0);
   });
 });

@@ -25,8 +25,8 @@ export const TRANSPOSE_MODE_INFO = {
   key: 'transpose' as ModeKey,
   name: '조옮김 연습',
   emoji: '🔄',
-  description: '키가 바뀌어도 같은 멜로디는 같은 도수로 듣기',
-  howTo: '먼저 으뜸음이 들리고, 이어 짧은 멜로디가 들립니다. 각 음의 도수(1~7)를 들은 순서대로 입력하세요. 키가 바뀌어도 같은 멜로디 모양이면 답은 동일합니다.',
+  description: '한 조에서 들은 멜로디를 다른 조로 옮겨서 연주하기',
+  howTo: '먼저 원래 조성의 으뜸음과 짧은 멜로디가 들립니다. 이어서 옮길 조성의 으뜸음이 들립니다. 같은 멜로디 모양을 새 조성으로 옮겨 피아노 건반으로 입력하세요. (옥타브는 달라도 정답으로 인정됩니다.)',
   maxLevel: MAX_LEVEL,
   defaultLevel: 1,
 };
