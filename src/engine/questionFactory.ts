@@ -29,7 +29,7 @@ import {
 } from '../modes/levels';
 import { pickDue } from './srs';
 import {
-  SCALE_LEVELS, CADENCE_PATTERNS, CADENCE_LEVELS, KEY_LEVELS,
+  SCALE_LEVELS, CADENCE_PATTERNS, CADENCE_LEVELS,
   INVERSION_LEVELS, INVERSION_SEVENTHS,
   COMPARE_FIRST, COMPARE_SECOND, COMPARE_SAME, COMPARE_LEVELS,
   ODD_LEVELS, CONTOUR_LEVELS, CONTOUR_LABEL,
@@ -473,29 +473,6 @@ export function makeCadenceQuestion(
     data: { type: 'cadence', cadenceType, key, chords },
     answer: cadenceType,
     context: { key, referenceToneNote: key + '4' },
-  };
-}
-
-// ─── Lab: Key Identification ──────────────────────────────────────────────────
-export function makeKeyIdQuestion(level: number): Question {
-  const cfg = KEY_LEVELS[level] ?? KEY_LEVELS[1];
-  const key = pickRandom(cfg.keys);
-  const mode = pickRandom(cfg.modes);
-  // Major: I-IV-V-I. Minor: i-iv-V-i (harmonic-minor dominant).
-  const pattern: Array<[number, string]> = mode === 'minor'
-    ? [[1, 'minor'], [4, 'minor'], [5, 'dominant7'], [1, 'minor']]
-    : [[1, 'major'], [4, 'major'], [5, 'dominant7'], [1, 'major']];
-  const steps = buildProgressionSteps(pattern, key, 3);
-  const chords = steps.map((s) => s.notes);
-
-  return {
-    id: genId(),
-    mode: 'lab-key',
-    level,
-    itemKey: `key_${key}`,
-    data: { type: 'key-id', key, mode, chords },
-    answer: key,
-    context: { key, absoluteMode: true },
   };
 }
 

@@ -12,6 +12,7 @@ import type {
 } from '../types';
 import { CURRENT_SCHEMA_VERSION, migrate, migrateImport } from './migrate';
 import { ensureCard, updateCard } from '../engine/srs';
+import { DEFAULT_MODE_ORDER } from '../modes/registry';
 import { evaluateAchievements, ACHIEVEMENTS_BY_ID } from '../engine/achievements';
 import { toast } from './useToast';
 
@@ -49,6 +50,7 @@ const defaultSettings: AppSettings = {
   showStaffFeedback: true,
   weakSessionLength: 10,
   reducedMotion: 'system',
+  modeOrder: DEFAULT_MODE_ORDER,
 };
 
 const emptyModeStats = (): ModeStats => ({});
@@ -64,10 +66,8 @@ const defaultStats = (): Record<ModeKey, ModeStats> => ({
   rhythm: emptyModeStats(),
   tempo: emptyModeStats(),
   bpm: emptyModeStats(),
-  lab: emptyModeStats(),
   'lab-scale': emptyModeStats(),
   'lab-cadence': emptyModeStats(),
-  'lab-key': emptyModeStats(),
   'lab-inversion': emptyModeStats(),
   'lab-interval-compare': emptyModeStats(),
   'lab-odd-note': emptyModeStats(),
@@ -89,10 +89,8 @@ const defaultSrs = (): Record<ModeKey, ModeSrs> => ({
   rhythm: emptyModeSrs(),
   tempo: emptyModeSrs(),
   bpm: emptyModeSrs(),
-  lab: emptyModeSrs(),
   'lab-scale': emptyModeSrs(),
   'lab-cadence': emptyModeSrs(),
-  'lab-key': emptyModeSrs(),
   'lab-inversion': emptyModeSrs(),
   'lab-interval-compare': emptyModeSrs(),
   'lab-odd-note': emptyModeSrs(),

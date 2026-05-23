@@ -4,6 +4,8 @@ import { useStore } from '../store/useStore';
 import { toast } from '../store/useToast';
 import { usePwaInstall } from '../hooks/usePwaInstall';
 import { refreshToLatest } from '../sw-update';
+import { MODE_REGISTRY, resolveModeOrder } from '../modes/registry';
+import type { ModeKey } from '../types';
 
 export function Settings() {
   const navigate = useNavigate();
@@ -84,6 +86,19 @@ export function Settings() {
     toast.success('학습 기록을 초기화했습니다.');
   }
 
+  const modeOrder = resolveModeOrder(settings.modeOrder);
+  function moveMode(index: number, dir: -1 | 1) {
+    const target = index + dir;
+    if (target < 0 || target >= modeOrder.length) return;
+    const next = [...modeOrder];
+    [next[index], next[target]] = [next[target], next[index]];
+    updateSettings({ modeOrder: next });
+  }
+  function resetModeOrder() {
+    updateSettings({ modeOrder: undefined });
+    toast.success('훈련 순서를 기본값으로 되돌렸어요.');
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 pb-10">
       <div className="bg-white border-b border-slate-100 px-4 py-4">
@@ -159,6 +174,59 @@ export function Settings() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Training order — reorder the mode cards on the Home screen */}
+        <div className="card">
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-sm font-semibold text-slate-600">훈련 순서</div>
+            <button
+              type="button"
+              className="text-xs text-primary-600 font-semibold focus-ring"
+              onClick={resetModeOrder}
+            >
+              기본값
+            </button>
+          </div>
+          <div className="text-xs text-slate-400 mb-3">
+            홈 화면에 표시되는 훈련 카드의 순서를 바꿉니다.
+          </div>
+          <ul className="space-y-1.5">
+            {modeOrder.map((key, i) => {
+              const info = MODE_REGISTRY[key as ModeKey];
+              if (!info) return null;
+              return (
+                <li
+                  key={key}
+                  className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2"
+                >
+                  <span className="text-lg" aria-hidden>{info.emoji}</span>
+                  <span className="flex-1 text-sm font-medium text-slate-700 leading-tight">
+                    {info.name}
+                  </span>
+                  <span className="text-[11px] tabular-nums text-slate-400 w-5 text-right">{i + 1}</span>
+                  <button
+                    type="button"
+                    className="w-8 h-8 rounded-md bg-white border border-slate-200 text-slate-600 disabled:opacity-30 focus-ring active:scale-95"
+                    onClick={() => moveMode(i, -1)}
+                    disabled={i === 0}
+                    aria-label={`${info.name} 위로`}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className="w-8 h-8 rounded-md bg-white border border-slate-200 text-slate-600 disabled:opacity-30 focus-ring active:scale-95"
+                    onClick={() => moveMode(i, 1)}
+                    disabled={i === modeOrder.length - 1}
+                    aria-label={`${info.name} 아래로`}
+                  >
+                    ↓
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         </div>
 
         {/* Reference tone */}

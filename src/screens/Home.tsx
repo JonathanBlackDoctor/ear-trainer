@@ -1,53 +1,17 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { INTERVAL_MODE_INFO } from '../modes/intervalMode';
-import { CHORD_MODE_INFO } from '../modes/chordMode';
-import { SOLFEGE_MODE_INFO } from '../modes/solfegeMode';
-import {
-  PROGRESSION_MODE_INFO,
-  MELODY_MODE_INFO,
-  TRANSPOSE_MODE_INFO,
-  RHYTHM_MODE_INFO,
-  TEMPO_MODE_INFO,
-  BPM_MODE_INFO,
-} from '../modes/progressionMode';
-import { LAB_MODE_INFO } from '../modes/labModes';
+import { MODE_REGISTRY, MODE_ACCENT_CLASS, resolveModeOrder } from '../modes/registry';
 import type { ModeKey, ModeStats } from '../types';
 import { useStore } from '../store/useStore';
 import { topWeakItems } from '../engine/weakness';
 import { rankFor } from '../engine/xp';
 import { ACHIEVEMENTS_BY_ID } from '../engine/achievements';
 
-// 모드별 색상 띠 클래스 (mode-card의 ::before에 사용)
-const MODE_ACCENT_CLASS: Partial<Record<ModeKey, string>> = {
-  solfege:     'accent-solfege',
-  interval:    'accent-interval',
-  chord:       'accent-chord',
-  progression: 'accent-progression',
-  melody:      'accent-melody',
-  transpose:   'accent-transpose',
-  rhythm:      'accent-rhythm',
-  tempo:       'accent-tempo',
-  bpm:         'accent-bpm',
-  lab:         'accent-interval',
-};
-
-const ALL_MODES = [
-  SOLFEGE_MODE_INFO,
-  INTERVAL_MODE_INFO,
-  CHORD_MODE_INFO,
-  PROGRESSION_MODE_INFO,
-  MELODY_MODE_INFO,
-  TRANSPOSE_MODE_INFO,
-  RHYTHM_MODE_INFO,
-  TEMPO_MODE_INFO,
-  BPM_MODE_INFO,
-  LAB_MODE_INFO,
-];
-
 export function Home() {
   const navigate = useNavigate();
-  const { stats, sessions, gamification } = useStore();
+  const { settings, stats, sessions, gamification } = useStore();
+
+  const orderedModes = resolveModeOrder(settings.modeOrder).map((k) => MODE_REGISTRY[k]);
 
   const totalSessions = sessions.length;
   const totalQuestions = sessions.reduce((s, ss) => s + ss.total, 0);
@@ -64,10 +28,6 @@ export function Home() {
     .slice(0, 3);
 
   function startMode(key: ModeKey) {
-    if (key === 'lab') {
-      navigate('/lab');
-      return;
-    }
     navigate(`/train/${key}`);
   }
 
@@ -257,7 +217,7 @@ export function Home() {
             훈련 선택
           </h2>
           <div className="grid grid-cols-2 gap-3">
-            {ALL_MODES.map((mode) => {
+            {orderedModes.map((mode) => {
               const modeStats = stats[mode.key];
               const items = modeStats ? Object.values(modeStats) : [];
               const attempts = items.reduce((s, i) => s + i.attempts, 0);

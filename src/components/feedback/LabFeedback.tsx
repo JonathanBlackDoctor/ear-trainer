@@ -8,7 +8,6 @@ interface Props {
 const CATEGORY_LABEL: Record<LabJudgeDetails['category'], string> = {
   scale: '스케일',
   cadence: '종지',
-  key: '조성',
   inversion: '전위',
   'interval-compare': '음정 크기',
   'odd-note': '틀린 음',
