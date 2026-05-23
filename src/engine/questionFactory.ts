@@ -525,7 +525,7 @@ export function makeInversionQuestion(level: number): Question {
 export function makeIntervalCompareQuestion(level: number): Question {
   const allowSame = level >= 2;
   const pick = () => 1 + Math.floor(Math.random() * 12); // 1..12 semitones
-  let semA = pick();
+  const semA = pick();
   let semB = pick();
   if (allowSame && Math.random() < 0.25) {
     semB = semA;
@@ -612,8 +612,8 @@ export function makeTuningQuestion(level: number): Question {
   const note = randomNote('C4', 'C5');
   const mags = TUNING_CENTS[level] ?? TUNING_CENTS[1];
   const r = Math.random();
-  let cents = 0;
-  let answer = TUNING_IN_TUNE;
+  let cents: number;
+  let answer: string;
   if (r < 0.34) {
     cents = 0;
     answer = TUNING_IN_TUNE;
