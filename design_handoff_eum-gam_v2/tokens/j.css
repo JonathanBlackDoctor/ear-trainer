@@ -1,0 +1,72 @@
+/* ============================================================================
+   Direction J — 카세트 테이프 (Y2K Cassette)
+   ============================================================================ */
+
+:root {
+  /* Surfaces */
+  --j-bg: #f5ecdc;      /* warm cream */
+  --j-card: #ffffff;
+  --j-ink: #1a0d1f;     /* deep purple-black */
+  --j-ink-soft: #5a4860;
+  --j-ink-mute: #a899ad;
+
+  /* Chrome gradient — for cassette body backplate */
+  --j-chrome: linear-gradient(180deg, #f5f5f7 0%, #d5d8de 50%, #f5f5f7 100%);
+
+  /* Tape-deck colors */
+  --j-pink: #ff3da8;
+  --j-pink-deep: #c91d80;
+  --j-teal: #00c4b4;
+  --j-teal-deep: #0a8a7d;
+  --j-yellow: #ffd83d;
+  --j-silver: #c0c4cc;
+
+  /* Semantic */
+  --j-success: var(--j-teal);
+  --j-warning: var(--j-yellow);
+  --j-danger: var(--j-pink);
+
+  /* Hairlines */
+  --j-hair: #ddd0c1;
+
+  /* Hard offset shadows (smaller than G) */
+  --j-shadow-xs: 2px 2px 0 var(--j-ink);
+  --j-shadow-sm: 3px 3px 0 var(--j-ink);
+  --j-shadow-md: 4px 4px 0 var(--j-ink);
+  --j-shadow-lg: 5px 5px 0 var(--j-ink);
+
+  --j-border-1: 1.5px solid var(--j-ink);
+  --j-border-2: 2px solid var(--j-ink);
+  --j-border-3: 2.5px solid var(--j-ink);
+
+  /* J is square except for tape reels and small pill stickers */
+  --j-radius: 0;
+  --j-radius-sticker: 4px;
+  --j-radius-reel: 50%;
+
+  --j-theme: var(--j-pink);
+  --j-splash: var(--j-bg);
+}
+
+/* Caution-tape diagonal stripe band — for top/bottom rules */
+.j-stripes {
+  background:
+    repeating-linear-gradient(45deg,
+      var(--j-pink)   0 14px,
+      var(--j-yellow) 14px 28px);
+  border-top: 2px solid var(--j-ink);
+  border-bottom: 2px solid var(--j-ink);
+}
+.j-stripes--alt {
+  background:
+    repeating-linear-gradient(45deg,
+      var(--j-teal) 0 14px,
+      var(--j-pink) 14px 28px);
+}
+
+/* Tape reel rotation — pause when prefers-reduced-motion */
+@keyframes j-spin { to { transform: rotate(360deg); } }
+.j-reel-spinning { animation: j-spin 4s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .j-reel-spinning { animation: none; }
+}

@@ -19,6 +19,7 @@ export interface ModeInfo {
   emoji: string;
   description: string;
   howTo?: string;
+  theory?: string;
   maxLevel: number;
   defaultLevel: number;
 }

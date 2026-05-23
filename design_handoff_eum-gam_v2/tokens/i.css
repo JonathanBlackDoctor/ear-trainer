@@ -1,0 +1,82 @@
+/* ============================================================================
+   Direction I — 모눈 / 데이터 (Grid / Data)
+   ============================================================================ */
+
+:root {
+  /* Surfaces */
+  --i-bg: #fbfcfd;
+  --i-card: #ffffff;
+  --i-inset: #f5f7fa;
+  --i-ink: #0f1419;
+  --i-ink-soft: #4a5563;
+  --i-ink-mute: #9aa3b0;
+
+  /* Hairlines (graph paper grid) */
+  --i-hair: #e2e7ed;
+  --i-hair-dark: #c8d0d9;
+  --i-grid: #eef1f5;
+
+  /* Primary (signal) */
+  --i-lime: #65a30d;
+  --i-lime-bright: #84cc16;
+  --i-lime-soft: #ecfccb;
+
+  /* Accents */
+  --i-cyan: #0e7490;
+  --i-cyan-bright: #06b6d4;
+  --i-amber: #ea580c;
+
+  /* Semantic */
+  --i-success: var(--i-lime);
+  --i-warning: var(--i-amber);
+  --i-danger: #ef4444;
+
+  /* No shadows — depth via grid */
+  --i-shadow-none: none;
+
+  /* Borders */
+  --i-border-hair: 1px solid var(--i-hair);
+  --i-border-emph: 1px solid var(--i-hair-dark);
+  --i-border-cta: 1.5px solid var(--i-ink);
+
+  --i-radius: 0;
+
+  --i-theme: var(--i-lime);
+  --i-splash: var(--i-bg);
+}
+
+/* Graph-paper background — apply to root containers */
+.i-graph {
+  background:
+    linear-gradient(var(--i-grid) 1px, transparent 1px) 0 0 / 12px 12px,
+    linear-gradient(90deg, var(--i-grid) 1px, transparent 1px) 0 0 / 12px 12px,
+    linear-gradient(var(--i-hair) 1px, transparent 1px) 0 0 / 60px 60px,
+    linear-gradient(90deg, var(--i-hair) 1px, transparent 1px) 0 0 / 60px 60px,
+    var(--i-bg);
+}
+
+/* Crosshair corner marks on emphasized cards. Wrap the card with
+   position:relative, then add 4 spans positioned absolutely. */
+.i-corners { position: relative; }
+.i-corners::before,
+.i-corners::after,
+.i-corners > .i-tl,
+.i-corners > .i-br {
+  content: ''; position: absolute; width: 10px; height: 10px; pointer-events: none;
+}
+.i-corners::before { top: 6px; left: 6px;  border-top: 1.5px solid var(--i-hair-dark); border-left:  1.5px solid var(--i-hair-dark); }
+.i-corners::after  { top: 6px; right: 6px; border-top: 1.5px solid var(--i-hair-dark); border-right: 1.5px solid var(--i-hair-dark); }
+/* Add two .i-tl / .i-br children for bottom corners if needed */
+
+/* Slashed-zero tabular numerals — Direction I signature */
+.i-tnum {
+  font-variant-numeric: tabular-nums slashed-zero;
+}
+
+/* Mono-style label (uppercase + wide tracking — evokes monospace using Pretendard) */
+.i-mono {
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums slashed-zero;
+}
