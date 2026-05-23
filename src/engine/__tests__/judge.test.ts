@@ -45,6 +45,18 @@ describe('judge — melody', () => {
     const r = judge(ques, ['C4', 'D4']);
     expect(r.partialScore).toBe(0);
   });
+  it('enharmonic-equivalent input (A#4 vs Bb4) counts as correct', () => {
+    const fQues = q({
+      mode: 'melody',
+      answer: ['F4', 'A4', 'Bb4'],
+      data: { type: 'melody', notes: ['F4', 'A4', 'Bb4'], key: 'F' },
+    });
+    // Piano always emits sharp form, so the user's correct play of Bb4
+    // is reported as A#4 — judge must treat them as equivalent.
+    const r = judge(fQues, ['F4', 'A4', 'A#4']);
+    expect(r.correct).toBe(true);
+    expect(r.partialScore).toBe(1);
+  });
 });
 
 describe('judge — transpose', () => {
