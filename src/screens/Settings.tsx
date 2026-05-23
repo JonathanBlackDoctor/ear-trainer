@@ -9,10 +9,10 @@ import type { DesignTheme, ModeKey } from '../types';
 
 const DESIGN_OPTIONS: { value: DesignTheme; label: string; desc: string; swatch: string }[] = [
   { value: 'default', label: '클래식', desc: '딥 인디고 · 골드 · 크림 (기본)', swatch: '#4f46e5' },
-  { value: 'g', label: 'G · 네오 브루탈리즘', desc: '캔디 색 · 두꺼운 테두리 · 하드 그림자', swatch: '#ff5a8c' },
-  { value: 'i', label: 'I · 모눈 · 데이터', desc: '그래프페이퍼 배경 · 라임 시그널', swatch: '#65a30d' },
-  { value: 'j', label: 'J · 카세트 테이프', desc: 'Y2K 핫핑크 · 틸 · 크롬', swatch: '#ff3da8' },
-  { value: 'm', label: 'M · 오로라 · 글래스', desc: '이리데센트 그라데이션 · 글래스 카드', swatch: '#a855f7' },
+  { value: 'g', label: '네오 브루탈리즘', desc: '캔디 색 · 두꺼운 테두리 · 하드 그림자', swatch: '#ff5a8c' },
+  { value: 'i', label: '모눈 · 데이터', desc: '그래프페이퍼 배경 · 라임 시그널', swatch: '#65a30d' },
+  { value: 'j', label: '카세트 테이프', desc: 'Y2K 핫핑크 · 틸 · 크롬', swatch: '#ff3da8' },
+  { value: 'm', label: '오로라 · 글래스', desc: '이리데센트 그라데이션 · 글래스 카드', swatch: '#a855f7' },
 ];
 
 export function Settings() {

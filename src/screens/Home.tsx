@@ -51,17 +51,36 @@ export function Home() {
     <div className="min-h-screen pb-10">
       {/* Header — 더 강한 브랜드 표현 (인디고 그라데이션 + 골드 액센트) */}
       <header className="bg-gradient-to-br from-primary-700 via-primary-800 to-primary-900 text-white">
-        <div className="max-w-lg mx-auto px-5 pt-8 pb-10">
-          <div className="flex items-center gap-2 text-accent-300 text-xs font-semibold tracking-widest uppercase mb-2">
-            <span className="inline-block w-6 h-px bg-accent-300"></span>
-            Ear Training
+        <div className="max-w-lg mx-auto px-5 pt-8 pb-10 flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 text-accent-300 text-xs font-semibold tracking-widest uppercase mb-2">
+              <span className="inline-block w-6 h-px bg-accent-300"></span>
+              Ear Training
+            </div>
+            <h1 className="font-display text-4xl font-bold tracking-tight">
+              음감 훈련
+            </h1>
+            <p className="text-sm text-primary-200 mt-2">
+              매일 5분, 자라나는 음감
+            </p>
           </div>
-          <h1 className="font-display text-4xl font-bold tracking-tight">
-            음감 훈련
-          </h1>
-          <p className="text-sm text-primary-200 mt-2">
-            매일 5분, 자라나는 음감
-          </p>
+          {/* 통계 / 설정 — 제목과 같은 줄 오른쪽 */}
+          <div className="flex shrink-0 gap-2">
+            <button
+              className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 active:scale-95 transition-all rounded-full px-3 py-1.5 text-sm font-medium focus-ring"
+              onClick={() => navigate('/stats')}
+              aria-label="통계 화면 열기"
+            >
+              <span aria-hidden>📊</span> 통계
+            </button>
+            <button
+              className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 active:scale-95 transition-all rounded-full px-3 py-1.5 text-sm font-medium focus-ring"
+              onClick={() => navigate('/settings')}
+              aria-label="설정 화면 열기"
+            >
+              <span aria-hidden>⚙️</span> 설정
+            </button>
+          </div>
         </div>
       </header>
 
@@ -250,22 +269,6 @@ export function Home() {
               );
             })}
           </div>
-        </div>
-
-        {/* Bottom nav */}
-        <div className="flex gap-3 pt-2">
-          <button
-            className="flex-1 btn-secondary flex items-center justify-center gap-2"
-            onClick={() => navigate('/stats')}
-          >
-            <span>📊</span> 통계
-          </button>
-          <button
-            className="flex-1 btn-secondary flex items-center justify-center gap-2"
-            onClick={() => navigate('/settings')}
-          >
-            <span>⚙️</span> 설정
-          </button>
         </div>
       </div>
     </div>
