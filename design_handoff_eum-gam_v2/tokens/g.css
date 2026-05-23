@@ -1,0 +1,63 @@
+/* ============================================================================
+   Direction G — 네오 브루탈리즘 (Neo-brutalism)
+   Drop into your global stylesheet or import per-route.
+   Pair with tailwind.config.js snippet in g.tailwind.js.
+   ============================================================================ */
+
+:root {
+  /* Surfaces */
+  --g-bg: #fffef0;
+  --g-card: #ffffff;
+  --g-ink: #0a0a0a;
+  --g-ink-soft: #3a3a3a;
+  --g-ink-mute: #7a7a7a;
+
+  /* Candy accents */
+  --g-pink: #ff5a8c;
+  --g-mustard: #f5d142;
+  --g-mint: #5af2c2;
+  --g-lavender: #a497ff;
+  --g-sky: #7fc6ff;
+  --g-orange: #fb923c;
+  --g-green: #7ce26c;
+  --g-red: #ff5b4a;
+
+  /* Semantic */
+  --g-success: var(--g-green);
+  --g-warning: var(--g-mustard);
+  --g-danger: var(--g-red);
+
+  /* Hard offset shadows (no blur) */
+  --g-shadow-xs: 2px 2px 0 var(--g-ink);
+  --g-shadow-sm: 3px 3px 0 var(--g-ink);
+  --g-shadow-md: 4px 4px 0 var(--g-ink);
+  --g-shadow-lg: 6px 6px 0 var(--g-ink);
+  --g-shadow-xl: 8px 8px 0 var(--g-ink);
+  --g-shadow-cta: 6px 6px 0 var(--g-pink); /* dark button w/ pink offset */
+
+  /* Borders */
+  --g-border-1: 2px solid var(--g-ink);
+  --g-border-2: 2.5px solid var(--g-ink);
+  --g-border-3: 3px solid var(--g-ink);
+
+  /* Radii (G is square) */
+  --g-radius: 0;
+  --g-radius-pill: 9999px; /* only for cassette-style chips, rare */
+
+  /* PWA */
+  --g-theme: var(--g-pink);
+  --g-splash: var(--g-bg);
+}
+
+/* Press state — apply on :active for any G button */
+.g-press:active {
+  transform: translate(2px, 2px);
+  box-shadow: var(--g-shadow-xs) !important;
+  transition: none;
+}
+.g-press {
+  transition: transform 80ms, box-shadow 80ms;
+}
+
+/* Tabular numerals helper (also defined globally) */
+.g-tnum { font-variant-numeric: tabular-nums; }
