@@ -16,7 +16,7 @@ export const LAB_SCALE_MODE_INFO = {
   name: '스케일 식별',
   emoji: '🪜',
   description: '스케일 종류를 맞혀보세요',
-  maxLevel: 3,
+  maxLevel: 10,
   defaultLevel: 1,
 };
 
@@ -25,7 +25,7 @@ export const LAB_CADENCE_MODE_INFO = {
   name: '종지 식별',
   emoji: '🛑',
   description: '종지 형태를 맞혀보세요',
-  maxLevel: 2,
+  maxLevel: 10,
   defaultLevel: 1,
 };
 
@@ -34,7 +34,7 @@ export const LAB_KEY_MODE_INFO = {
   name: '조성 식별',
   emoji: '🗝️',
   description: '진행을 듣고 조성을 맞혀보세요',
-  maxLevel: 3,
+  maxLevel: 10,
   defaultLevel: 1,
 };
 
@@ -43,15 +43,24 @@ export const LAB_INVERSION_MODE_INFO = {
   name: '자리바꿈 식별',
   emoji: '🔄',
   description: '화음의 자리바꿈을 맞혀보세요',
-  maxLevel: 2,
+  maxLevel: 10,
   defaultLevel: 1,
 };
 
 // ─── Scales ───────────────────────────────────────────────────────────────
+// Scale-type pool grows one family at a time; descending playback unlocks at
+// the top tiers (handled in the factory).
 export const SCALE_LEVELS: Record<number, string[]> = {
-  1: ['major', 'natural minor'],
-  2: ['major', 'natural minor', 'harmonic minor', 'melodic minor'],
-  3: ['major', 'natural minor', 'harmonic minor', 'melodic minor', 'dorian', 'phrygian', 'lydian', 'mixolydian'],
+  1:  ['major', 'natural minor'],
+  2:  ['major', 'natural minor', 'harmonic minor'],
+  3:  ['major', 'natural minor', 'harmonic minor', 'melodic minor'],
+  4:  ['major', 'natural minor', 'harmonic minor', 'melodic minor', 'dorian'],
+  5:  ['major', 'natural minor', 'harmonic minor', 'melodic minor', 'dorian', 'mixolydian'],
+  6:  ['major', 'natural minor', 'harmonic minor', 'melodic minor', 'dorian', 'mixolydian', 'lydian'],
+  7:  ['major', 'natural minor', 'harmonic minor', 'melodic minor', 'dorian', 'mixolydian', 'lydian', 'phrygian'],
+  8:  ['major', 'natural minor', 'harmonic minor', 'melodic minor', 'dorian', 'mixolydian', 'lydian', 'phrygian', 'locrian'],
+  9:  ['major', 'natural minor', 'harmonic minor', 'melodic minor', 'dorian', 'mixolydian', 'lydian', 'phrygian', 'locrian'],
+  10: ['major', 'natural minor', 'harmonic minor', 'melodic minor', 'dorian', 'mixolydian', 'lydian', 'phrygian', 'locrian'],
 };
 
 const SCALE_LABEL: Record<string, string> = {
@@ -63,6 +72,7 @@ const SCALE_LABEL: Record<string, string> = {
   'phrygian': '프리지안',
   'lydian': '리디안',
   'mixolydian': '믹솔리디안',
+  'locrian': '로크리안',
 };
 
 export function getScaleChoices(level: number): ChoiceOption[] {
@@ -81,9 +91,20 @@ export const CADENCE_PATTERNS: Record<string, Array<[number, string]>> = {
   deceptive:  [[1,'major'],[4,'major'],[5,'dominant7'],[6,'minor']],  // V→vi
 };
 
-export const CADENCE_LEVELS: Record<number, string[]> = {
-  1: ['authentic', 'plagal'],
-  2: ['authentic', 'plagal', 'half', 'deceptive'],
+const CADENCE_ALL = ['authentic', 'plagal', 'half', 'deceptive'];
+
+// Cadence type pool grows, then the key pool widens (more transposition).
+export const CADENCE_LEVELS: Record<number, { types: string[]; keys: string[] }> = {
+  1:  { types: ['authentic', 'plagal'], keys: ['C'] },
+  2:  { types: ['authentic', 'plagal', 'half'], keys: ['C'] },
+  3:  { types: CADENCE_ALL, keys: ['C'] },
+  4:  { types: CADENCE_ALL, keys: ['C', 'G', 'F'] },
+  5:  { types: CADENCE_ALL, keys: ['C', 'G', 'F', 'D', 'Bb'] },
+  6:  { types: CADENCE_ALL, keys: ['C', 'G', 'F', 'D', 'Bb', 'A', 'Eb'] },
+  7:  { types: CADENCE_ALL, keys: ['C', 'G', 'D', 'A', 'E', 'F', 'Bb', 'Eb'] },
+  8:  { types: CADENCE_ALL, keys: ['C', 'G', 'D', 'A', 'E', 'F', 'Bb', 'Eb'] },
+  9:  { types: CADENCE_ALL, keys: ['C', 'G', 'D', 'A', 'E', 'F', 'Bb', 'Eb'] },
+  10: { types: CADENCE_ALL, keys: ['C', 'G', 'D', 'A', 'E', 'F', 'Bb', 'Eb'] },
 };
 
 const CADENCE_LABEL: Record<string, string> = {
@@ -94,31 +115,55 @@ const CADENCE_LABEL: Record<string, string> = {
 };
 
 export function getCadenceChoices(level: number): ChoiceOption[] {
-  return (CADENCE_LEVELS[level] ?? CADENCE_LEVELS[1]).map((c) => ({
+  const cfg = CADENCE_LEVELS[level] ?? CADENCE_LEVELS[1];
+  return cfg.types.map((c) => ({
     value: c,
     label: CADENCE_LABEL[c] ?? c,
   }));
 }
 
 // ─── Keys ─────────────────────────────────────────────────────────────────
-export const KEY_LEVELS: Record<number, string[]> = {
-  1: ['C', 'G', 'D', 'A', 'F', 'Bb', 'Eb'],
-  2: ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'],
-  3: ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'],
+const KEYS_ALL_12 = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+// Key pool widens to all 12, then minor tonalities join the pool.
+export const KEY_LEVELS: Record<number, { keys: string[]; modes: Array<'major' | 'minor'> }> = {
+  1:  { keys: ['C', 'G', 'F'], modes: ['major'] },
+  2:  { keys: ['C', 'G', 'F', 'D', 'Bb'], modes: ['major'] },
+  3:  { keys: ['C', 'G', 'F', 'D', 'Bb', 'A', 'Eb'], modes: ['major'] },
+  4:  { keys: ['C', 'G', 'F', 'D', 'Bb', 'A', 'Eb', 'E', 'Ab'], modes: ['major'] },
+  5:  { keys: KEYS_ALL_12, modes: ['major'] },
+  6:  { keys: KEYS_ALL_12, modes: ['major'] },
+  7:  { keys: KEYS_ALL_12, modes: ['major', 'minor'] },
+  8:  { keys: KEYS_ALL_12, modes: ['major', 'minor'] },
+  9:  { keys: KEYS_ALL_12, modes: ['major', 'minor'] },
+  10: { keys: KEYS_ALL_12, modes: ['major', 'minor'] },
 };
 
 export function getKeyChoices(level: number): ChoiceOption[] {
-  return (KEY_LEVELS[level] ?? KEY_LEVELS[1]).map((k) => ({
+  const cfg = KEY_LEVELS[level] ?? KEY_LEVELS[1];
+  return cfg.keys.map((k) => ({
     value: k,
     label: k,
   }));
 }
 
 // ─── Inversions ───────────────────────────────────────────────────────────
-export const INVERSION_LEVELS: Record<number, number[]> = {
-  1: [0, 1, 2],     // triads: root / 1st / 2nd
-  2: [0, 1, 2, 3],  // 7th chords add 3rd inversion
+// Chord-quality vocabulary grows; 3rd inversion (and 7th chords) unlock at L5.
+export const INVERSION_LEVELS: Record<number, { inversions: number[]; qualities: string[] }> = {
+  1:  { inversions: [0, 1, 2], qualities: ['major'] },
+  2:  { inversions: [0, 1, 2], qualities: ['major', 'minor'] },
+  3:  { inversions: [0, 1, 2], qualities: ['major', 'minor', 'dim'] },
+  4:  { inversions: [0, 1, 2], qualities: ['major', 'minor', 'dim', 'aug'] },
+  5:  { inversions: [0, 1, 2, 3], qualities: ['major', 'minor', 'dominant7'] },
+  6:  { inversions: [0, 1, 2, 3], qualities: ['major', 'minor', 'dominant7', 'major7'] },
+  7:  { inversions: [0, 1, 2, 3], qualities: ['major', 'minor', 'dominant7', 'major7', 'minor7'] },
+  8:  { inversions: [0, 1, 2, 3], qualities: ['major', 'minor', 'dominant7', 'major7', 'minor7', 'm7b5'] },
+  9:  { inversions: [0, 1, 2, 3], qualities: ['major', 'minor', 'dim', 'aug', 'dominant7', 'major7', 'minor7', 'm7b5'] },
+  10: { inversions: [0, 1, 2, 3], qualities: ['major', 'minor', 'dim', 'aug', 'dominant7', 'major7', 'minor7', 'm7b5'] },
 };
+
+// 7th-chord qualities — the only ones that have a meaningful 3rd inversion.
+export const INVERSION_SEVENTHS = ['dominant7', 'major7', 'minor7', 'm7b5'];
 
 const INVERSION_LABEL: Record<number, string> = {
   0: '기본 위치',
@@ -128,7 +173,8 @@ const INVERSION_LABEL: Record<number, string> = {
 };
 
 export function getInversionChoices(level: number): ChoiceOption[] {
-  return (INVERSION_LEVELS[level] ?? INVERSION_LEVELS[1]).map((n) => ({
+  const cfg = INVERSION_LEVELS[level] ?? INVERSION_LEVELS[1];
+  return cfg.inversions.map((n) => ({
     value: String(n),
     label: INVERSION_LABEL[n] ?? `${n}전위`,
   }));
