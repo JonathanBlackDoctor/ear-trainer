@@ -89,9 +89,11 @@ export interface SolfegeData {
 
 export interface TransposeData {
   type: 'transpose';
-  notes: string[];       // actual notes played, e.g. ["G4","B4","D5"]
-  degrees: number[];     // 1-7 scale degrees aligned with notes
-  key: string;           // tonic of the chosen key, e.g. "G"
+  degrees: number[];     // 1-7 scale degrees of the melodic shape
+  fromKey: string;       // key the melody is played in, e.g. "C"
+  toKey: string;         // key the user must transpose the melody into, e.g. "G"
+  fromNotes: string[];   // notes actually played (in fromKey)
+  toNotes: string[];     // expected answer notes (same shape, in toKey)
 }
 
 export interface RhythmData {

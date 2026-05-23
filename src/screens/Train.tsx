@@ -96,7 +96,6 @@ export function Train() {
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [pianoInput, setPianoInput] = useState<string[]>([]);
   const [progressionInput, setProgressionInput] = useState<ProgressionAnswer[]>([]);
-  const [transposeInput, setTransposeInput] = useState<number[]>([]);
   const [feedbackResult, setFeedbackResult] = useState<ReturnType<typeof judge> | null>(null);
   const [loading, setLoading] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
@@ -195,7 +194,6 @@ export function Train() {
     setSelectedAnswer(null);
     setPianoInput([]);
     setProgressionInput([]);
-    setTransposeInput([]);
     setRhythmTaps([]);
     setRhythmStartTime(0);
     setTempoTaps([]);
@@ -254,15 +252,14 @@ export function Train() {
     setLoading(true);
     try {
       // Play reference tone if enabled (skip entirely in absolute-pitch mode).
-      // Transpose mode forces the tonic on the initial auto-play — it's the
-      // anchor for the degree answer — even if the user has reference tones
-      // off. The "듣기" button passes includeReference=false to keep replays
-      // from re-sounding the tonic (separate reference button is available).
-      const forceReference = q.mode === 'transpose';
+      // Transpose mode handles its own reference tones inline (it sounds both
+      // the source and target key tonics around the melody), so the generic
+      // pre-roll is skipped for it.
       if (
         includeReference &&
+        q.mode !== 'transpose' &&
         !q.context?.absoluteMode &&
-        (forceReference || settings.referenceTone === 'perQuestion') &&
+        settings.referenceTone === 'perQuestion' &&
         q.context?.referenceToneNote
       ) {
         await playReferenceTone(q.context.referenceToneNote, '2n');
@@ -318,7 +315,13 @@ export function Train() {
       }
       case 'transpose': {
         const d = data as TransposeData;
-        await playSequence(d.notes, '4n', speed);
+        // Original key: tonic, then the melody in fromKey.
+        await playReferenceTone(d.fromKey + '4', '4n');
+        await delay(400 / speed);
+        await playSequence(d.fromNotes, '4n', speed);
+        // Pause, then sound the target key's tonic to prime the transposed input.
+        await delay(700 / speed);
+        await playReferenceTone(d.toKey + '4', '2n');
         break;
       }
       case 'solfege': {
@@ -425,11 +428,13 @@ export function Train() {
       submitAnswer(syllable);
       return;
     }
-    if (modeKey !== 'melody') {
+    if (modeKey !== 'melody' && modeKey !== 'transpose') {
       submitAnswer(note);
       return;
     }
-    const expected = (currentQuestion?.data as MelodyData)?.notes ?? [];
+    const expected = modeKey === 'transpose'
+      ? (currentQuestion?.data as TransposeData)?.toNotes ?? []
+      : (currentQuestion?.data as MelodyData)?.notes ?? [];
     const next = [...pianoInput, note];
     setPianoInput(next);
     if (next.length >= expected.length) {
@@ -441,15 +446,6 @@ export function Train() {
     const expected = (currentQuestion?.data as ProgressionData)?.chords ?? [];
     const next = [...progressionInput, { degree, quality }];
     setProgressionInput(next);
-    if (next.length >= expected.length) {
-      submitAnswer(next);
-    }
-  }
-
-  function handleTransposeSelect(degree: number) {
-    const expected = (currentQuestion?.data as TransposeData)?.degrees ?? [];
-    const next = [...transposeInput, degree];
-    setTransposeInput(next);
     if (next.length >= expected.length) {
       submitAnswer(next);
     }
@@ -795,8 +791,8 @@ export function Train() {
             loading={loading}
           />
 
-          {/* Key badge */}
-          {currentQuestion.context.key && !isInterval && !isAbsolute && (
+          {/* Key badge (transpose shows its own from→to badge in the input area) */}
+          {currentQuestion.context.key && !isInterval && !isTranspose && !isAbsolute && (
             <div className="text-center">
               <span className="inline-block bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1 rounded-full">
                 조성: {currentQuestion.context.key}장조
@@ -909,34 +905,40 @@ export function Train() {
                 />
               )}
 
-              {/* Transpose: degree-sequence input */}
-              {isTranspose && (
-                <>
-                  <div className="text-sm text-center text-slate-500">
-                    {(currentQuestion.data as TransposeData).degrees.length}개 도수 입력
-                    {transposeInput.length > 0 && ` (${transposeInput.length}/${(currentQuestion.data as TransposeData).degrees.length})`}
-                  </div>
-                  {transposeInput.length > 0 && (
-                    <div className="flex gap-2 flex-wrap justify-center">
-                      {transposeInput.map((d, i) => (
-                        <span key={i} className="bg-primary-100 text-primary-700 px-3 py-1.5 rounded-lg font-semibold text-sm">
-                          {settings.notation === 'roman' ? (ROMAN[d] ?? String(d)) : d}
-                        </span>
-                      ))}
+              {/* Transpose: re-enter the melody in the target key on the piano */}
+              {isTranspose && (() => {
+                const td = currentQuestion.data as TransposeData;
+                return (
+                  <>
+                    <div className="text-center text-sm text-slate-600">
+                      <span className="inline-block bg-primary-100 text-primary-700 font-semibold px-3 py-1 rounded-full">
+                        {td.fromKey}장조 → {td.toKey}장조로 옮겨서 입력
+                      </span>
                     </div>
-                  )}
-                  <TransposeInput
-                    notation={settings.notation}
-                    onSelect={handleTransposeSelect}
-                    disabled={loading}
-                  />
-                  {transposeInput.length > 0 && (
-                    <button className="btn-ghost text-sm text-slate-400" onClick={() => setTransposeInput([])}>
-                      ← 다시 입력
-                    </button>
-                  )}
-                </>
-              )}
+                    <div className="text-center text-sm text-slate-500">
+                      건반으로 {td.toNotes.length}개 음 입력
+                      {pianoInput.length > 0 && ` (${pianoInput.length}/${td.toNotes.length})`}
+                    </div>
+                    {pianoInput.length > 0 && (
+                      <div className="flex gap-2 flex-wrap justify-center">
+                        {pianoInput.map((n, i) => (
+                          <span key={i} className="bg-primary-100 text-primary-700 px-2 py-1 rounded text-sm font-mono">{n}</span>
+                        ))}
+                      </div>
+                    )}
+                    <Piano
+                      onNotePress={handlePianoNote}
+                      highlightNotes={pianoInput}
+                      disabled={loading}
+                    />
+                    {pianoInput.length > 0 && (
+                      <button className="btn-ghost text-sm text-slate-400" onClick={() => setPianoInput([])}>
+                        ← 다시 입력
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
 
               {/* Solfege piano input */}
               {isSolfege && solfegeInputMethod === 'piano' && (
@@ -1134,30 +1136,19 @@ export function Train() {
               )}
               {isTranspose && feedbackResult && (
                 <div className="space-y-2">
-                  <div className="text-xs text-slate-500 text-center">정답</div>
-                  <div className="flex gap-2 flex-wrap justify-center">
-                    {(feedbackResult.correctAnswer as number[]).map((d, i) => {
-                      const userVal = transposeInput[i];
-                      const isCorrect = userVal === d;
-                      return (
-                        <span
-                          key={i}
-                          className={`px-3 py-1.5 rounded-lg font-semibold text-sm ${
-                            isCorrect
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-red-100 text-red-700'
-                          }`}
-                        >
-                          {settings.notation === 'roman' ? (ROMAN[d] ?? String(d)) : d}
-                          {!isCorrect && userVal != null && (
-                            <span className="text-xs text-red-500 ml-1">
-                              (입력: {settings.notation === 'roman' ? (ROMAN[userVal] ?? String(userVal)) : userVal})
-                            </span>
-                          )}
-                        </span>
-                      );
-                    })}
+                  <div className="text-xs text-slate-500 text-center">
+                    정답 ({(currentQuestion.data as TransposeData).toKey}장조)
                   </div>
+                  <Piano
+                    highlightNotes={feedbackResult.correctAnswer as string[]}
+                    correctNotes={feedbackResult.correctAnswer as string[]}
+                    wrongNotes={pianoInput.filter((n) =>
+                      !(feedbackResult.correctAnswer as string[]).some(
+                        (c) => Note.pitchClass(c) === Note.pitchClass(n)
+                      )
+                    )}
+                    disabled
+                  />
                 </div>
               )}
               {isSolfege && solfegeInputMethod === 'piano' && feedbackResult && (
@@ -1259,11 +1250,6 @@ function formatAnswer(answer: unknown, mode: ModeKey, notation: 'roman' | 'numbe
           : romanize(p.degree, p.quality))
         .join(' → ');
     }
-    if (mode === 'transpose') {
-      return (answer as number[])
-        .map((d) => notation === 'roman' ? (ROMAN[d] ?? String(d)) : String(d))
-        .join(' → ');
-    }
     return (answer as string[]).join(', ');
   }
   return String(answer);
@@ -1295,30 +1281,6 @@ function ProgressionInput({ notation, onSelect, disabled }: ProgInputProps) {
           disabled={disabled}
         >
           {c.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ─── Transpose Degree Input ─────────────────────────────────────────────────
-interface TransposeInputProps {
-  notation: 'roman' | 'number';
-  onSelect: (degree: number) => void;
-  disabled?: boolean;
-}
-
-function TransposeInput({ notation, onSelect, disabled }: TransposeInputProps) {
-  return (
-    <div className="grid grid-cols-7 gap-2">
-      {[1, 2, 3, 4, 5, 6, 7].map((d) => (
-        <button
-          key={d}
-          className="choice-btn py-3 text-base font-bold"
-          onClick={() => !disabled && onSelect(d)}
-          disabled={disabled}
-        >
-          {notation === 'roman' ? (ROMAN[d] ?? String(d)) : d}
         </button>
       ))}
     </div>
