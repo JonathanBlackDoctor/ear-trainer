@@ -52,6 +52,23 @@ export function Home() {
       {/* Header — 더 강한 브랜드 표현 (인디고 그라데이션 + 골드 액센트) */}
       <header className="bg-gradient-to-br from-primary-700 via-primary-800 to-primary-900 text-white">
         <div className="max-w-lg mx-auto px-5 pt-8 pb-10">
+          {/* 통계 / 설정 — 화면 가장 상단 */}
+          <div className="flex justify-end gap-2 mb-4">
+            <button
+              className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 active:scale-95 transition-all rounded-full px-3 py-1.5 text-sm font-medium focus-ring"
+              onClick={() => navigate('/stats')}
+              aria-label="통계 화면 열기"
+            >
+              <span aria-hidden>📊</span> 통계
+            </button>
+            <button
+              className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 active:scale-95 transition-all rounded-full px-3 py-1.5 text-sm font-medium focus-ring"
+              onClick={() => navigate('/settings')}
+              aria-label="설정 화면 열기"
+            >
+              <span aria-hidden>⚙️</span> 설정
+            </button>
+          </div>
           <div className="flex items-center gap-2 text-accent-300 text-xs font-semibold tracking-widest uppercase mb-2">
             <span className="inline-block w-6 h-px bg-accent-300"></span>
             Ear Training
@@ -250,22 +267,6 @@ export function Home() {
               );
             })}
           </div>
-        </div>
-
-        {/* Bottom nav */}
-        <div className="flex gap-3 pt-2">
-          <button
-            className="flex-1 btn-secondary flex items-center justify-center gap-2"
-            onClick={() => navigate('/stats')}
-          >
-            <span>📊</span> 통계
-          </button>
-          <button
-            className="flex-1 btn-secondary flex items-center justify-center gap-2"
-            onClick={() => navigate('/settings')}
-          >
-            <span>⚙️</span> 설정
-          </button>
         </div>
       </div>
     </div>
