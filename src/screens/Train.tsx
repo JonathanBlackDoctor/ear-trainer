@@ -96,6 +96,7 @@ export function Train() {
   const [audioQuality, setAudioQuality] = useState<AudioQuality>('synth');
   const [solfegeInputMethod, setSolfegeInputMethod] = useState<'choice' | 'piano'>('choice');
   const [absoluteMode, setAbsoluteMode] = useState(false);
+  const [showTheory, setShowTheory] = useState(false);
 
   const modeKey = mode as ModeKey;
   const modeInfo: ModeInfo = MODE_INFO[modeKey] ?? {
@@ -678,11 +679,25 @@ export function Train() {
             </div>
           )}
 
-          {/* Music theory */}
+          {/* Music theory — collapsed by default */}
           {modeInfo.theory && (
             <div className="card w-full max-w-sm">
-              <div className="text-sm font-semibold text-slate-600 mb-2">음악 개념</div>
-              <p className="text-sm text-slate-600 leading-relaxed">{modeInfo.theory}</p>
+              <button
+                className="w-full flex items-center justify-between gap-2 text-left"
+                onClick={() => setShowTheory((v) => !v)}
+                aria-expanded={showTheory}
+              >
+                <span className="text-sm font-semibold text-slate-600">음악 개념</span>
+                <span
+                  className={`text-slate-400 transition-transform ${showTheory ? 'rotate-180' : ''}`}
+                  aria-hidden
+                >
+                  ▾
+                </span>
+              </button>
+              {showTheory && (
+                <p className="mt-2 text-sm text-slate-600 leading-relaxed">{modeInfo.theory}</p>
+              )}
             </div>
           )}
 
