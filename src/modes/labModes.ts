@@ -134,13 +134,17 @@ export function getInversionChoices(level: number): ChoiceOption[] {
   }));
 }
 
+// All eight new lab modes use the full 10-level ladder like the core trainings.
+// Each *_LEVELS map ramps difficulty monotonically; content-limited modes
+// (3 answers) lean on tighter tolerances / larger pools at higher tiers.
+
 // ─── Interval Compare ───────────────────────────────────────────────────────
 export const LAB_INTERVAL_COMPARE_MODE_INFO = {
   key: 'lab-interval-compare' as ModeKey,
   name: '음정 크기 비교',
   emoji: '🆚',
   description: '두 음정 중 더 넓은 쪽을 고르세요',
-  maxLevel: 2,
+  maxLevel: 10,
   defaultLevel: 1,
 };
 
@@ -149,12 +153,27 @@ export const COMPARE_FIRST = '첫 번째';
 export const COMPARE_SECOND = '두 번째';
 export const COMPARE_SAME = '같음';
 
+// minGap shrinks (harder to tell apart), range widens, "same" unlocks midway.
+export const COMPARE_LEVELS: Record<number, { minGap: number; allowSame: boolean; low: string; high: string }> = {
+  1:  { minGap: 6, allowSame: false, low: 'C4', high: 'C5' },
+  2:  { minGap: 5, allowSame: false, low: 'C4', high: 'C5' },
+  3:  { minGap: 4, allowSame: false, low: 'C4', high: 'C5' },
+  4:  { minGap: 3, allowSame: false, low: 'C3', high: 'C5' },
+  5:  { minGap: 3, allowSame: true,  low: 'C3', high: 'C5' },
+  6:  { minGap: 2, allowSame: true,  low: 'C3', high: 'C5' },
+  7:  { minGap: 2, allowSame: true,  low: 'A2', high: 'C6' },
+  8:  { minGap: 1, allowSame: true,  low: 'A2', high: 'C6' },
+  9:  { minGap: 1, allowSame: true,  low: 'A2', high: 'C6' },
+  10: { minGap: 1, allowSame: true,  low: 'A2', high: 'C6' },
+};
+
 export function getIntervalCompareChoices(level: number): ChoiceOption[] {
+  const cfg = COMPARE_LEVELS[level] ?? COMPARE_LEVELS[1];
   const base: ChoiceOption[] = [
     { value: COMPARE_FIRST, label: '첫 번째가 더 넓다' },
     { value: COMPARE_SECOND, label: '두 번째가 더 넓다' },
   ];
-  if (level >= 2) base.push({ value: COMPARE_SAME, label: '두 음정이 같다' });
+  if (cfg.allowSame) base.push({ value: COMPARE_SAME, label: '두 음정이 같다' });
   return base;
 }
 
@@ -164,8 +183,22 @@ export const LAB_ODD_NOTE_MODE_INFO = {
   name: '틀린 음 찾기',
   emoji: '🔍',
   description: '음계 속 어긋난 음의 위치를 찾으세요',
-  maxLevel: 2,
+  maxLevel: 10,
   defaultLevel: 1,
+};
+
+// Scale pool widens, end notes become eligible, descending playback unlocks.
+export const ODD_LEVELS: Record<number, { scales: string[]; allowEnds: boolean; descending: boolean }> = {
+  1:  { scales: ['major'], allowEnds: false, descending: false },
+  2:  { scales: ['major'], allowEnds: false, descending: false },
+  3:  { scales: ['major'], allowEnds: true,  descending: false },
+  4:  { scales: ['major', 'minor'], allowEnds: false, descending: false },
+  5:  { scales: ['major', 'minor'], allowEnds: true,  descending: false },
+  6:  { scales: ['major', 'minor'], allowEnds: true,  descending: true },
+  7:  { scales: ['major', 'minor', 'dorian'], allowEnds: true, descending: true },
+  8:  { scales: ['major', 'minor', 'dorian', 'mixolydian'], allowEnds: true, descending: true },
+  9:  { scales: ['major', 'minor', 'dorian', 'phrygian', 'lydian', 'mixolydian'], allowEnds: true, descending: true },
+  10: { scales: ['major', 'minor', 'dorian', 'phrygian', 'lydian', 'mixolydian'], allowEnds: true, descending: true },
 };
 
 // noteCount-aware: 8-note scale (octave inclusive) → positions 1..8.
@@ -182,13 +215,25 @@ export const LAB_CONTOUR_MODE_INFO = {
   name: '멜로디 윤곽',
   emoji: '〰️',
   description: '선율의 모양을 맞혀보세요',
-  maxLevel: 2,
+  maxLevel: 10,
   defaultLevel: 1,
 };
 
-export const CONTOUR_LEVELS: Record<number, string[]> = {
-  1: ['up', 'down', 'arch', 'inv-arch'],
-  2: ['up', 'down', 'arch', 'inv-arch', 'wave'],
+const ALL_CONTOURS = ['up', 'down', 'arch', 'inv-arch', 'wave'];
+
+// Shapes unlock 1→4, then longer melodies and a non-tonic start (jitter) raise
+// the challenge while the answer set stays at the five named shapes.
+export const CONTOUR_LEVELS: Record<number, { shapes: string[]; length: 5 | 7; jitter: boolean }> = {
+  1:  { shapes: ['up', 'down'], length: 5, jitter: false },
+  2:  { shapes: ['up', 'down', 'arch'], length: 5, jitter: false },
+  3:  { shapes: ['up', 'down', 'arch', 'inv-arch'], length: 5, jitter: false },
+  4:  { shapes: ALL_CONTOURS, length: 5, jitter: false },
+  5:  { shapes: ALL_CONTOURS, length: 5, jitter: true },
+  6:  { shapes: ALL_CONTOURS, length: 7, jitter: false },
+  7:  { shapes: ALL_CONTOURS, length: 7, jitter: true },
+  8:  { shapes: ALL_CONTOURS, length: 7, jitter: true },
+  9:  { shapes: ALL_CONTOURS, length: 7, jitter: true },
+  10: { shapes: ALL_CONTOURS, length: 7, jitter: true },
 };
 
 export const CONTOUR_LABEL: Record<string, string> = {
@@ -200,7 +245,8 @@ export const CONTOUR_LABEL: Record<string, string> = {
 };
 
 export function getContourChoices(level: number): ChoiceOption[] {
-  return (CONTOUR_LEVELS[level] ?? CONTOUR_LEVELS[1]).map((c) => ({
+  const cfg = CONTOUR_LEVELS[level] ?? CONTOUR_LEVELS[1];
+  return cfg.shapes.map((c) => ({
     value: CONTOUR_LABEL[c],
     label: CONTOUR_LABEL[c],
   }));
@@ -212,7 +258,7 @@ export const LAB_TUNING_MODE_INFO = {
   name: '음정 정확도',
   emoji: '🎯',
   description: '기준음 대비 높낮이를 판별하세요',
-  maxLevel: 2,
+  maxLevel: 10,
   defaultLevel: 1,
 };
 
@@ -228,10 +274,18 @@ export function getTuningChoices(): ChoiceOption[] {
   ];
 }
 
-// Detune magnitude (cents) by level. Larger = easier.
+// Detune magnitude (cents) shrinks every level — subtler = harder.
 export const TUNING_CENTS: Record<number, number[]> = {
-  1: [28, 33, 38, 42],
-  2: [12, 15, 18, 22],
+  1:  [40, 45],
+  2:  [33, 38],
+  3:  [28, 32],
+  4:  [23, 27],
+  5:  [18, 22],
+  6:  [15, 18],
+  7:  [12, 15],
+  8:  [9, 12],
+  9:  [7, 9],
+  10: [5, 7],
 };
 
 // ─── Harmonic Function (T/S/D) ──────────────────────────────────────────────
@@ -240,7 +294,7 @@ export const LAB_FUNCTION_MODE_INFO = {
   name: '화성 기능 식별',
   emoji: '⚙️',
   description: '화음의 기능(T/S/D)을 맞혀보세요',
-  maxLevel: 2,
+  maxLevel: 10,
   defaultLevel: 1,
 };
 
@@ -255,9 +309,18 @@ export const DEGREE_FUNCTION: Record<number, string> = {
   5: FUNCTION_DOMINANT, 7: FUNCTION_DOMINANT,
 };
 
-export const FUNCTION_LEVELS: Record<number, number[]> = {
-  1: [1, 4, 5],
-  2: [1, 2, 3, 4, 5, 6, 7],
+// Degree pool grows, then keys randomize.
+export const FUNCTION_LEVELS: Record<number, { degrees: number[]; randomKey: boolean }> = {
+  1:  { degrees: [1, 4, 5], randomKey: false },
+  2:  { degrees: [1, 4, 5, 6], randomKey: false },
+  3:  { degrees: [1, 2, 4, 5], randomKey: false },
+  4:  { degrees: [1, 2, 4, 5, 6], randomKey: false },
+  5:  { degrees: [1, 2, 3, 4, 5, 6, 7], randomKey: false },
+  6:  { degrees: [1, 2, 3, 4, 5, 6, 7], randomKey: true },
+  7:  { degrees: [1, 2, 3, 4, 5, 6, 7], randomKey: true },
+  8:  { degrees: [1, 2, 3, 4, 5, 6, 7], randomKey: true },
+  9:  { degrees: [1, 2, 3, 4, 5, 6, 7], randomKey: true },
+  10: { degrees: [1, 2, 3, 4, 5, 6, 7], randomKey: true },
 };
 
 export function getFunctionChoices(): ChoiceOption[] {
@@ -274,17 +337,29 @@ export const LAB_EXTENDED_MODE_INFO = {
   name: '확장 화음 식별',
   emoji: '🎨',
   description: '6·add9·9·sus 등 컬러 코드를 맞혀보세요',
-  maxLevel: 2,
+  maxLevel: 10,
   defaultLevel: 1,
 };
 
-export const EXTENDED_LEVELS: Record<number, string[]> = {
-  1: ['maj6', 'min6', 'sus2', 'sus4'],
-  2: ['maj6', 'min6', 'sus2', 'sus4', 'add9', 'maj9', 'dom9', 'min9'],
+const ALL_EXTENDED = ['maj6', 'min6', 'sus2', 'sus4', 'add9', 'maj9', 'dom9', 'min9'];
+
+// Quality pool grows, arpeggio→block, then inversions enter.
+export const EXTENDED_LEVELS: Record<number, { qualities: string[]; inversions: number[]; arpeggio: boolean }> = {
+  1:  { qualities: ['maj6', 'min6'], inversions: [0], arpeggio: true },
+  2:  { qualities: ['maj6', 'min6', 'sus2', 'sus4'], inversions: [0], arpeggio: true },
+  3:  { qualities: ['maj6', 'min6', 'sus2', 'sus4', 'add9'], inversions: [0], arpeggio: true },
+  4:  { qualities: ['maj6', 'min6', 'sus2', 'sus4', 'add9'], inversions: [0], arpeggio: false },
+  5:  { qualities: ['maj6', 'min6', 'sus2', 'sus4', 'add9', 'maj9'], inversions: [0], arpeggio: false },
+  6:  { qualities: ['maj6', 'min6', 'sus2', 'sus4', 'add9', 'maj9', 'dom9'], inversions: [0], arpeggio: false },
+  7:  { qualities: ALL_EXTENDED, inversions: [0], arpeggio: false },
+  8:  { qualities: ALL_EXTENDED, inversions: [0, 1], arpeggio: false },
+  9:  { qualities: ALL_EXTENDED, inversions: [0, 1, 2], arpeggio: false },
+  10: { qualities: ALL_EXTENDED, inversions: [0, 1, 2], arpeggio: false },
 };
 
 export function getExtendedChoices(level: number): ChoiceOption[] {
-  return (EXTENDED_LEVELS[level] ?? EXTENDED_LEVELS[1]).map((q) => ({
+  const cfg = EXTENDED_LEVELS[level] ?? EXTENDED_LEVELS[1];
+  return cfg.qualities.map((q) => ({
     value: chordLabel(q),
     label: chordLabel(q),
   }));
@@ -296,7 +371,7 @@ export const LAB_BASS_MODE_INFO = {
   name: '베이스 식별',
   emoji: '🔊',
   description: '화음의 최저음을 찾으세요',
-  maxLevel: 2,
+  maxLevel: 10,
   defaultLevel: 1,
 };
 
@@ -304,14 +379,26 @@ const NATURAL_NOTES = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 // Flat spelling matches tonal's Note.fromMidi output (e.g. midi 70 → "Bb4").
 const CHROMATIC_NOTES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 
+// Once inversions appear (L2+), the bass can be any chromatic pitch class.
 export function getBassChoices(level: number): ChoiceOption[] {
   const names = level >= 2 ? CHROMATIC_NOTES : NATURAL_NOTES;
   return names.map((n) => ({ value: n, label: n }));
 }
 
+const BASS_7THS = ['major', 'minor', 'dominant7', 'major7', 'minor7'];
+const BASS_ALL = [...BASS_7THS, 'dim', 'aug'];
+
 export const BASS_LEVELS: Record<number, { roots: string[]; qualities: string[]; inversions: number[] }> = {
-  1: { roots: NATURAL_NOTES, qualities: ['major', 'minor'], inversions: [0] },
-  2: { roots: CHROMATIC_NOTES, qualities: ['major', 'minor', 'dominant7'], inversions: [0, 1, 2] },
+  1:  { roots: NATURAL_NOTES, qualities: ['major', 'minor'], inversions: [0] },
+  2:  { roots: NATURAL_NOTES, qualities: ['major', 'minor'], inversions: [0, 1] },
+  3:  { roots: NATURAL_NOTES, qualities: ['major', 'minor'], inversions: [0, 1, 2] },
+  4:  { roots: NATURAL_NOTES, qualities: ['major', 'minor', 'dominant7'], inversions: [0, 1, 2] },
+  5:  { roots: CHROMATIC_NOTES, qualities: ['major', 'minor', 'dominant7'], inversions: [0, 1, 2] },
+  6:  { roots: CHROMATIC_NOTES, qualities: BASS_7THS, inversions: [0, 1, 2] },
+  7:  { roots: CHROMATIC_NOTES, qualities: BASS_7THS, inversions: [0, 1, 2, 3] },
+  8:  { roots: CHROMATIC_NOTES, qualities: BASS_ALL, inversions: [0, 1, 2, 3] },
+  9:  { roots: CHROMATIC_NOTES, qualities: BASS_ALL, inversions: [0, 1, 2, 3] },
+  10: { roots: CHROMATIC_NOTES, qualities: BASS_ALL, inversions: [0, 1, 2, 3] },
 };
 
 // ─── Tension Notes ──────────────────────────────────────────────────────────
@@ -320,7 +407,7 @@ export const LAB_TENSION_MODE_INFO = {
   name: '텐션음 식별',
   emoji: '🌶️',
   description: '화음 위에 더해진 텐션을 맞혀보세요',
-  maxLevel: 2,
+  maxLevel: 10,
   defaultLevel: 1,
 };
 
@@ -332,13 +419,25 @@ export const TENSION_LABEL: Record<string, string> = {
   '9': '9도', 'b9': '♭9', '#9': '♯9', '11': '11도', '#11': '♯11', '13': '13도', 'b13': '♭13',
 };
 
-export const TENSION_LEVELS: Record<number, string[]> = {
-  1: ['9', '11', '13'],
-  2: ['9', 'b9', '#9', '11', '#11', '13', 'b13'],
+const ALL_TENSIONS = ['9', 'b9', '#9', '11', '#11', '13', 'b13'];
+
+// Tension pool grows, then the underlying chord quality varies.
+export const TENSION_LEVELS: Record<number, { tensions: string[]; bases: string[] }> = {
+  1:  { tensions: ['9', '11', '13'], bases: ['dominant7'] },
+  2:  { tensions: ['9', 'b9', '11', '13'], bases: ['dominant7'] },
+  3:  { tensions: ['9', 'b9', '#9', '11', '13'], bases: ['dominant7'] },
+  4:  { tensions: ['9', 'b9', '#9', '11', '#11', '13'], bases: ['dominant7'] },
+  5:  { tensions: ALL_TENSIONS, bases: ['dominant7'] },
+  6:  { tensions: ALL_TENSIONS, bases: ['dominant7', 'major7'] },
+  7:  { tensions: ALL_TENSIONS, bases: ['dominant7', 'major7', 'minor7'] },
+  8:  { tensions: ALL_TENSIONS, bases: ['dominant7', 'major7', 'minor7'] },
+  9:  { tensions: ALL_TENSIONS, bases: ['dominant7', 'major7', 'minor7'] },
+  10: { tensions: ALL_TENSIONS, bases: ['dominant7', 'major7', 'minor7'] },
 };
 
 export function getTensionChoices(level: number): ChoiceOption[] {
-  return (TENSION_LEVELS[level] ?? TENSION_LEVELS[1]).map((t) => ({
+  const cfg = TENSION_LEVELS[level] ?? TENSION_LEVELS[1];
+  return cfg.tensions.map((t) => ({
     value: TENSION_LABEL[t],
     label: TENSION_LABEL[t],
   }));
