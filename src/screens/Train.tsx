@@ -10,7 +10,7 @@ import {
   makeIntervalQuestion, makeChordQuestion, makeMelodyQuestion,
   makeSolfegeQuestion, makeProgressionQuestion, makeRhythmQuestion,
   makeTempoQuestion, makeBpmQuestion, makeTransposeQuestion,
-  makeScaleQuestion, makeCadenceQuestion, makeKeyIdQuestion, makeInversionQuestion,
+  makeScaleQuestion, makeCadenceQuestion, makeInversionQuestion,
   makeIntervalCompareQuestion, makeOddNoteQuestion, makeContourQuestion,
   makeTuningQuestion, makeFunctionQuestion, makeExtendedQuestion,
   makeBassQuestion, makeTensionQuestion,
@@ -30,16 +30,13 @@ import { getChordChoices } from '../modes/chordMode';
 import { getSolfegeChoices, getNoteNameChoices } from '../modes/solfegeMode';
 import { getDegreeChoices } from '../modes/progressionMode';
 import {
-  LAB_SCALE_MODE_INFO, LAB_CADENCE_MODE_INFO, LAB_KEY_MODE_INFO, LAB_INVERSION_MODE_INFO,
-  LAB_INTERVAL_COMPARE_MODE_INFO, LAB_ODD_NOTE_MODE_INFO, LAB_CONTOUR_MODE_INFO,
-  LAB_TUNING_MODE_INFO, LAB_FUNCTION_MODE_INFO, LAB_EXTENDED_MODE_INFO,
-  LAB_BASS_MODE_INFO, LAB_TENSION_MODE_INFO,
-  getScaleChoices, getCadenceChoices, getKeyChoices, getInversionChoices,
+  getScaleChoices, getCadenceChoices, getInversionChoices,
   getIntervalCompareChoices, getOddNoteChoices, getContourChoices, getTuningChoices,
   getFunctionChoices, getExtendedChoices, getBassChoices, getTensionChoices,
 } from '../modes/labModes';
+import { MODE_REGISTRY, type ModeInfo } from '../modes/registry';
 import type {
-  ScaleData, CadenceData, KeyIdData,
+  ScaleData, CadenceData,
   IntervalCompareData, OddNoteData, ContourData, TuningData, FunctionData, TensionData,
 } from '../types';
 import {
@@ -48,47 +45,18 @@ import {
   playMetronome, stopAllAudio, getAudioStatus, getPlaybackGen, type AudioQuality,
   playReferenceTone,
 } from '../audio/piano';
-import { INTERVAL_MODE_INFO } from '../modes/intervalMode';
-import { CHORD_MODE_INFO } from '../modes/chordMode';
-import { SOLFEGE_MODE_INFO } from '../modes/solfegeMode';
-import {
-  PROGRESSION_MODE_INFO, MELODY_MODE_INFO, TRANSPOSE_MODE_INFO, RHYTHM_MODE_INFO,
-  TEMPO_MODE_INFO, BPM_MODE_INFO,
-} from '../modes/progressionMode';
 import type { ChordStep } from '../types';
 import { Note } from 'tonal';
 import { semitoneToSolfege } from '../theory/solfege';
 import { topWeakItems } from '../engine/weakness';
 
-const MODE_INFO: Record<string, { name: string; emoji: string; maxLevel?: number; howTo?: string }> = {
-  interval: INTERVAL_MODE_INFO,
-  chord: CHORD_MODE_INFO,
-  solfege: SOLFEGE_MODE_INFO,
-  progression: PROGRESSION_MODE_INFO,
-  melody: MELODY_MODE_INFO,
-  transpose: TRANSPOSE_MODE_INFO,
-  rhythm: RHYTHM_MODE_INFO,
-  tempo: TEMPO_MODE_INFO,
-  bpm: BPM_MODE_INFO,
-  'lab-scale': LAB_SCALE_MODE_INFO,
-  'lab-cadence': LAB_CADENCE_MODE_INFO,
-  'lab-key': LAB_KEY_MODE_INFO,
-  'lab-inversion': LAB_INVERSION_MODE_INFO,
-  'lab-interval-compare': LAB_INTERVAL_COMPARE_MODE_INFO,
-  'lab-odd-note': LAB_ODD_NOTE_MODE_INFO,
-  'lab-contour': LAB_CONTOUR_MODE_INFO,
-  'lab-tuning': LAB_TUNING_MODE_INFO,
-  'lab-function': LAB_FUNCTION_MODE_INFO,
-  'lab-extended': LAB_EXTENDED_MODE_INFO,
-  'lab-bass': LAB_BASS_MODE_INFO,
-  'lab-tension': LAB_TENSION_MODE_INFO,
-};
+const MODE_INFO = MODE_REGISTRY;
 
 // Modes for which the absolute-pitch toggle should be available
 // (pitch-based modes; excludes rhythm/tempo/bpm).
 const ABSOLUTE_TOGGLE_MODES = new Set<ModeKey>([
   'interval', 'chord', 'solfege', 'progression', 'melody', 'transpose',
-  'lab-scale', 'lab-cadence', 'lab-key', 'lab-inversion',
+  'lab-scale', 'lab-cadence', 'lab-inversion',
 ]);
 
 type TrainPhase = 'setup' | 'playing' | 'answering' | 'feedback' | 'done';
@@ -130,7 +98,9 @@ export function Train() {
   const [absoluteMode, setAbsoluteMode] = useState(false);
 
   const modeKey = mode as ModeKey;
-  const modeInfo = MODE_INFO[modeKey] ?? { name: modeKey, emoji: '🎵' };
+  const modeInfo: ModeInfo = MODE_INFO[modeKey] ?? {
+    key: modeKey, name: modeKey, emoji: '🎵', description: '', maxLevel: MAX_LEVEL, defaultLevel: 1,
+  };
   const isWeakSession = focusMode === 'weak';
   const totalQuestions = isWeakSession ? settings.weakSessionLength : settings.questionsPerSession;
 
@@ -242,7 +212,6 @@ export function Train() {
       case 'bpm': return makeBpmQuestion(level);
       case 'lab-scale': return makeScaleQuestion(level);
       case 'lab-cadence': q = makeCadenceQuestion(level, k, fk); break;
-      case 'lab-key': return makeKeyIdQuestion(level);
       case 'lab-inversion': return makeInversionQuestion(level);
       case 'lab-interval-compare': return makeIntervalCompareQuestion(level);
       case 'lab-odd-note': return makeOddNoteQuestion(level);
@@ -381,11 +350,6 @@ export function Train() {
       case 'cadence': {
         const d = data as CadenceData;
         await playProgression(d.chords.map((c) => c.notes), '2n', speed);
-        break;
-      }
-      case 'key-id': {
-        const d = data as KeyIdData;
-        await playProgression(d.chords, '2n', speed);
         break;
       }
       case 'interval-compare': {
@@ -823,7 +787,6 @@ export function Train() {
   const choiceColumns: 2 | 3 | 4 =
     isInterval ? 2
     : isChord ? 2
-    : modeKey === 'lab-key' ? 4
     : modeKey === 'lab-odd-note' ? 4
     : modeKey === 'lab-bass' ? 4
     : modeKey === 'lab-inversion' ? 2
@@ -1308,7 +1271,6 @@ function getChoiceOptions(mode: ModeKey, level: number, absolute = false): Choic
   if (mode === 'solfege') return absolute ? getNoteNameChoices(level) : getSolfegeChoices(level);
   if (mode === 'lab-scale') return getScaleChoices(level);
   if (mode === 'lab-cadence') return getCadenceChoices(level);
-  if (mode === 'lab-key') return getKeyChoices(level);
   if (mode === 'lab-inversion') return getInversionChoices(level);
   if (mode === 'lab-interval-compare') return getIntervalCompareChoices(level);
   if (mode === 'lab-odd-note') return getOddNoteChoices();

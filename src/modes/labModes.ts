@@ -2,15 +2,6 @@ import type { ChoiceOption } from '../components/ChoiceGrid';
 import type { ModeKey } from '../types';
 import { chordLabel } from '../theory/chords';
 
-export const LAB_MODE_INFO = {
-  key: 'lab' as ModeKey,
-  name: '실험실',
-  emoji: '🧪',
-  description: '다양한 음악 식별 훈련 모음',
-  maxLevel: 3,
-  defaultLevel: 1,
-};
-
 export const LAB_SCALE_MODE_INFO = {
   key: 'lab-scale' as ModeKey,
   name: '스케일 식별',
@@ -25,15 +16,6 @@ export const LAB_CADENCE_MODE_INFO = {
   name: '종지 식별',
   emoji: '🛑',
   description: '종지 형태를 맞혀보세요',
-  maxLevel: 10,
-  defaultLevel: 1,
-};
-
-export const LAB_KEY_MODE_INFO = {
-  key: 'lab-key' as ModeKey,
-  name: '조성 식별',
-  emoji: '🗝️',
-  description: '진행을 듣고 조성을 맞혀보세요',
   maxLevel: 10,
   defaultLevel: 1,
 };
@@ -119,31 +101,6 @@ export function getCadenceChoices(level: number): ChoiceOption[] {
   return cfg.types.map((c) => ({
     value: c,
     label: CADENCE_LABEL[c] ?? c,
-  }));
-}
-
-// ─── Keys ─────────────────────────────────────────────────────────────────
-const KEYS_ALL_12 = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
-
-// Key pool widens to all 12, then minor tonalities join the pool.
-export const KEY_LEVELS: Record<number, { keys: string[]; modes: Array<'major' | 'minor'> }> = {
-  1:  { keys: ['C', 'G', 'F'], modes: ['major'] },
-  2:  { keys: ['C', 'G', 'F', 'D', 'Bb'], modes: ['major'] },
-  3:  { keys: ['C', 'G', 'F', 'D', 'Bb', 'A', 'Eb'], modes: ['major'] },
-  4:  { keys: ['C', 'G', 'F', 'D', 'Bb', 'A', 'Eb', 'E', 'Ab'], modes: ['major'] },
-  5:  { keys: KEYS_ALL_12, modes: ['major'] },
-  6:  { keys: KEYS_ALL_12, modes: ['major'] },
-  7:  { keys: KEYS_ALL_12, modes: ['major', 'minor'] },
-  8:  { keys: KEYS_ALL_12, modes: ['major', 'minor'] },
-  9:  { keys: KEYS_ALL_12, modes: ['major', 'minor'] },
-  10: { keys: KEYS_ALL_12, modes: ['major', 'minor'] },
-};
-
-export function getKeyChoices(level: number): ChoiceOption[] {
-  const cfg = KEY_LEVELS[level] ?? KEY_LEVELS[1];
-  return cfg.keys.map((k) => ({
-    value: k,
-    label: k,
   }));
 }
 
