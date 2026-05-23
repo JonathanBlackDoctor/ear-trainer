@@ -678,6 +678,14 @@ export function Train() {
             </div>
           )}
 
+          {/* Music theory */}
+          {modeInfo.theory && (
+            <div className="card w-full max-w-sm">
+              <div className="text-sm font-semibold text-slate-600 mb-2">음악 개념</div>
+              <p className="text-sm text-slate-600 leading-relaxed">{modeInfo.theory}</p>
+            </div>
+          )}
+
           {/* Level selector — 10 levels in a 2×5 grid + label strip */}
           <div className="card w-full max-w-sm">
             <div className="text-sm font-semibold text-slate-600 mb-3">레벨 선택</div>
