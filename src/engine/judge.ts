@@ -99,7 +99,7 @@ export interface BpmJudgeDetails {
 export interface LabJudgeDetails {
   kind: 'lab';
   category:
-    | 'scale' | 'cadence' | 'key' | 'inversion'
+    | 'scale' | 'cadence' | 'inversion'
     | 'interval-compare' | 'odd-note' | 'contour' | 'tuning'
     | 'function' | 'extended' | 'bass' | 'tension';
   userAnswer: string;
@@ -228,7 +228,6 @@ export function judge(question: Question, userAnswer: AnswerValue): JudgeResult 
 
     case 'lab-scale':
     case 'lab-cadence':
-    case 'lab-key':
     case 'lab-inversion':
     case 'lab-interval-compare':
     case 'lab-odd-note':

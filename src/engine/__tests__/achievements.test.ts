@@ -20,7 +20,7 @@ function emptyState(overrides: Partial<GamificationState> = {}): GamificationSta
 function emptyStats(): Record<ModeKey, ModeStats> {
   const keys: ModeKey[] = [
     'interval','chord','progression','melody','solfege','transpose',
-    'rhythm','tempo','bpm','lab','lab-scale','lab-cadence','lab-key','lab-inversion',
+    'rhythm','tempo','bpm','lab-scale','lab-cadence','lab-inversion',
   ];
   return Object.fromEntries(keys.map((k) => [k, {}])) as Record<ModeKey, ModeStats>;
 }

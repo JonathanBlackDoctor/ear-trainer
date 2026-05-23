@@ -9,10 +9,8 @@ export type ModeKey =
   | 'rhythm'
   | 'tempo'
   | 'bpm'
-  | 'lab'
   | 'lab-scale'
   | 'lab-cadence'
-  | 'lab-key'
   | 'lab-inversion'
   | 'lab-interval-compare'
   | 'lab-odd-note'
@@ -50,7 +48,6 @@ export type QuestionData =
   | BpmData
   | ScaleData
   | CadenceData
-  | KeyIdData
   | IntervalCompareData
   | OddNoteData
   | ContourData
@@ -141,13 +138,6 @@ export interface CadenceData {
   cadenceType: string;   // e.g. "authentic", "plagal", "half", "deceptive"
   key: string;
   chords: ChordStep[];
-}
-
-export interface KeyIdData {
-  type: 'key-id';
-  key: string;           // e.g. "C", "F#"
-  mode: 'major' | 'minor';
-  chords: string[][];    // sequence of chord note arrays (I-IV-V-I)
 }
 
 export interface IntervalCompareData {
@@ -251,6 +241,9 @@ export interface AppSettings {
   weakSessionLength: number;
   reducedMotion: 'system' | 'on' | 'off';
   design: DesignTheme;
+  // User-defined ordering of training modes on the Home screen. Reconciled
+  // against the current mode registry at read time (see resolveModeOrder).
+  modeOrder?: ModeKey[];
 }
 
 // Visual theme. 'default' is the original classic look; g/i/j/m are the four
