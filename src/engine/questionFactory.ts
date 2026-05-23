@@ -144,7 +144,7 @@ export function makeProgressionQuestion(
   const key = cfg.keyMode === 'random' ? pickRandom(COMMON_KEYS) : fixedKey;
 
   const steps: ChordStep[] = source === 'praise'
-    ? randomPraiseProgression(key)
+    ? randomPraiseProgression(key, 3, cfg)
     : randomProgressionFromConfig(cfg, key);
 
   const answer: ProgressionAnswer[] = steps.map((s) => ({

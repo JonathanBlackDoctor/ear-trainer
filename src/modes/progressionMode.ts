@@ -61,20 +61,44 @@ export const BPM_MODE_INFO = {
   defaultLevel: 1,
 };
 
+const DEGREE_ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+
+/**
+ * Render a scale degree + chord quality as a label, consistently across the
+ * choice buttons, input chips, feedback table and the "correct answer" line.
+ * Minor qualities lower-case the roman / add "m" to the number; diminished
+ * qualities get a "°" instead. This is the single source of truth so the
+ * notations never drift apart (e.g. vii° showing as a bare "vii").
+ */
+export function formatDegree(
+  degree: number,
+  quality: string,
+  notation: 'roman' | 'number'
+): string {
+  const isDim = quality === 'dim' || quality === 'm7b5';
+  const isMinor = quality === 'm' || quality === 'm7';
+  if (notation === 'number') {
+    return `${degree}${isDim ? '°' : isMinor ? 'm' : ''}`;
+  }
+  const r = DEGREE_ROMAN[degree] ?? String(degree);
+  const base = isDim || isMinor ? r.toLowerCase() : r;
+  return `${base}${isDim ? '°' : ''}`;
+}
+
 // Degree choice options for progression input
 export function getDegreeChoices(notation: 'roman' | 'number') {
   const entries = [
-    { degree: 1, roman: 'I',    num: '1', quality: 'M' },
-    { degree: 2, roman: 'ii',   num: '2m', quality: 'm' },
-    { degree: 3, roman: 'iii',  num: '3m', quality: 'm' },
-    { degree: 4, roman: 'IV',   num: '4', quality: 'M' },
-    { degree: 5, roman: 'V',    num: '5', quality: '7' },
-    { degree: 6, roman: 'vi',   num: '6m', quality: 'm' },
-    { degree: 7, roman: 'vii°', num: '7°', quality: 'dim' },
+    { degree: 1, quality: 'M'   },
+    { degree: 2, quality: 'm'   },
+    { degree: 3, quality: 'm'   },
+    { degree: 4, quality: 'M'   },
+    { degree: 5, quality: '7'   },
+    { degree: 6, quality: 'm'   },
+    { degree: 7, quality: 'dim' },
   ];
   return entries.map((e) => ({
     value: `${e.degree}_${e.quality}`,
-    label: notation === 'roman' ? e.roman : e.num,
+    label: formatDegree(e.degree, e.quality, notation),
     degree: e.degree,
     quality: e.quality,
   }));
