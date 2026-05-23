@@ -13,7 +13,15 @@ export type ModeKey =
   | 'lab-scale'
   | 'lab-cadence'
   | 'lab-key'
-  | 'lab-inversion';
+  | 'lab-inversion'
+  | 'lab-interval-compare'
+  | 'lab-odd-note'
+  | 'lab-contour'
+  | 'lab-tuning'
+  | 'lab-function'
+  | 'lab-extended'
+  | 'lab-bass'
+  | 'lab-tension';
 
 // ─── Question & Answer ────────────────────────────────────────────────────────
 export interface Question {
@@ -42,7 +50,13 @@ export type QuestionData =
   | BpmData
   | ScaleData
   | CadenceData
-  | KeyIdData;
+  | KeyIdData
+  | IntervalCompareData
+  | OddNoteData
+  | ContourData
+  | TuningData
+  | FunctionData
+  | TensionData;
 
 export interface IntervalData {
   type: 'interval';
@@ -134,6 +148,49 @@ export interface KeyIdData {
   key: string;           // e.g. "C", "F#"
   mode: 'major' | 'minor';
   chords: string[][];    // sequence of chord note arrays (I-IV-V-I)
+}
+
+export interface IntervalCompareData {
+  type: 'interval-compare';
+  pairA: string[];       // two notes of the first interval
+  pairB: string[];       // two notes of the second interval
+  semA: number;          // semitone size of first interval
+  semB: number;          // semitone size of second interval
+}
+
+export interface OddNoteData {
+  type: 'odd-note';
+  notes: string[];       // played scale with one altered note
+  correctNotes: string[];// the in-tune scale
+  wrongIndex: number;    // 0-based position of the altered note
+}
+
+export interface ContourData {
+  type: 'contour';
+  notes: string[];       // the melody whose shape is judged
+  contour: string;       // contour code, e.g. "up", "arch"
+}
+
+export interface TuningData {
+  type: 'tuning';
+  note: string;          // full note, e.g. "A4"
+  cents: number;         // detune in cents (+sharp, −flat, 0 in-tune)
+}
+
+export interface FunctionData {
+  type: 'function';
+  key: string;           // tonal center
+  degree: number;        // scale degree of the target chord
+  tonicNotes: string[];  // I chord, played first to establish the key
+  chordNotes: string[];  // the target chord to classify
+}
+
+export interface TensionData {
+  type: 'tension';
+  root: string;          // chord root, full note
+  baseNotes: string[];   // base chord (without the tension)
+  fullNotes: string[];   // base chord + tension note
+  tension: string;       // tension code, e.g. "9", "b9"
 }
 
 export interface BpmData {

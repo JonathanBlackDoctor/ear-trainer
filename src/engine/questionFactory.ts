@@ -6,7 +6,7 @@ import {
   randomNote,
   pickRandom,
 } from '../theory/intervals';
-import { CHORD_LEVELS, buildChord } from '../theory/chords';
+import { CHORD_LEVELS, buildChord, chordLabel } from '../theory/chords';
 import {
   PROGRESSION_LEVELS,
   COMMON_KEYS,
@@ -30,6 +30,12 @@ import {
 import { pickDue } from './srs';
 import {
   SCALE_LEVELS, CADENCE_PATTERNS, CADENCE_LEVELS, KEY_LEVELS, INVERSION_LEVELS,
+  COMPARE_FIRST, COMPARE_SECOND, COMPARE_SAME,
+  CONTOUR_LEVELS, CONTOUR_LABEL,
+  TUNING_IN_TUNE, TUNING_SHARP, TUNING_FLAT, TUNING_CENTS,
+  DEGREE_FUNCTION, FUNCTION_LEVELS, FUNCTION_TONIC, FUNCTION_SUBDOMINANT,
+  EXTENDED_LEVELS, BASS_LEVELS,
+  TENSION_SEMITONES, TENSION_LABEL, TENSION_LEVELS,
 } from '../modes/labModes';
 
 /** SRS-aware target picker. Falls back to a random item when SRS is empty. */
@@ -511,6 +517,206 @@ export function makeInversionQuestion(level: number): Question {
     itemKey: `inv_${inv}`,
     data: { type: 'chord', notes, root: rootNote, quality, inversion: inv, arpeggio: false },
     answer: String(inv),
+    context: { key: 'C', absoluteMode: true },
+  };
+}
+
+// ─── Lab: Interval Compare ──────────────────────────────────────────────────
+export function makeIntervalCompareQuestion(level: number): Question {
+  const allowSame = level >= 2;
+  const pick = () => 1 + Math.floor(Math.random() * 12); // 1..12 semitones
+  let semA = pick();
+  let semB = pick();
+  if (allowSame && Math.random() < 0.25) {
+    semB = semA;
+  } else {
+    const minGap = level >= 2 ? 1 : 3;
+    while (Math.abs(semA - semB) < minGap) semB = pick();
+  }
+  const noteUp = (root: string, semis: number): string[] =>
+    [root, Note.fromMidi((Note.midi(root) ?? 60) + semis) ?? root];
+  const pairA = noteUp(randomNote('C4', 'C5'), semA);
+  const pairB = noteUp(randomNote('C4', 'C5'), semB);
+  const answer =
+    semA === semB ? COMPARE_SAME : semA > semB ? COMPARE_FIRST : COMPARE_SECOND;
+  const code = semA === semB ? 'same' : semA > semB ? 'first' : 'second';
+
+  return {
+    id: genId(),
+    mode: 'lab-interval-compare',
+    level,
+    itemKey: `cmp_${code}`,
+    data: { type: 'interval-compare', pairA, pairB, semA, semB },
+    answer,
+    context: { key: 'C', absoluteMode: true },
+  };
+}
+
+// ─── Lab: Odd Note ──────────────────────────────────────────────────────────
+export function makeOddNoteQuestion(level: number): Question {
+  const tonic = pickRandom(COMMON_KEYS);
+  const scaleType = level >= 2 && Math.random() < 0.5 ? 'minor' : 'major';
+  const base = Scale.get(`${tonic}4 ${scaleType}`).notes;
+  const upper = Note.transpose(tonic + '4', '8P');
+  const correctNotes = [...base, upper]; // 8 notes incl. upper tonic
+  // Alter an interior note (never first/last) by ±1 semitone.
+  const wrongIndex = 1 + Math.floor(Math.random() * (correctNotes.length - 2));
+  const dir = Math.random() < 0.5 ? 1 : -1;
+  const altered =
+    Note.fromMidi((Note.midi(correctNotes[wrongIndex]) ?? 60) + dir) ?? correctNotes[wrongIndex];
+  const notes = [...correctNotes];
+  notes[wrongIndex] = altered;
+
+  return {
+    id: genId(),
+    mode: 'lab-odd-note',
+    level,
+    itemKey: `odd_${wrongIndex}`,
+    data: { type: 'odd-note', notes, correctNotes, wrongIndex },
+    answer: `${wrongIndex + 1}번`,
+    context: { key: tonic, absoluteMode: true },
+  };
+}
+
+// ─── Lab: Melodic Contour ───────────────────────────────────────────────────
+const CONTOUR_DEGREES: Record<string, number[]> = {
+  'up': [0, 1, 2, 3, 4],
+  'down': [4, 3, 2, 1, 0],
+  'arch': [0, 2, 4, 2, 0],
+  'inv-arch': [4, 2, 0, 2, 4],
+  'wave': [0, 2, 1, 3, 2],
+};
+
+export function makeContourQuestion(level: number): Question {
+  const choices = CONTOUR_LEVELS[level] ?? CONTOUR_LEVELS[1];
+  const contour = pickRandom(choices);
+  const tonic = pickRandom(COMMON_KEYS);
+  const scale = getScaleNotes(tonic, 4);
+  const upper = Note.transpose(tonic + '4', '8P');
+  const ext = [...scale, upper];
+  const notes = (CONTOUR_DEGREES[contour] ?? CONTOUR_DEGREES['up']).map((i) => ext[i] ?? ext[0]);
+
+  return {
+    id: genId(),
+    mode: 'lab-contour',
+    level,
+    itemKey: `contour_${contour}`,
+    data: { type: 'contour', notes, contour },
+    answer: CONTOUR_LABEL[contour],
+    context: { key: tonic, absoluteMode: true },
+  };
+}
+
+// ─── Lab: Tuning (intonation) ───────────────────────────────────────────────
+export function makeTuningQuestion(level: number): Question {
+  const note = randomNote('C4', 'C5');
+  const mags = TUNING_CENTS[level] ?? TUNING_CENTS[1];
+  const r = Math.random();
+  let cents = 0;
+  let answer = TUNING_IN_TUNE;
+  if (r < 0.34) {
+    cents = 0;
+    answer = TUNING_IN_TUNE;
+  } else if (r < 0.67) {
+    cents = pickRandom(mags);
+    answer = TUNING_SHARP;
+  } else {
+    cents = -pickRandom(mags);
+    answer = TUNING_FLAT;
+  }
+  const code = cents === 0 ? 'intune' : cents > 0 ? 'sharp' : 'flat';
+
+  return {
+    id: genId(),
+    mode: 'lab-tuning',
+    level,
+    itemKey: `tune_${code}`,
+    data: { type: 'tuning', note, cents },
+    answer,
+    context: { key: 'C', absoluteMode: true },
+  };
+}
+
+// ─── Lab: Harmonic Function (T/S/D) ─────────────────────────────────────────
+const DIATONIC_QUALITIES = ['major', 'minor', 'minor', 'major', 'dominant7', 'minor', 'dim'];
+
+export function makeFunctionQuestion(level: number): Question {
+  const degrees = FUNCTION_LEVELS[level] ?? FUNCTION_LEVELS[1];
+  const degree = pickRandom(degrees);
+  const key = pickRandom(COMMON_KEYS);
+  const tonicStep = buildProgressionSteps([[1, 'major']], key, 3)[0];
+  const quality = DIATONIC_QUALITIES[(degree - 1) % 7];
+  const targetStep = buildProgressionSteps([[degree, quality]], key, 3)[0];
+  const func = DEGREE_FUNCTION[degree];
+  const code = func === FUNCTION_TONIC ? 'T' : func === FUNCTION_SUBDOMINANT ? 'S' : 'D';
+
+  return {
+    id: genId(),
+    mode: 'lab-function',
+    level,
+    itemKey: `func_${code}`,
+    data: { type: 'function', key, degree, tonicNotes: tonicStep.notes, chordNotes: targetStep.notes },
+    answer: func,
+    context: { key },
+  };
+}
+
+// ─── Lab: Extended Chords ───────────────────────────────────────────────────
+export function makeExtendedQuestion(level: number): Question {
+  const qualities = EXTENDED_LEVELS[level] ?? EXTENDED_LEVELS[1];
+  const quality = pickRandom(qualities);
+  const rootNote = randomNote('C3', 'F4');
+  const notes = buildChord(rootNote, quality, 0);
+  const arpeggio = level >= 2 && Math.random() < 0.4;
+
+  return {
+    id: genId(),
+    mode: 'lab-extended',
+    level,
+    itemKey: `ext_${quality}`,
+    data: { type: 'chord', notes, root: rootNote, quality, inversion: 0, arpeggio },
+    answer: chordLabel(quality),
+    context: { key: 'C', absoluteMode: true },
+  };
+}
+
+// ─── Lab: Bass (lowest note) ────────────────────────────────────────────────
+export function makeBassQuestion(level: number): Question {
+  const cfg = BASS_LEVELS[level] ?? BASS_LEVELS[1];
+  const rootNote = pickRandom(cfg.roots) + '3';
+  const quality = pickRandom(cfg.qualities);
+  const inversion = pickRandom(cfg.inversions);
+  const notes = buildChord(rootNote, quality, inversion);
+  const bass = Note.pitchClass(notes[0]);
+
+  return {
+    id: genId(),
+    mode: 'lab-bass',
+    level,
+    itemKey: `bass_${bass}`,
+    data: { type: 'chord', notes, root: rootNote, quality, inversion, arpeggio: false },
+    answer: bass,
+    context: { key: 'C', absoluteMode: true },
+  };
+}
+
+// ─── Lab: Tension ───────────────────────────────────────────────────────────
+export function makeTensionQuestion(level: number): Question {
+  const tensions = TENSION_LEVELS[level] ?? TENSION_LEVELS[1];
+  const code = pickRandom(tensions);
+  const rootNote = randomNote('C3', 'E4');
+  const baseNotes = buildChord(rootNote, 'dominant7', 0);
+  const semis = TENSION_SEMITONES[code] ?? 14;
+  const tensionNote = Note.fromMidi((Note.midi(rootNote) ?? 60) + semis) ?? rootNote;
+  const fullNotes = [...baseNotes, tensionNote];
+
+  return {
+    id: genId(),
+    mode: 'lab-tension',
+    level,
+    itemKey: `tension_${code}`,
+    data: { type: 'tension', root: rootNote, baseNotes, fullNotes, tension: code },
+    answer: TENSION_LABEL[code],
     context: { key: 'C', absoluteMode: true },
   };
 }
