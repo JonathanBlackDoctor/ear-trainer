@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import type {
   Question, ModeKey, SessionResult, ProgressionAnswer,
   IntervalData, ChordData, SolfegeData, MelodyData, ProgressionData, RhythmData,
-  TempoData, BpmData,
+  TempoData, BpmData, TransposeData,
 } from '../types';
 import { useStore } from '../store/useStore';
 import {
@@ -13,16 +13,19 @@ import {
   makeScaleQuestion, makeCadenceQuestion, makeKeyIdQuestion, makeInversionQuestion,
 } from '../engine/questionFactory';
 import { MAX_LEVEL, getLevelLabel } from '../modes/levels';
-import { judge, type TempoJudgeDetails } from '../engine/judge';
+import { judge } from '../engine/judge';
+import { awardXp } from '../engine/xp';
 import { PlaybackControls } from '../components/PlaybackControls';
 import { ChoiceGrid, type ChoiceOption } from '../components/ChoiceGrid';
 import { Piano } from '../components/Piano';
 import { Staff } from '../components/Staff';
 import { ProgressBar } from '../components/ProgressBar';
+import { ComboOverlay } from '../components/ComboOverlay';
+import { ModeFeedback } from '../components/feedback';
 import { getIntervalChoices } from '../modes/intervalMode';
 import { getChordChoices } from '../modes/chordMode';
 import { getSolfegeChoices, getNoteNameChoices } from '../modes/solfegeMode';
-import { getDegreeChoices, getTransposeChoices } from '../modes/progressionMode';
+import { getDegreeChoices } from '../modes/progressionMode';
 import {
   LAB_SCALE_MODE_INFO, LAB_CADENCE_MODE_INFO, LAB_KEY_MODE_INFO, LAB_INVERSION_MODE_INFO,
   getScaleChoices, getCadenceChoices, getKeyChoices, getInversionChoices,
@@ -77,6 +80,8 @@ interface SessionState {
   currentIdx: number;
   startTime: number;
   questionStartTime: number;
+  combo: number;       // current consecutive-correct streak
+  bestCombo: number;   // highest combo reached this session
 }
 
 export function Train() {
@@ -91,6 +96,7 @@ export function Train() {
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [pianoInput, setPianoInput] = useState<string[]>([]);
   const [progressionInput, setProgressionInput] = useState<ProgressionAnswer[]>([]);
+  const [transposeInput, setTransposeInput] = useState<number[]>([]);
   const [feedbackResult, setFeedbackResult] = useState<ReturnType<typeof judge> | null>(null);
   const [loading, setLoading] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
@@ -141,11 +147,17 @@ export function Train() {
   // after samples actually finished loading.
   useEffect(() => {
     if (!audioReady) return;
+    let attempts = 0;
     const id = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      attempts++;
       const q = getAudioStatus();
       setAudioQuality((prev) => (prev === q ? prev : q));
-      if (q === 'piano') clearInterval(id);
-    }, 1000);
+      // Cap the polling: stop once the sampler reports ready, or after ~30s
+      // total. Without this cap a stalled sampler would keep the 1 Hz wake
+      // alive for the entire session, preventing mobile devices from idling.
+      if (q === 'piano' || attempts >= 15) clearInterval(id);
+    }, 2000);
     return () => clearInterval(id);
   }, [audioReady]);
 
@@ -165,6 +177,8 @@ export function Train() {
       currentIdx: 0,
       startTime,
       questionStartTime: startTime,
+      combo: 0,
+      bestCombo: 0,
     });
     setPhase('playing');
     loadNextQuestion([], 0);
@@ -181,6 +195,7 @@ export function Train() {
     setSelectedAnswer(null);
     setPianoInput([]);
     setProgressionInput([]);
+    setTransposeInput([]);
     setRhythmTaps([]);
     setRhythmStartTime(0);
     setTempoTaps([]);
@@ -227,7 +242,7 @@ export function Train() {
   }
 
   // ─── Playback ─────────────────────────────────────────────────────────────
-  async function playQuestion(q: Question, speed = 1.0) {
+  async function playQuestion(q: Question, speed = 1.0, includeReference = true) {
     // Cut any audio left over from the previous question (release tails,
     // notes still queued in the future) before starting the new one.
     stopAllAudio();
@@ -238,8 +253,18 @@ export function Train() {
     const gen = getPlaybackGen();
     setLoading(true);
     try {
-      // Play reference tone if enabled (skip entirely in absolute-pitch mode)
-      if (!q.context?.absoluteMode && settings.referenceTone === 'perQuestion' && q.context?.referenceToneNote) {
+      // Play reference tone if enabled (skip entirely in absolute-pitch mode).
+      // Transpose mode forces the tonic on the initial auto-play — it's the
+      // anchor for the degree answer — even if the user has reference tones
+      // off. The "듣기" button passes includeReference=false to keep replays
+      // from re-sounding the tonic (separate reference button is available).
+      const forceReference = q.mode === 'transpose';
+      if (
+        includeReference &&
+        !q.context?.absoluteMode &&
+        (forceReference || settings.referenceTone === 'perQuestion') &&
+        q.context?.referenceToneNote
+      ) {
         await playReferenceTone(q.context.referenceToneNote, '2n');
         if (gen !== getPlaybackGen()) return;
         await delay(700 / speed);
@@ -288,6 +313,11 @@ export function Train() {
       }
       case 'melody': {
         const d = data as MelodyData;
+        await playSequence(d.notes, '4n', speed);
+        break;
+      }
+      case 'transpose': {
+        const d = data as TransposeData;
         await playSequence(d.notes, '4n', speed);
         break;
       }
@@ -416,6 +446,15 @@ export function Train() {
     }
   }
 
+  function handleTransposeSelect(degree: number) {
+    const expected = (currentQuestion?.data as TransposeData)?.degrees ?? [];
+    const next = [...transposeInput, degree];
+    setTransposeInput(next);
+    if (next.length >= expected.length) {
+      submitAnswer(next);
+    }
+  }
+
   function handleRhythmTap() {
     if (!rhythmStartTime) {
       setRhythmStartTime(Date.now());
@@ -460,21 +499,44 @@ export function Train() {
     setFeedbackResult(result);
     setPhase('feedback');
 
+    // Combo: only a fully-correct answer extends the streak. Partial credit
+    // (e.g. melody with 2/3 notes) resets it — otherwise melody mode would
+    // keep a "combo" alive on near-misses.
+    const newCombo = result.correct ? session.combo + 1 : 0;
+    const newBestCombo = Math.max(session.bestCombo, newCombo);
+
+    const timeTaken = Date.now() - session.questionStartTime;
+    const xp = awardXp({
+      level: q.level,
+      partialScore: result.partialScore,
+      correct: result.correct,
+      timeTakenMs: timeTaken,
+      comboAfterAnswer: newCombo,
+    });
+
     const sessionResult: SessionResult = {
       questionId: q.id,
       itemKey: q.itemKey,
       mode: q.mode,
+      level: q.level,
       correct: result.correct,
       skipped: false,
       partialScore: result.partialScore,
-      timeTaken: Date.now() - session.questionStartTime,
+      timeTaken,
+      xpEarned: xp.total,
+      comboAtAnswer: newCombo,
     };
 
-    recordResult(sessionResult);
+    recordResult(sessionResult, newCombo);
 
     setSession((prev) => {
       if (!prev) return prev;
-      return { ...prev, results: [...prev.results, sessionResult] };
+      return {
+        ...prev,
+        results: [...prev.results, sessionResult],
+        combo: newCombo,
+        bestCombo: newBestCombo,
+      };
     });
 
     // Play correct answer audio on feedback
@@ -490,15 +552,18 @@ export function Train() {
       questionId: q.id,
       itemKey: q.itemKey,
       mode: q.mode,
+      level: q.level,
       correct: false,
       skipped: true,
       partialScore: 0,
       timeTaken: Date.now() - session.questionStartTime,
+      xpEarned: 0,
+      comboAtAnswer: 0,
     };
-    recordResult(sessionResult);
+    recordResult(sessionResult, 0);
     setSession((prev) => {
       if (!prev) return prev;
-      return { ...prev, results: [...prev.results, sessionResult] };
+      return { ...prev, results: [...prev.results, sessionResult], combo: 0 };
     });
     advanceQuestion();
   }
@@ -520,15 +585,36 @@ export function Train() {
     const results = session?.results ?? [];
     const correct = results.filter((r) => r.correct).length;
     const durationSec = Math.round((Date.now() - (session?.startTime ?? Date.now())) / 1000);
-    addSession({
-      date: Date.now(),
-      mode: modeKey,
-      total: results.length,
-      correct,
-      durationSec,
-    });
+    const xpEarned = results.reduce((s, r) => s + (r.xpEarned ?? 0), 0);
+    const bestCombo = session?.bestCombo ?? 0;
+    // totalXp before this session — Result reads this to detect rank-ups.
+    const previousTotalXp = useStore.getState().gamification.totalXp;
+
+    const newlyUnlocked = addSession(
+      {
+        date: Date.now(),
+        mode: modeKey,
+        total: results.length,
+        correct,
+        durationSec,
+        bestCombo,
+        xpEarned,
+      },
+      results,
+    );
+
     navigate('/result', {
-      state: { mode: modeKey, total: results.length, correct, results, durationSec },
+      state: {
+        mode: modeKey,
+        total: results.length,
+        correct,
+        results,
+        durationSec,
+        xpEarned,
+        bestCombo,
+        previousTotalXp,
+        sessionUnlockedIds: newlyUnlocked,
+      },
     });
   }
 
@@ -703,7 +789,7 @@ export function Train() {
         <div className="max-w-lg mx-auto px-4 py-5 space-y-5">
           {/* Playback */}
           <PlaybackControls
-            onPlay={(speed) => playQuestion(currentQuestion, speed)}
+            onPlay={(speed) => playQuestion(currentQuestion, speed, false)}
             onPlayReference={handlePlayReference}
             showReference={!isAbsolute && settings.referenceTone !== 'off' && !!currentQuestion?.context?.referenceToneNote}
             loading={loading}
@@ -718,6 +804,11 @@ export function Train() {
             </div>
           )}
 
+          {/* Combo overlay — only renders at >=3 consecutive correct */}
+          {phase === 'feedback' && (session?.combo ?? 0) >= 3 && feedbackResult?.correct && (
+            <ComboOverlay combo={session?.combo ?? 0} />
+          )}
+
           {/* Feedback panel */}
           {phase === 'feedback' && feedbackResult && (
             <div
@@ -729,7 +820,7 @@ export function Train() {
             >
               <div className="flex items-center gap-2">
                 <span className="text-2xl">{feedbackResult.correct ? '✅' : '❌'}</span>
-                <div>
+                <div className="flex-1">
                   <div className={`font-bold ${feedbackResult.correct ? 'text-emerald-700' : 'text-red-700'}`}>
                     {feedbackResult.correct ? '정답!' : '오답'}
                   </div>
@@ -744,6 +835,19 @@ export function Train() {
                     </div>
                   )}
                 </div>
+                {/* XP floater — pop-in on every feedback render */}
+                {(() => {
+                  const last = session?.results[session.results.length - 1];
+                  if (!last || last.xpEarned <= 0) return null;
+                  return (
+                    <div className="text-right animate-pop motion-reduce:animate-none" key={last.questionId}>
+                      <div className="text-[10px] uppercase tracking-wider text-accent-700 font-semibold">+XP</div>
+                      <div className="text-lg font-bold text-accent-700 tabular-nums">
+                        +{last.xpEarned}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Staff feedback */}
@@ -753,10 +857,18 @@ export function Train() {
                 </div>
               )}
 
-              {/* Tempo detail feedback */}
-              {isTempo && feedbackResult.details?.kind === 'tempo' && (
-                <TempoFeedbackDetail details={feedbackResult.details} />
-              )}
+              {/* Per-mode detailed feedback (replaces the inline TempoFeedbackDetail) */}
+              <ModeFeedback
+                question={currentQuestion}
+                userAnswer={selectedAnswer ?? (
+                  pianoInput.length > 0 ? pianoInput
+                  : progressionInput.length > 0 ? progressionInput
+                  : null
+                )}
+                result={feedbackResult}
+                modeStats={stats[modeKey]}
+                notation={settings.notation}
+              />
             </div>
           )}
 
@@ -786,15 +898,44 @@ export function Train() {
               )}
 
               {/* Choice-based modes */}
-              {(isInterval || isChord || isTranspose || (isSolfege && solfegeInputMethod === 'choice') || isLabChoice) && (
+              {(isInterval || isChord || (isSolfege && solfegeInputMethod === 'choice') || isLabChoice) && (
                 <ChoiceGrid
                   options={getChoiceOptions(modeKey, level, isAbsolute)}
                   selected={selectedAnswer ?? undefined}
                   answered={false}
                   onSelect={handleChoiceSelect}
-                  columns={isInterval || isTranspose ? 2 : isChord ? 2 : modeKey === 'lab-key' ? 4 : modeKey === 'lab-inversion' ? 2 : 3}
+                  columns={isInterval ? 2 : isChord ? 2 : modeKey === 'lab-key' ? 4 : modeKey === 'lab-inversion' ? 2 : 3}
                   disabled={loading}
                 />
+              )}
+
+              {/* Transpose: degree-sequence input */}
+              {isTranspose && (
+                <>
+                  <div className="text-sm text-center text-slate-500">
+                    {(currentQuestion.data as TransposeData).degrees.length}개 도수 입력
+                    {transposeInput.length > 0 && ` (${transposeInput.length}/${(currentQuestion.data as TransposeData).degrees.length})`}
+                  </div>
+                  {transposeInput.length > 0 && (
+                    <div className="flex gap-2 flex-wrap justify-center">
+                      {transposeInput.map((d, i) => (
+                        <span key={i} className="bg-primary-100 text-primary-700 px-3 py-1.5 rounded-lg font-semibold text-sm">
+                          {settings.notation === 'roman' ? (ROMAN[d] ?? String(d)) : d}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <TransposeInput
+                    notation={settings.notation}
+                    onSelect={handleTransposeSelect}
+                    disabled={loading}
+                  />
+                  {transposeInput.length > 0 && (
+                    <button className="btn-ghost text-sm text-slate-400" onClick={() => setTransposeInput([])}>
+                      ← 다시 입력
+                    </button>
+                  )}
+                </>
               )}
 
               {/* Solfege piano input */}
@@ -981,15 +1122,43 @@ export function Train() {
           ) : (
             /* After feedback: show correct answer highlight for choice modes */
             <>
-              {(isInterval || isChord || isTranspose || (isSolfege && solfegeInputMethod === 'choice') || isLabChoice) && (
+              {(isInterval || isChord || (isSolfege && solfegeInputMethod === 'choice') || isLabChoice) && (
                 <ChoiceGrid
                   options={getChoiceOptions(modeKey, level, isAbsolute)}
                   selected={selectedAnswer ?? undefined}
                   correct={feedbackResult?.correctAnswer as string}
                   answered
                   onSelect={() => {}}
-                  columns={isInterval || isTranspose ? 2 : isChord ? 2 : modeKey === 'lab-key' ? 4 : modeKey === 'lab-inversion' ? 2 : 3}
+                  columns={isInterval ? 2 : isChord ? 2 : modeKey === 'lab-key' ? 4 : modeKey === 'lab-inversion' ? 2 : 3}
                 />
+              )}
+              {isTranspose && feedbackResult && (
+                <div className="space-y-2">
+                  <div className="text-xs text-slate-500 text-center">정답</div>
+                  <div className="flex gap-2 flex-wrap justify-center">
+                    {(feedbackResult.correctAnswer as number[]).map((d, i) => {
+                      const userVal = transposeInput[i];
+                      const isCorrect = userVal === d;
+                      return (
+                        <span
+                          key={i}
+                          className={`px-3 py-1.5 rounded-lg font-semibold text-sm ${
+                            isCorrect
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-red-100 text-red-700'
+                          }`}
+                        >
+                          {settings.notation === 'roman' ? (ROMAN[d] ?? String(d)) : d}
+                          {!isCorrect && userVal != null && (
+                            <span className="text-xs text-red-500 ml-1">
+                              (입력: {settings.notation === 'roman' ? (ROMAN[userVal] ?? String(userVal)) : userVal})
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
               {isSolfege && solfegeInputMethod === 'piano' && feedbackResult && (
                 <div className="space-y-2">
@@ -1067,7 +1236,6 @@ export function Train() {
 // ─── Helpers ────────────────────────────────────────────────────────────────
 function getChoiceOptions(mode: ModeKey, level: number, absolute = false): ChoiceOption[] {
   if (mode === 'interval') return getIntervalChoices(level);
-  if (mode === 'transpose') return getTransposeChoices(level);
   if (mode === 'chord') return getChordChoices(level);
   if (mode === 'solfege') return absolute ? getNoteNameChoices(level) : getSolfegeChoices(level);
   if (mode === 'lab-scale') return getScaleChoices(level);
@@ -1089,6 +1257,11 @@ function formatAnswer(answer: unknown, mode: ModeKey, notation: 'roman' | 'numbe
         .map((p) => notation === 'number'
           ? `${p.degree}${['m','dim','m7','m7b5'].includes(p.quality) ? 'm' : ''}`
           : romanize(p.degree, p.quality))
+        .join(' → ');
+    }
+    if (mode === 'transpose') {
+      return (answer as number[])
+        .map((d) => notation === 'roman' ? (ROMAN[d] ?? String(d)) : String(d))
         .join(' → ');
     }
     return (answer as string[]).join(', ');
@@ -1128,132 +1301,27 @@ function ProgressionInput({ notation, onSelect, disabled }: ProgInputProps) {
   );
 }
 
-// ─── Tempo Feedback Detail ──────────────────────────────────────────────────
-function TempoFeedbackDetail({ details }: { details: TempoJudgeDetails }) {
-  const {
-    targetBpm, userBpm, bpmDelta, deviationPct, tolerancePct,
-    intervalBpms, jitterPct,
-  } = details;
+// ─── Transpose Degree Input ─────────────────────────────────────────────────
+interface TransposeInputProps {
+  notation: 'roman' | 'number';
+  onSelect: (degree: number) => void;
+  disabled?: boolean;
+}
 
-  const tolBpm = targetBpm * tolerancePct;
-  // Visual scale for bars: clamp to 3× tolerance so extreme outliers don't break layout.
-  const visualHalfRangeBpm = Math.max(tolBpm * 3, Math.abs(bpmDelta) + tolBpm);
-
-  const inTolerance = (bpm: number) => Math.abs(bpm - targetBpm) / targetBpm <= tolerancePct;
-  const fastSlowLabel =
-    Math.abs(bpmDelta) < 0.5 ? '딱 맞음'
-    : bpmDelta > 0 ? `${bpmDelta.toFixed(1)} BPM 빠름`
-    : `${Math.abs(bpmDelta).toFixed(1)} BPM 느림`;
-
-  // Consistency rating
-  const consistencyLabel =
-    jitterPct <= tolerancePct ? '매우 안정'
-    : jitterPct <= tolerancePct * 2 ? '약간 흔들림'
-    : '많이 흔들림';
-  const consistencyColor =
-    jitterPct <= tolerancePct ? 'text-emerald-700'
-    : jitterPct <= tolerancePct * 2 ? 'text-amber-700'
-    : 'text-red-700';
-
+function TransposeInput({ notation, onSelect, disabled }: TransposeInputProps) {
   return (
-    <div className="mt-3 pt-3 border-t border-slate-200 space-y-3">
-      {/* Headline numbers */}
-      <div className="grid grid-cols-3 gap-2 text-center">
-        <div>
-          <div className="text-[10px] uppercase tracking-wide text-slate-500">목표</div>
-          <div className="text-lg font-bold text-slate-800 tabular-nums">
-            {Math.round(targetBpm)}
-          </div>
-          <div className="text-[10px] text-slate-400">BPM</div>
-        </div>
-        <div>
-          <div className="text-[10px] uppercase tracking-wide text-slate-500">내 템포</div>
-          <div className={`text-lg font-bold tabular-nums ${
-            deviationPct <= tolerancePct ? 'text-emerald-700' : 'text-red-700'
-          }`}>
-            {userBpm.toFixed(1)}
-          </div>
-          <div className="text-[10px] text-slate-400">BPM</div>
-        </div>
-        <div>
-          <div className="text-[10px] uppercase tracking-wide text-slate-500">편차</div>
-          <div className={`text-lg font-bold tabular-nums ${
-            deviationPct <= tolerancePct ? 'text-emerald-700' : 'text-red-700'
-          }`}>
-            {bpmDelta >= 0 ? '+' : ''}{bpmDelta.toFixed(1)}
-          </div>
-          <div className="text-[10px] text-slate-400">
-            {(deviationPct * 100).toFixed(1)}%
-          </div>
-        </div>
-      </div>
-
-      {/* Verbal summary */}
-      <div className="text-xs text-slate-600 text-center">
-        평균 <b>{fastSlowLabel}</b>
-        {' · '}
-        허용 ±{(tolerancePct * 100).toFixed(0)}%
-        {' · '}
-        일관성 <span className={`font-semibold ${consistencyColor}`}>{consistencyLabel}</span>
-        {' '}
-        <span className="text-slate-400">(흔들림 {(jitterPct * 100).toFixed(1)}%)</span>
-      </div>
-
-      {/* Per-tap BPM chart: each interval drawn as a bar from the target line */}
-      <div>
-        <div className="text-[10px] text-slate-500 mb-1 flex justify-between">
-          <span>탭별 BPM 변동</span>
-          <span className="text-slate-400">총 {intervalBpms.length}개 간격</span>
-        </div>
-        <div className="relative h-20 bg-slate-50 rounded border border-slate-200 overflow-hidden">
-          {/* Tolerance band */}
-          <div
-            className="absolute left-0 right-0 bg-emerald-100/70"
-            style={{
-              top: `${50 - (tolBpm / visualHalfRangeBpm) * 50}%`,
-              height: `${(tolBpm / visualHalfRangeBpm) * 100}%`,
-            }}
-          />
-          {/* Target line (center) */}
-          <div className="absolute left-0 right-0 top-1/2 border-t border-dashed border-slate-400" />
-          {/* Bars */}
-          <div className="absolute inset-0 flex items-stretch justify-around px-1">
-            {intervalBpms.map((bpm, i) => {
-              const offsetBpm = bpm - targetBpm; // signed
-              const pct = Math.max(-1, Math.min(1, offsetBpm / visualHalfRangeBpm));
-              const heightPct = Math.abs(pct) * 50;
-              const isOk = inTolerance(bpm);
-              return (
-                <div key={i} className="flex-1 flex flex-col justify-center mx-0.5 relative">
-                  <div
-                    className={`absolute left-0 right-0 mx-auto rounded-sm ${
-                      isOk ? 'bg-emerald-500' : 'bg-red-400'
-                    }`}
-                    style={
-                      pct >= 0
-                        ? { bottom: '50%', height: `${heightPct}%`, width: '70%' }
-                        : { top: '50%', height: `${heightPct}%`, width: '70%' }
-                    }
-                  />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-        {/* Per-tap BPM numbers */}
-        <div className="mt-1 flex justify-around gap-1 text-[10px] tabular-nums">
-          {intervalBpms.map((bpm, i) => (
-            <span
-              key={i}
-              className={`flex-1 text-center ${
-                inTolerance(bpm) ? 'text-emerald-700' : 'text-red-600'
-              }`}
-            >
-              {bpm.toFixed(0)}
-            </span>
-          ))}
-        </div>
-      </div>
+    <div className="grid grid-cols-7 gap-2">
+      {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+        <button
+          key={d}
+          className="choice-btn py-3 text-base font-bold"
+          onClick={() => !disabled && onSelect(d)}
+          disabled={disabled}
+        >
+          {notation === 'roman' ? (ROMAN[d] ?? String(d)) : d}
+        </button>
+      ))}
     </div>
   );
 }
+

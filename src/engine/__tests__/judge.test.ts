@@ -60,21 +60,25 @@ describe('judge — melody', () => {
 });
 
 describe('judge — transpose', () => {
-  // Transpose mode answer is the interval-name string (e.g. "P5") picked
-  // from a choice grid. A bug previously routed it through the array-
-  // comparison branch, so every answer scored 0.
+  // Transpose mode answer is a degree sequence (e.g. [1,3,5]) matched against
+  // the user's degree-button taps.
   const ques = q({
     mode: 'transpose',
-    answer: 'P5',
-    data: { type: 'interval', notes: ['C4', 'G4'], direction: 'up', intervalName: 'P5' },
+    answer: [1, 3, 5],
+    data: { type: 'transpose', notes: ['G4', 'B4', 'D5'], degrees: [1, 3, 5], key: 'G' },
   });
-  it('exact string match → correct', () => {
-    const r = judge(ques, 'P5');
+  it('exact sequence → correct', () => {
+    const r = judge(ques, [1, 3, 5]);
     expect(r.correct).toBe(true);
     expect(r.partialScore).toBe(1);
   });
-  it('wrong choice → incorrect', () => {
-    const r = judge(ques, 'P4');
+  it('wrong sequence → incorrect', () => {
+    const r = judge(ques, [1, 3, 4]);
+    expect(r.correct).toBe(false);
+    expect(r.partialScore).toBeCloseTo(2 / 3);
+  });
+  it('wrong length → 0', () => {
+    const r = judge(ques, [1, 3]);
     expect(r.correct).toBe(false);
     expect(r.partialScore).toBe(0);
   });

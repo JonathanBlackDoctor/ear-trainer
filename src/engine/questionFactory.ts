@@ -271,43 +271,56 @@ export function makeSolfegeQuestion(
 }
 
 // ─── Transpose ─────────────────────────────────────────────────────────────────
+// Plays a short melody in a random key (with the tonic sounded first as a
+// reference). Answer is the degree sequence, e.g. [1,3,5] — the same melodic
+// shape stays the same answer across all keys, which is what transposition
+// practice is for.
 export function makeTransposeQuestion(
   level: number,
   _keyMode: 'fixed' | 'random',
   fixedKey: string,
-  lastItemKey?: string,
-  srs?: ModeSrs,
-  stats?: ModeStats,
-  candidateFilter?: (key: string) => boolean
+  _lastItemKey?: string,
+  _srs?: ModeSrs,
+  _stats?: ModeStats,
+  _candidateFilter?: (key: string) => boolean
 ): Question {
   const cfg = TRANSPOSE_LEVELS[level] ?? TRANSPOSE_LEVELS[1];
   const key = cfg.keyPool.length <= 1
     ? (cfg.keyPool[0] ?? fixedKey)
     : pickRandom(cfg.keyPool);
 
-  const allItemKeys = cfg.intervals.flatMap((n) => cfg.directions.map((d) => `${n}_${d}`));
-  const filteredKeys = candidateFilter ? allItemKeys.filter(candidateFilter) : allItemKeys;
-  const itemKeys = filteredKeys.length > 0 ? filteredKeys : allItemKeys;
-  const chosenItemKey = nextTarget(itemKeys, srs, stats, lastItemKey);
-  const [intervalName, direction] = chosenItemKey.split('_') as [string, IntervalDirection];
+  const pool = cfg.degreePool;
+  const degrees: number[] = [pickRandom(pool)];
+  for (let i = 1; i < cfg.noteCount; i++) {
+    const prev = degrees[i - 1];
+    const candidates = pool.filter((d) => d !== prev && Math.abs(d - prev) <= cfg.maxJump);
+    degrees.push(candidates.length > 0 ? pickRandom(candidates) : pickRandom(pool));
+  }
 
-  // Anchor the root on the tonic of the picked key — that's the whole point of
-  // transposition practice: same interval, different starting pitch.
-  const rootMidi = Note.midi(key + '4') ?? 60;
-  const rootNote = Note.fromMidi(rootMidi) ?? 'C4';
-  const semitones = getIntervalSemitones(intervalName);
-  const secondMidi = rootMidi + (direction === 'down' ? -semitones : semitones);
-  const secondNote = Note.fromMidi(secondMidi) ?? 'C4';
+  // Convert degrees to actual notes in the chosen key. Degree 1 anchors at
+  // octave 4; higher degrees follow naturally, and we wrap to the next octave
+  // when the running pitch dips below the tonic (keeps the melody contiguous).
+  const tonicMidi = Note.midi(key + '4') ?? 60;
+  const notes: string[] = degrees.map((d) => {
+    const semis = degreeToSemitones(d);
+    return Note.fromMidi(tonicMidi + semis) ?? key + '4';
+  });
 
   return {
     id: genId(),
     mode: 'transpose',
     level,
-    itemKey: chosenItemKey,
-    data: { type: 'interval', notes: [rootNote, secondNote], direction, intervalName },
-    answer: intervalName,
-    context: { key },
+    itemKey: `transpose_lv${level}`,
+    data: { type: 'transpose', notes, degrees, key },
+    answer: degrees,
+    context: { key, referenceToneNote: key + '4' },
   };
+}
+
+// Major-scale degree (1..7) → semitones above tonic.
+function degreeToSemitones(degree: number): number {
+  const map: Record<number, number> = { 1: 0, 2: 2, 3: 4, 4: 5, 5: 7, 6: 9, 7: 11 };
+  return map[degree] ?? 0;
 }
 
 // ─── Rhythm ────────────────────────────────────────────────────────────────────

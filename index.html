@@ -32,6 +32,20 @@
   <body>
     <div id="root"></div>
     <noscript>이 앱을 사용하려면 자바스크립트를 활성화해 주세요.</noscript>
+    <script>
+      // SPA 부팅보다 beforeinstallprompt가 먼저 발생하는 경우가 잦아,
+      // 인라인 스크립트에서 가장 먼저 이벤트를 캡처해 전역에 보관한다.
+      window.__pwaDeferredPrompt = null;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        window.__pwaDeferredPrompt = e;
+        window.dispatchEvent(new Event('pwa-install-available'));
+      });
+      window.addEventListener('appinstalled', () => {
+        window.__pwaDeferredPrompt = null;
+        window.dispatchEvent(new Event('pwa-installed'));
+      });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
