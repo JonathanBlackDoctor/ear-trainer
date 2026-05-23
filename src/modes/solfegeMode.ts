@@ -1,5 +1,5 @@
 import type { ChoiceOption } from '../components/ChoiceGrid';
-import { SOLFEGE_LEVELS } from '../theory/solfege';
+import { SOLFEGE_LEVELS, solfegeToSemitone } from '../theory/solfege';
 import { MAX_LEVEL } from './levels';
 import type { ModeKey } from '../types';
 
@@ -15,10 +15,12 @@ export const SOLFEGE_MODE_INFO = {
 
 export function getSolfegeChoices(level: number): ChoiceOption[] {
   const cfg = SOLFEGE_LEVELS[level] ?? SOLFEGE_LEVELS[1];
-  return cfg.candidates.map((s) => ({
-    value: s,
-    label: s,
-  }));
+  return [...cfg.candidates]
+    .sort((a, b) => solfegeToSemitone(a) - solfegeToSemitone(b))
+    .map((s) => ({
+      value: s,
+      label: s,
+    }));
 }
 
 // Absolute-pitch mode: identify by note name (C/D/E…) without a reference tone.

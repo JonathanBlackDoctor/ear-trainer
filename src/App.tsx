@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { RouteSpinner } from './components/RouteSpinner';
 import { ToastContainer } from './components/Toast';
+import { ScrollRestoration } from './components/ScrollRestoration';
 import { useThemeSync } from './hooks/useThemeSync';
 
 // Lazy-load each route so the initial bundle stays small. Train.tsx (~1100 LOC)
@@ -19,6 +20,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <HashRouter>
+        <ScrollRestoration />
         <Suspense fallback={<RouteSpinner />}>
           <Routes>
             <Route path="/" element={<Home />} />
