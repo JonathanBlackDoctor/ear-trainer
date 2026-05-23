@@ -757,7 +757,7 @@ export function Train() {
   const isAbsolute = !!currentQuestion?.context?.absoluteMode;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="h-[100dvh] bg-slate-50 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="bg-white border-b border-slate-100 px-4 py-3">
         <div className="max-w-lg mx-auto">
@@ -781,7 +781,7 @@ export function Train() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="max-w-lg mx-auto px-4 py-5 space-y-5">
           {/* Playback */}
           <PlaybackControls
