@@ -1198,26 +1198,29 @@ export function Train() {
               )}
             </>
           )}
+        </div>
+      </div>
 
-          {/* Next / Skip buttons */}
-          <div className="flex gap-3">
-            {phase !== 'feedback' && (
-              <button
-                className="flex-1 btn-ghost text-slate-400"
-                onClick={handleSkip}
-              >
-                건너뛰기
-              </button>
-            )}
-            {phase === 'feedback' && (
-              <button
-                className="flex-1 btn-primary"
-                onClick={advanceQuestion}
-              >
-                {currentIdx + 1 >= totalQuestions ? '결과 보기 →' : '다음 →'}
-              </button>
-            )}
-          </div>
+      {/* Next / Skip buttons — pinned to the bottom so they stay reachable
+          without scrolling, even when the feedback panel pushes content down. */}
+      <div className="bg-white border-t border-slate-100 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+        <div className="max-w-lg mx-auto flex gap-3">
+          {phase !== 'feedback' && (
+            <button
+              className="flex-1 btn-ghost text-slate-400"
+              onClick={handleSkip}
+            >
+              건너뛰기
+            </button>
+          )}
+          {phase === 'feedback' && (
+            <button
+              className="flex-1 btn-primary"
+              onClick={advanceQuestion}
+            >
+              {currentIdx + 1 >= totalQuestions ? '결과 보기 →' : '다음 →'}
+            </button>
+          )}
         </div>
       </div>
     </div>
