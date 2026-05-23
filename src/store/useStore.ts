@@ -50,6 +50,7 @@ const defaultSettings: AppSettings = {
   showStaffFeedback: true,
   weakSessionLength: 10,
   reducedMotion: 'system',
+  design: 'default',
   modeOrder: DEFAULT_MODE_ORDER,
 };
 

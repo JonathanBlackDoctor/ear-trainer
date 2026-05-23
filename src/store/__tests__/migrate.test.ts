@@ -66,7 +66,8 @@ describe('migrate v2 → v3 (10-level curriculum reset)', () => {
       date: 1, mode: 'interval', total: 5, correct: 4, durationSec: 30,
       bestCombo: 0, xpEarned: 0,
     });
-    expect(out.settings).toEqual(v2State.settings);
+    // v4→v5 adds the `design` theme setting (defaults to 'default').
+    expect(out.settings).toEqual({ ...v2State.settings, design: 'default' });
     expect(out.customPatterns).toEqual(v2State.customPatterns);
   });
 
@@ -126,10 +127,35 @@ describe('migrate v3 → v4 (gamification slice)', () => {
     expect(out.srs.interval.P5_up.ease).toBe(2.5);
   });
 
-  it('is a no-op when already at v4', () => {
-    const v4 = migrate(v3State, 3) as any;
-    const again = migrate(v4, 4) as any;
-    expect(again).toBe(v4);
+  it('is a no-op when already at the current version', () => {
+    // v3State cascades v3→v4→v5; re-running at the current version changes nothing.
+    const current = migrate(v3State, 3) as any;
+    const again = migrate(current, CURRENT_SCHEMA_VERSION) as any;
+    expect(again).toBe(current);
+  });
+});
+
+describe('migrate v4 → v5 (design theme setting)', () => {
+  const v4State = {
+    settings: { weakSessionLength: 10, reducedMotion: 'system', notation: 'number' },
+    stats: { interval: {} },
+    sessions: [],
+    customPatterns: [],
+    srs: { interval: {} },
+    gamification: { totalXp: 0, achievements: {} },
+  };
+
+  it("defaults design to 'default' for existing users", () => {
+    const out = migrate(v4State, 4) as any;
+    expect(out.settings.design).toBe('default');
+    // unrelated settings preserved
+    expect(out.settings.weakSessionLength).toBe(10);
+    expect(out.settings.notation).toBe('number');
+  });
+
+  it('keeps an already-chosen design', () => {
+    const out = migrate({ ...v4State, settings: { ...v4State.settings, design: 'm' } }, 4) as any;
+    expect(out.settings.design).toBe('m');
   });
 });
 

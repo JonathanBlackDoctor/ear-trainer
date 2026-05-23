@@ -240,10 +240,15 @@ export interface AppSettings {
   showStaffFeedback: boolean;
   weakSessionLength: number;
   reducedMotion: 'system' | 'on' | 'off';
+  design: DesignTheme;
   // User-defined ordering of training modes on the Home screen. Reconciled
   // against the current mode registry at read time (see resolveModeOrder).
   modeOrder?: ModeKey[];
 }
+
+// Visual theme. 'default' is the original classic look; g/i/j/m are the four
+// designer directions (네오 브루탈리즘 / 모눈·데이터 / 카세트 / 오로라).
+export type DesignTheme = 'default' | 'g' | 'i' | 'j' | 'm';
 
 // ─── SRS (Spaced Repetition) ───────────────────────────────────────────────────
 export interface SrsCard {

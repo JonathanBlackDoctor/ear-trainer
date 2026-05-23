@@ -86,13 +86,28 @@ function v3Tov4(state: AnyState | null | undefined): AnyState | null | undefined
   };
 }
 
-export const CURRENT_SCHEMA_VERSION = 4;
+// v4 → v5: add the `design` visual-theme setting. Existing users default to
+// the classic 'default' look. Everything else is preserved.
+function v4Tov5(state: AnyState | null | undefined): AnyState | null | undefined {
+  if (!state) return state;
+  const oldSettings = (state.settings ?? {}) as Record<string, unknown>;
+  return {
+    ...state,
+    settings: {
+      ...oldSettings,
+      design: oldSettings.design ?? 'default',
+    },
+  };
+}
+
+export const CURRENT_SCHEMA_VERSION = 5;
 
 export function migrate(persistedState: unknown, fromVersion: number): unknown {
   let state = persistedState as AnyState | null | undefined;
   if (fromVersion < 2) state = v1Tov2(state);
   if (fromVersion < 3) state = v2Tov3(state);
   if (fromVersion < 4) state = v3Tov4(state);
+  if (fromVersion < 5) state = v4Tov5(state);
   return state;
 }
 

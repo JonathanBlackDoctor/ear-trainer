@@ -48,7 +48,7 @@ export function Home() {
     .slice(0, 3);
 
   return (
-    <div className="min-h-screen bg-canvas-50 pb-10">
+    <div className="min-h-screen pb-10">
       {/* Header — 더 강한 브랜드 표현 (인디고 그라데이션 + 골드 액센트) */}
       <header className="bg-gradient-to-br from-primary-700 via-primary-800 to-primary-900 text-white">
         <div className="max-w-lg mx-auto px-5 pt-8 pb-10">

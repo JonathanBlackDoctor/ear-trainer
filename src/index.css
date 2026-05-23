@@ -2,6 +2,187 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ════════════════════════════════════════════════════════════════════════
+   THEME TOKENS
+   Every Tailwind color/shadow/radius utility resolves to one of these CSS
+   variables (see tailwind.config.js). `:root` is the classic "default" look;
+   `[data-theme="g|i|j|m"]` re-skin the whole app. The active theme is set on
+   <html> by src/hooks/useThemeSync.ts from the persisted `design` setting.
+   Palette values are space-separated RGB triples so Tailwind opacity
+   modifiers keep working.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── default · 클래식 (딥 인디고 + 골드 + 크림, Noto) ───────────────────── */
+:root {
+  --c-primary-50: 238 242 255;  --c-primary-100: 224 231 255; --c-primary-200: 199 210 254;
+  --c-primary-300: 165 180 252; --c-primary-400: 129 140 248; --c-primary-500: 99 102 241;
+  --c-primary-600: 79 70 229;   --c-primary-700: 67 56 202;   --c-primary-800: 55 48 163;
+  --c-primary-900: 49 46 129;   --c-primary-950: 30 27 75;
+  --c-accent-50: 255 251 235;  --c-accent-100: 254 243 199; --c-accent-200: 253 230 138;
+  --c-accent-300: 252 211 77;  --c-accent-400: 251 191 36;  --c-accent-500: 245 158 11;
+  --c-accent-600: 217 119 6;   --c-accent-700: 180 83 9;    --c-accent-800: 146 64 14;
+  --c-accent-900: 120 53 15;
+  --c-canvas-50: 253 252 248; --c-canvas-100: 250 248 241; --c-canvas-200: 243 239 226;
+  --c-success-50: 240 253 244; --c-success-100: 220 252 231; --c-success-400: 74 222 128;
+  --c-success-500: 34 197 94;  --c-success-600: 22 163 74;  --c-success-700: 21 128 61;
+  --c-danger-50: 255 241 242; --c-danger-100: 255 228 230; --c-danger-400: 251 113 133;
+  --c-danger-500: 244 63 94;  --c-danger-600: 225 29 72;   --c-danger-700: 190 18 60;
+
+  --font-sans: 'Noto Sans KR';
+  --font-display: 'Noto Serif KR', 'Noto Sans KR';
+
+  --radius-lg: 0.5rem; --radius-xl: 0.75rem; --radius-2xl: 1rem; --radius-3xl: 1.5rem;
+  --radius-chip: 9999px;
+
+  --border-card: 1px solid rgb(var(--c-canvas-200));
+  --app-bg: #fdfcf8;
+
+  --shadow-soft:   0 1px 2px 0 rgb(49 46 129 / 0.04), 0 1px 3px 0 rgb(49 46 129 / 0.06);
+  --shadow-card:   0 2px 4px -1px rgb(49 46 129 / 0.06), 0 4px 12px -2px rgb(49 46 129 / 0.08);
+  --shadow-lifted: 0 10px 25px -5px rgb(49 46 129 / 0.12), 0 6px 12px -4px rgb(49 46 129 / 0.08);
+  --shadow-cta:    var(--shadow-card);
+  --shadow-glow-primary: 0 0 0 4px rgb(99 102 241 / 0.15);
+  --shadow-glow-accent:  0 0 0 4px rgb(245 158 11 / 0.2);
+}
+
+/* ── G · 네오 브루탈리즘 (캔디 핑크 + 머스타드, 검정 테두리, 하드 그림자) ─ */
+[data-theme="g"] {
+  --c-primary-50: 255 240 244;  --c-primary-100: 255 224 234; --c-primary-200: 255 194 213;
+  --c-primary-300: 255 156 187; --c-primary-400: 255 122 163; --c-primary-500: 255 90 140;
+  --c-primary-600: 245 48 111;  --c-primary-700: 209 30 91;   --c-primary-800: 163 22 74;
+  --c-primary-900: 20 10 14;    --c-primary-950: 10 10 10;
+  --c-accent-50: 254 250 230;  --c-accent-100: 253 243 192; --c-accent-200: 251 233 138;
+  --c-accent-300: 248 223 94;  --c-accent-400: 245 209 66;  --c-accent-500: 238 191 31;
+  --c-accent-600: 209 160 19;  --c-accent-700: 168 124 15;  --c-accent-800: 130 96 12;
+  --c-accent-900: 94 69 8;
+  --c-canvas-50: 255 254 240; --c-canvas-100: 250 247 228; --c-canvas-200: 10 10 10;
+  --c-success-50: 240 252 237; --c-success-100: 219 247 213; --c-success-400: 124 226 108;
+  --c-success-500: 90 200 74;  --c-success-600: 60 160 48;  --c-success-700: 40 120 32;
+  --c-danger-50: 255 240 238; --c-danger-100: 255 224 220; --c-danger-400: 255 91 74;
+  --c-danger-500: 240 60 44;  --c-danger-600: 200 40 28;   --c-danger-700: 150 28 18;
+
+  --font-sans: 'Pretendard';
+  --font-display: 'Pretendard';
+
+  --radius-lg: 0; --radius-xl: 0; --radius-2xl: 0; --radius-3xl: 0;
+  --radius-chip: 0;
+
+  --border-card: 3px solid #0a0a0a;
+  --app-bg: #fffef0;
+
+  --shadow-soft:   3px 3px 0 #0a0a0a;
+  --shadow-card:   4px 4px 0 #0a0a0a;
+  --shadow-lifted: 8px 8px 0 #0a0a0a;
+  --shadow-cta:    6px 6px 0 #0a0a0a;
+  --shadow-glow-primary: 0 0 0 3px #ff5a8c;
+  --shadow-glow-accent:  0 0 0 3px #f5d142;
+}
+
+/* ── I · 모눈 / 데이터 (그래프페이퍼 배경 + 라임 시그널, 헤어라인, 무그림자) */
+[data-theme="i"] {
+  --c-primary-50: 236 252 203; --c-primary-100: 217 244 168; --c-primary-200: 192 232 120;
+  --c-primary-300: 163 214 74; --c-primary-400: 132 204 22;  --c-primary-500: 101 163 13;
+  --c-primary-600: 82 127 10;  --c-primary-700: 63 97 8;     --c-primary-800: 47 71 8;
+  --c-primary-900: 31 47 8;    --c-primary-950: 15 20 25;
+  --c-accent-50: 236 254 255;  --c-accent-100: 207 250 254; --c-accent-200: 165 243 252;
+  --c-accent-300: 103 232 249; --c-accent-400: 34 211 238;  --c-accent-500: 6 182 212;
+  --c-accent-600: 8 145 178;   --c-accent-700: 14 116 144;  --c-accent-800: 21 94 117;
+  --c-accent-900: 22 78 99;
+  --c-canvas-50: 251 252 253; --c-canvas-100: 245 247 250; --c-canvas-200: 200 208 217;
+  --c-success-50: 240 253 244; --c-success-100: 220 252 231; --c-success-400: 74 222 128;
+  --c-success-500: 34 197 94;  --c-success-600: 22 163 74;  --c-success-700: 21 128 61;
+  --c-danger-50: 254 242 242; --c-danger-100: 254 226 226; --c-danger-400: 248 113 113;
+  --c-danger-500: 239 68 68;  --c-danger-600: 220 38 38;   --c-danger-700: 185 28 28;
+
+  --font-sans: 'Pretendard';
+  --font-display: 'Pretendard';
+
+  --radius-lg: 0; --radius-xl: 0; --radius-2xl: 0; --radius-3xl: 0;
+  --radius-chip: 0;
+
+  --border-card: 1px solid rgb(var(--c-canvas-200));
+  --app-bg:
+    linear-gradient(#eef1f5 1px, transparent 1px) 0 0 / 12px 12px,
+    linear-gradient(90deg, #eef1f5 1px, transparent 1px) 0 0 / 12px 12px,
+    linear-gradient(#e2e7ed 1px, transparent 1px) 0 0 / 60px 60px,
+    linear-gradient(90deg, #e2e7ed 1px, transparent 1px) 0 0 / 60px 60px,
+    #fbfcfd;
+
+  --shadow-soft:   none;
+  --shadow-card:   none;
+  --shadow-lifted: none;
+  --shadow-cta:    none;
+  --shadow-glow-primary: 0 0 0 2px #65a30d;
+  --shadow-glow-accent:  0 0 0 2px #06b6d4;
+}
+
+/* ── J · 카세트 테이프 (핫핑크 + 틸, 크림, 검정 테두리, 작은 하드 그림자) ─ */
+[data-theme="j"] {
+  --c-primary-50: 255 233 245;  --c-primary-100: 255 208 234; --c-primary-200: 255 168 214;
+  --c-primary-300: 255 125 193; --c-primary-400: 255 92 178;  --c-primary-500: 255 61 168;
+  --c-primary-600: 229 29 142;  --c-primary-700: 201 29 128;  --c-primary-800: 153 21 97;
+  --c-primary-900: 60 13 45;    --c-primary-950: 26 13 31;
+  --c-accent-50: 255 251 224;  --c-accent-100: 255 246 184; --c-accent-200: 255 238 122;
+  --c-accent-300: 255 228 84;  --c-accent-400: 255 216 61;  --c-accent-500: 240 196 20;
+  --c-accent-600: 209 168 12;  --c-accent-700: 168 132 10;  --c-accent-800: 130 100 8;
+  --c-accent-900: 94 71 6;
+  --c-canvas-50: 250 244 232; --c-canvas-100: 245 236 220; --c-canvas-200: 26 13 31;
+  --c-success-50: 224 250 247; --c-success-100: 191 244 238; --c-success-400: 45 212 191;
+  --c-success-500: 0 196 180;  --c-success-600: 10 138 125; --c-success-700: 8 110 100;
+  --c-danger-50: 254 242 242; --c-danger-100: 254 226 226; --c-danger-400: 248 113 113;
+  --c-danger-500: 239 68 68;  --c-danger-600: 220 38 38;   --c-danger-700: 185 28 28;
+
+  --font-sans: 'Pretendard';
+  --font-display: 'Pretendard';
+
+  --radius-lg: 0; --radius-xl: 0; --radius-2xl: 0; --radius-3xl: 0;
+  --radius-chip: 4px;
+
+  --border-card: 2px solid #1a0d1f;
+  --app-bg: #f5ecdc;
+
+  --shadow-soft:   2px 2px 0 #1a0d1f;
+  --shadow-card:   3px 3px 0 #1a0d1f;
+  --shadow-lifted: 5px 5px 0 #1a0d1f;
+  --shadow-cta:    4px 4px 0 #1a0d1f;
+  --shadow-glow-primary: 0 0 0 3px #ff3da8;
+  --shadow-glow-accent:  0 0 0 3px #00c4b4;
+}
+
+/* ── M · 오로라 / 홀로그래픽 (이리데센트 배경 + 글래스 카드, 22px 라운드) ─ */
+[data-theme="m"] {
+  --c-primary-50: 246 239 254; --c-primary-100: 236 220 253; --c-primary-200: 221 193 251;
+  --c-primary-300: 200 155 248; --c-primary-400: 184 118 247; --c-primary-500: 168 85 247;
+  --c-primary-600: 147 51 234;  --c-primary-700: 126 34 206;  --c-primary-800: 107 33 168;
+  --c-primary-900: 42 31 80;    --c-primary-950: 26 31 58;
+  --c-accent-50: 255 251 235;  --c-accent-100: 254 243 199; --c-accent-200: 253 230 138;
+  --c-accent-300: 252 211 77;  --c-accent-400: 251 191 36;  --c-accent-500: 245 158 11;
+  --c-accent-600: 217 119 6;   --c-accent-700: 180 83 9;    --c-accent-800: 146 64 14;
+  --c-accent-900: 120 53 15;
+  --c-canvas-50: 253 252 255; --c-canvas-100: 247 245 252; --c-canvas-200: 220 218 235;
+  --c-success-50: 236 253 245; --c-success-100: 209 250 229; --c-success-400: 52 211 153;
+  --c-success-500: 16 185 129; --c-success-600: 5 150 105;  --c-success-700: 4 120 87;
+  --c-danger-50: 254 242 242; --c-danger-100: 254 226 226; --c-danger-400: 248 113 113;
+  --c-danger-500: 239 68 68;  --c-danger-600: 220 38 38;   --c-danger-700: 185 28 28;
+
+  --font-sans: 'Pretendard';
+  --font-display: 'Pretendard';
+
+  --radius-lg: 0.875rem; --radius-xl: 1rem; --radius-2xl: 1.375rem; --radius-3xl: 1.625rem;
+  --radius-chip: 9999px;
+
+  --border-card: 1px solid rgba(255, 255, 255, 0.9);
+  --app-bg: linear-gradient(135deg, #ede2ff 0%, #d9eaff 22%, #d2f5e9 44%, #fff0d9 66%, #ffd9ec 88%, #e6d9ff 100%);
+  --iridescent: linear-gradient(135deg, #06b6d4 0%, #a855f7 25%, #ec4899 50%, #f59e0b 75%, #10b981 100%);
+
+  --shadow-soft:   0 4px 12px rgba(26, 31, 58, 0.06);
+  --shadow-card:   0 8px 24px rgba(26, 31, 58, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  --shadow-lifted: 0 14px 30px rgba(168, 85, 247, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  --shadow-cta:    0 14px 30px rgba(168, 85, 247, 0.5);
+  --shadow-glow-primary: 0 0 0 4px rgba(168, 85, 247, 0.25);
+  --shadow-glow-accent:  0 0 0 4px rgba(245, 158, 11, 0.25);
+}
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -13,10 +194,11 @@
     padding: 0;
   }
   body {
-    font-family: 'Noto Sans KR', system-ui, sans-serif;
-    /* 따뜻한 크림 톤 배경 — 순백 대신 종이/상아 느낌 */
-    background-color: #fdfcf8;
-    color: #1e1b4b; /* primary-950, 잉크 느낌의 짙은 인디고 */
+    font-family: var(--font-sans), system-ui, sans-serif;
+    /* 테마별 배경 (default 크림 / G 크림 / I 모눈 / J 크림 / M 오로라) */
+    background: var(--app-bg);
+    background-attachment: fixed;
+    color: rgb(var(--c-primary-950)); /* 잉크 느낌의 짙은 브랜드 컬러 */
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
@@ -33,7 +215,7 @@
   /* 접근성: 키보드 포커스만 강조 (마우스 클릭은 깔끔하게) */
   :focus { outline: none; }
   :focus-visible {
-    outline: 3px solid theme('colors.primary.500');
+    outline: 3px solid rgb(var(--c-primary-500));
     outline-offset: 2px;
     border-radius: 8px;
   }
@@ -51,76 +233,98 @@
 @layer components {
   /* ─── 버튼 ─────────────────────────────────────────────────────────────── */
   .btn-primary {
-    @apply bg-primary-600 text-white font-semibold py-3 px-6 rounded-xl
-           shadow-soft
-           hover:bg-primary-700 hover:shadow-card
+    @apply bg-primary-600 text-white font-semibold py-3 px-6
+           hover:bg-primary-700
            active:scale-95 active:bg-primary-800
            transition-all duration-150 select-none
            disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-primary-600;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-cta);
   }
   .btn-secondary {
-    @apply bg-white text-primary-700 border border-primary-200 font-semibold py-3 px-6 rounded-xl
-           shadow-soft
-           hover:bg-primary-50 hover:border-primary-300
+    @apply bg-white text-primary-700 font-semibold py-3 px-6
+           hover:bg-primary-50
            active:scale-95
            transition-all duration-150 select-none;
+    border-radius: var(--radius-xl);
+    border: var(--border-card);
+    box-shadow: var(--shadow-soft);
   }
   .btn-accent {
-    @apply bg-accent-500 text-white font-semibold py-3 px-6 rounded-xl
-           shadow-soft
-           hover:bg-accent-600 hover:shadow-card
+    @apply bg-accent-500 text-white font-semibold py-3 px-6
+           hover:bg-accent-600
            active:scale-95
            transition-all duration-150 select-none;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-cta);
   }
   .btn-ghost {
-    @apply text-slate-500 font-medium py-2 px-4 rounded-lg
+    @apply text-slate-500 font-medium py-2 px-4
            hover:bg-slate-100 hover:text-slate-700
            active:bg-slate-200
            transition-all duration-150 select-none;
+    border-radius: var(--radius-lg);
   }
 
   /* ─── 카드 ─────────────────────────────────────────────────────────────── */
   .card {
-    @apply bg-white rounded-2xl shadow-card border border-canvas-200 p-4;
+    @apply bg-white p-4;
+    border-radius: var(--radius-2xl);
+    border: var(--border-card);
+    box-shadow: var(--shadow-card);
   }
   .card-lifted {
-    @apply bg-white rounded-2xl shadow-lifted border border-canvas-200 p-5;
+    @apply bg-white p-5;
+    border-radius: var(--radius-2xl);
+    border: var(--border-card);
+    box-shadow: var(--shadow-lifted);
   }
   /* 메인 hero 카드 — 결과 화면, 통계 강조 등에 사용 */
   .card-hero {
-    @apply bg-gradient-to-br from-white via-canvas-50 to-canvas-100
-           rounded-3xl shadow-lifted border border-canvas-200 p-6;
+    @apply bg-gradient-to-br from-white via-canvas-50 to-canvas-100 p-6;
+    border-radius: var(--radius-3xl);
+    border: var(--border-card);
+    box-shadow: var(--shadow-lifted);
   }
 
   /* ─── 선택 버튼 (퀴즈 보기) ──────────────────────────────────────────── */
   .choice-btn {
-    @apply bg-white border-2 border-canvas-200 rounded-xl font-semibold text-primary-900
-           shadow-soft
-           hover:border-primary-300 hover:bg-primary-50
+    @apply bg-white font-semibold text-primary-900
+           hover:bg-primary-50
            active:scale-95
            transition-all duration-150 select-none cursor-pointer
            flex items-center justify-center;
+    border-radius: var(--radius-xl);
+    border: var(--border-card);
+    box-shadow: var(--shadow-soft);
   }
   .choice-btn-correct {
-    @apply bg-success-50 border-success-500 text-success-700
-           shadow-card animate-pop;
+    @apply bg-success-50 text-success-700 animate-pop;
+    border-color: rgb(var(--c-success-500));
+    box-shadow: var(--shadow-card);
   }
   .choice-btn-wrong {
-    @apply bg-danger-50 border-danger-500 text-danger-700
-           animate-shake;
+    @apply bg-danger-50 text-danger-700 animate-shake;
+    border-color: rgb(var(--c-danger-500));
   }
   .choice-btn-selected {
-    @apply bg-primary-50 border-primary-500 text-primary-700 shadow-glow-primary;
+    @apply bg-primary-50 text-primary-700;
+    border-color: rgb(var(--c-primary-500));
+    box-shadow: var(--shadow-glow-primary);
   }
 
   /* ─── 모드 카드 (Home의 훈련 선택) ─────────────────────────────────── */
   .mode-card {
-    @apply relative bg-white rounded-2xl shadow-card border border-canvas-200 p-4 text-left
-           hover:shadow-lifted hover:-translate-y-0.5
+    @apply relative bg-white p-4 text-left
+           hover:-translate-y-0.5
            active:scale-[0.97]
            transition-all duration-200 select-none cursor-pointer
            overflow-hidden;
+    border-radius: var(--radius-2xl);
+    border: var(--border-card);
+    box-shadow: var(--shadow-card);
   }
+  .mode-card:hover { box-shadow: var(--shadow-lifted); }
   /* 모드별 상단 색상 띠 — 인라인 스타일로 색상 지정 */
   .mode-card::before {
     content: '';
@@ -129,24 +333,62 @@
     left: 0;
     right: 0;
     height: 4px;
-    background: var(--mode-accent, theme('colors.primary.500'));
-    border-radius: 1rem 1rem 0 0;
+    background: var(--mode-accent, rgb(var(--c-primary-500)));
+    border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
   }
 
   /* ─── 뱃지 ─────────────────────────────────────────────────────────────── */
   .badge {
-    @apply inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold;
+    @apply inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold;
+    border-radius: var(--radius-chip);
   }
-  .badge-primary { @apply badge bg-primary-50 text-primary-700 border border-primary-200; }
-  .badge-accent  { @apply badge bg-accent-50  text-accent-700  border border-accent-200; }
-  .badge-muted   { @apply badge bg-canvas-100 text-slate-600   border border-canvas-200; }
+  .badge-primary { @apply badge bg-primary-50 text-primary-700; border: 1px solid rgb(var(--c-primary-200)); }
+  .badge-accent  { @apply badge bg-accent-50  text-accent-700;  border: 1px solid rgb(var(--c-accent-200)); }
+  .badge-muted   { @apply badge bg-canvas-100 text-slate-600;   border: var(--border-card); }
 
   /* ─── 큰 숫자 (정답률, 점수 등) ───────────────────────────────────── */
   .hero-number {
-    @apply font-display font-bold text-primary-700 tabular-nums leading-none;
+    @apply font-display font-bold tabular-nums leading-none;
+    color: rgb(var(--c-primary-700));
   }
   .hero-number-accent {
-    @apply font-display font-bold text-accent-600 tabular-nums leading-none;
+    @apply font-display font-bold tabular-nums leading-none;
+    color: rgb(var(--c-accent-600));
+  }
+}
+
+/* ── M 테마: 글래스 카드 + 그라데이션 큰 숫자 ──────────────────────────── */
+[data-theme="m"] .card,
+[data-theme="m"] .card-lifted,
+[data-theme="m"] .choice-btn,
+[data-theme="m"] .btn-secondary {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+[data-theme="m"] .card-hero {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+[data-theme="m"] .hero-number {
+  background: var(--iridescent);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* iOS 투명도 줄이기 / 저사양: 글래스 블러 제거하고 불투명 처리 */
+@media (prefers-reduced-transparency: reduce) {
+  [data-theme="m"] .card,
+  [data-theme="m"] .card-lifted,
+  [data-theme="m"] .card-hero,
+  [data-theme="m"] .choice-btn,
+  [data-theme="m"] .btn-secondary {
+    background: #fdfcff;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 }
 
@@ -159,18 +401,18 @@
   /* 피아노 건반 가로 스크롤 — 항상 보이는 얇은 스크롤바 (macOS/iOS 대응) */
   .piano-scroll {
     scrollbar-width: thin;
-    scrollbar-color: #6366f1 #e0e7ff;
+    scrollbar-color: rgb(var(--c-primary-500)) rgb(var(--c-primary-100));
   }
   .piano-scroll::-webkit-scrollbar { height: 10px; }
   .piano-scroll::-webkit-scrollbar-track {
-    background: #e0e7ff;
+    background: rgb(var(--c-primary-100));
     border-radius: 5px;
   }
   .piano-scroll::-webkit-scrollbar-thumb {
-    background: #6366f1;
+    background: rgb(var(--c-primary-500));
     border-radius: 5px;
   }
-  .piano-scroll::-webkit-scrollbar-thumb:hover { background: #4f46e5; }
+  .piano-scroll::-webkit-scrollbar-thumb:hover { background: rgb(var(--c-primary-600)); }
 
   /* 모드 카드별 색상 띠 변수 헬퍼 */
   .accent-solfege     { --mode-accent: #f59e0b; } /* 골드 */

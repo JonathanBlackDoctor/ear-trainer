@@ -30,7 +30,7 @@ export function Badges() {
   }));
 
   return (
-    <div className="min-h-screen bg-canvas-50 pb-10">
+    <div className="min-h-screen pb-10">
       <header className="bg-white border-b border-slate-100 px-4 py-4 sticky top-0 z-10">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button className="btn-ghost py-1 px-2 text-sm" onClick={() => navigate('/')}>← 홈</button>

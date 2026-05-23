@@ -73,7 +73,7 @@ export function Stats() {
   ).sort((a, b) => b.score - a.score).slice(0, 8);
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-8">
+    <div className="min-h-screen pb-8">
       <div className="bg-white border-b border-slate-100 px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button className="btn-ghost focus-ring" onClick={() => navigate('/')} aria-label="홈으로 돌아가기">← 뒤로</button>
