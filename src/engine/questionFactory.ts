@@ -29,7 +29,8 @@ import {
 } from '../modes/levels';
 import { pickDue } from './srs';
 import {
-  SCALE_LEVELS, CADENCE_PATTERNS, CADENCE_LEVELS, KEY_LEVELS, INVERSION_LEVELS,
+  SCALE_LEVELS, CADENCE_PATTERNS, CADENCE_LEVELS, KEY_LEVELS,
+  INVERSION_LEVELS, INVERSION_SEVENTHS,
   COMPARE_FIRST, COMPARE_SECOND, COMPARE_SAME, COMPARE_LEVELS,
   ODD_LEVELS, CONTOUR_LEVELS, CONTOUR_LABEL,
   TUNING_IN_TUNE, TUNING_SHARP, TUNING_FLAT, TUNING_CENTS,
@@ -48,11 +49,6 @@ export function nextTarget(
   if (candidates.length === 0) return '';
   if (!srs || !stats) return pickRandom(candidates);
   return pickDue(srs, stats, candidates, Date.now(), lastKey);
-}
-
-function randomKey(keyMode: 'fixed' | 'random', fixedKey: string): string {
-  if (keyMode === 'fixed') return fixedKey;
-  return pickRandom(COMMON_KEYS);
 }
 
 // UUID polyfill for browser
@@ -430,6 +426,7 @@ const SCALE_TONAL_NAMES: Record<string, string> = {
   'phrygian': 'phrygian',
   'lydian': 'lydian',
   'mixolydian': 'mixolydian',
+  'locrian': 'locrian',
 };
 
 export function makeScaleQuestion(level: number): Question {
@@ -441,7 +438,8 @@ export function makeScaleQuestion(level: number): Question {
   // Add upper tonic (octave above) so it sounds like a complete scale
   const upper = Note.transpose(tonic + '4', '8P');
   const fullNotes = [...scaleNotes, upper];
-  const direction: 'up' | 'down' = level >= 3 && Math.random() < 0.5 ? 'down' : 'up';
+  // Descending playback only at the top tiers, where it adds difficulty.
+  const direction: 'up' | 'down' = level >= 9 && Math.random() < 0.5 ? 'down' : 'up';
   const notes = direction === 'up' ? fullNotes : [...fullNotes].reverse();
 
   return {
@@ -458,12 +456,12 @@ export function makeScaleQuestion(level: number): Question {
 // ─── Lab: Cadence ─────────────────────────────────────────────────────────────
 export function makeCadenceQuestion(
   level: number,
-  keyMode: 'fixed' | 'random',
-  fixedKey: string,
+  _keyMode: 'fixed' | 'random',
+  _fixedKey: string,
 ): Question {
-  const choices = CADENCE_LEVELS[level] ?? CADENCE_LEVELS[1];
-  const cadenceType = pickRandom(choices);
-  const key = randomKey(keyMode, fixedKey);
+  const cfg = CADENCE_LEVELS[level] ?? CADENCE_LEVELS[1];
+  const cadenceType = pickRandom(cfg.types);
+  const key = pickRandom(cfg.keys);
   const pattern = CADENCE_PATTERNS[cadenceType];
   const chords = buildProgressionSteps(pattern, key, 3);
 
@@ -480,12 +478,13 @@ export function makeCadenceQuestion(
 
 // ─── Lab: Key Identification ──────────────────────────────────────────────────
 export function makeKeyIdQuestion(level: number): Question {
-  const choices = KEY_LEVELS[level] ?? KEY_LEVELS[1];
-  const key = pickRandom(choices);
-  // Always I-IV-V-I in the chosen key.
-  const pattern: Array<[number, string]> = [
-    [1, 'major'], [4, 'major'], [5, 'dominant7'], [1, 'major'],
-  ];
+  const cfg = KEY_LEVELS[level] ?? KEY_LEVELS[1];
+  const key = pickRandom(cfg.keys);
+  const mode = pickRandom(cfg.modes);
+  // Major: I-IV-V-I. Minor: i-iv-V-i (harmonic-minor dominant).
+  const pattern: Array<[number, string]> = mode === 'minor'
+    ? [[1, 'minor'], [4, 'minor'], [5, 'dominant7'], [1, 'minor']]
+    : [[1, 'major'], [4, 'major'], [5, 'dominant7'], [1, 'major']];
   const steps = buildProgressionSteps(pattern, key, 3);
   const chords = steps.map((s) => s.notes);
 
@@ -494,7 +493,7 @@ export function makeKeyIdQuestion(level: number): Question {
     mode: 'lab-key',
     level,
     itemKey: `key_${key}`,
-    data: { type: 'key-id', key, mode: 'major', chords },
+    data: { type: 'key-id', key, mode, chords },
     answer: key,
     context: { key, absoluteMode: true },
   };
@@ -502,11 +501,13 @@ export function makeKeyIdQuestion(level: number): Question {
 
 // ─── Lab: Chord Inversion ─────────────────────────────────────────────────────
 export function makeInversionQuestion(level: number): Question {
-  const inversions = INVERSION_LEVELS[level] ?? INVERSION_LEVELS[1];
-  const inv = pickRandom(inversions);
-  // Use a triad for Lv1, possibly 7th for Lv2 with 3rd inversion
-  const useSeventh = level >= 2 && inv === 3;
-  const quality = useSeventh ? 'dominant7' : pickRandom(['major', 'minor']);
+  const cfg = INVERSION_LEVELS[level] ?? INVERSION_LEVELS[1];
+  const inv = pickRandom(cfg.inversions);
+  // A 3rd inversion only exists for 7th chords, so force one in that case.
+  const sevenths = cfg.qualities.filter((q) => INVERSION_SEVENTHS.includes(q));
+  const quality = inv === 3
+    ? (sevenths.length > 0 ? pickRandom(sevenths) : 'dominant7')
+    : pickRandom(cfg.qualities);
   const rootNote = randomNote('C3', 'E4');
   const notes = buildChord(rootNote, quality, inv);
 
