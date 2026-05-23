@@ -4,6 +4,15 @@ import { useStore } from '../store/useStore';
 import { toast } from '../store/useToast';
 import { usePwaInstall } from '../hooks/usePwaInstall';
 import { refreshToLatest } from '../sw-update';
+import type { DesignTheme } from '../types';
+
+const DESIGN_OPTIONS: { value: DesignTheme; label: string; desc: string; swatch: string }[] = [
+  { value: 'default', label: '클래식', desc: '딥 인디고 · 골드 · 크림 (기본)', swatch: '#4f46e5' },
+  { value: 'g', label: 'G · 네오 브루탈리즘', desc: '캔디 색 · 두꺼운 테두리 · 하드 그림자', swatch: '#ff5a8c' },
+  { value: 'i', label: 'I · 모눈 · 데이터', desc: '그래프페이퍼 배경 · 라임 시그널', swatch: '#65a30d' },
+  { value: 'j', label: 'J · 카세트 테이프', desc: 'Y2K 핫핑크 · 틸 · 크롬', swatch: '#ff3da8' },
+  { value: 'm', label: 'M · 오로라 · 글래스', desc: '이리데센트 그라데이션 · 글래스 카드', swatch: '#a855f7' },
+];
 
 export function Settings() {
   const navigate = useNavigate();
@@ -85,7 +94,7 @@ export function Settings() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-10">
+    <div className="min-h-screen pb-10">
       <div className="bg-white border-b border-slate-100 px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button className="btn-ghost focus-ring" onClick={() => navigate('/')} aria-label="홈으로 돌아가기">← 뒤로</button>
@@ -137,6 +146,41 @@ export function Settings() {
             </div>
           </div>
         )}
+
+        {/* Design theme */}
+        <div className="card">
+          <div className="text-sm font-semibold text-slate-600 mb-1">디자인 테마</div>
+          <div className="text-xs text-slate-400 mb-3">앱 전체의 색·폰트·모양을 바꿔요</div>
+          <div className="flex flex-col gap-2">
+            {DESIGN_OPTIONS.map((opt) => {
+              const active = settings.design === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  aria-pressed={active}
+                  className={`flex items-center gap-3 py-2.5 px-3 rounded-lg text-left transition-colors ${
+                    active ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-600'
+                  }`}
+                  onClick={() => updateSettings({ design: opt.value })}
+                >
+                  <span
+                    className="w-5 h-5 rounded-full border border-black/10 shrink-0"
+                    style={{ background: opt.swatch }}
+                    aria-hidden
+                  />
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-sm font-semibold leading-tight">{opt.label}</span>
+                    <span className={`block text-xs leading-snug ${active ? 'text-white/80' : 'text-slate-400'}`}>
+                      {opt.desc}
+                    </span>
+                  </span>
+                  {active && <span className="text-white" aria-hidden>✓</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         {/* Notation */}
         <div className="card">

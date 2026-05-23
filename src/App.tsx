@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { RouteSpinner } from './components/RouteSpinner';
 import { ToastContainer } from './components/Toast';
+import { useThemeSync } from './hooks/useThemeSync';
 
 // Lazy-load each route so the initial bundle stays small. Train.tsx (~1100 LOC)
 // and the Recharts dependency in Stats are the biggest wins here.
@@ -15,6 +16,7 @@ const Lab = lazy(() => import('./screens/Lab').then((m) => ({ default: m.Lab }))
 const Badges = lazy(() => import('./screens/Badges').then((m) => ({ default: m.Badges })));
 
 export default function App() {
+  useThemeSync();
   return (
     <ErrorBoundary>
       <HashRouter>

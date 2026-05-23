@@ -75,7 +75,7 @@ export function Result() {
     .filter(Boolean);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen flex flex-col">
       <div className="bg-white border-b border-slate-100 px-4 py-4">
         <h1 className="max-w-lg mx-auto font-semibold text-slate-700">세션 결과</h1>
       </div>

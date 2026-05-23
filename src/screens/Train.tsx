@@ -687,7 +687,7 @@ export function Train() {
   // ─── Setup Screen ─────────────────────────────────────────────────────────
   if (phase === 'setup' || !audioReady) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="min-h-screen flex flex-col">
         <div className="bg-white border-b border-slate-100 px-4 py-4">
           <div className="max-w-lg mx-auto flex items-center gap-3">
             <button className="btn-ghost" onClick={() => navigate('/')}>← 뒤로</button>
@@ -831,7 +831,7 @@ export function Train() {
     : 3;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen flex flex-col">
       {/* Header */}
       <div className="bg-white border-b border-slate-100 px-4 py-3">
         <div className="max-w-lg mx-auto">

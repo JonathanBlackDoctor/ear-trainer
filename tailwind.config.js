@@ -10,9 +10,11 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Noto Sans KR', 'system-ui', 'sans-serif'],
+        // Driven by CSS vars so each theme can swap the family (default = Noto,
+        // the four designer directions = Pretendard). See src/index.css.
+        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
         // 헤드라인 / 큰 숫자 / 정답률 표시용 (클래식한 무게감)
-        display: ['Noto Serif KR', 'Noto Sans KR', 'serif'],
+        display: ['var(--font-display)', 'system-ui', 'serif'],
       },
       fontSize: {
         // 디스플레이용 큰 숫자: 정답률, 결과 점수 등
@@ -21,65 +23,73 @@ export default {
         'display-lg': ['4.75rem', { lineHeight: '1', letterSpacing: '-0.03em', fontWeight: '700' }],
       },
       colors: {
-        // 딥 인디고 (피아노 건반의 검은 건반, 잉크, 경건함)
+        // All palettes are driven by CSS custom properties (space-separated RGB
+        // triples) defined per-theme in src/index.css. The `<alpha-value>`
+        // placeholder lets Tailwind's opacity modifiers (e.g. bg-primary-500/20)
+        // keep working. Switching `<html data-theme>` re-skins every utility.
         primary: {
-          50:  '#eef2ff',
-          100: '#e0e7ff',
-          200: '#c7d2fe',
-          300: '#a5b4fc',
-          400: '#818cf8',
-          500: '#6366f1',
-          600: '#4f46e5',
-          700: '#4338ca',
-          800: '#3730a3',
-          900: '#312e81',
-          950: '#1e1b4b',
+          50:  'rgb(var(--c-primary-50) / <alpha-value>)',
+          100: 'rgb(var(--c-primary-100) / <alpha-value>)',
+          200: 'rgb(var(--c-primary-200) / <alpha-value>)',
+          300: 'rgb(var(--c-primary-300) / <alpha-value>)',
+          400: 'rgb(var(--c-primary-400) / <alpha-value>)',
+          500: 'rgb(var(--c-primary-500) / <alpha-value>)',
+          600: 'rgb(var(--c-primary-600) / <alpha-value>)',
+          700: 'rgb(var(--c-primary-700) / <alpha-value>)',
+          800: 'rgb(var(--c-primary-800) / <alpha-value>)',
+          900: 'rgb(var(--c-primary-900) / <alpha-value>)',
+          950: 'rgb(var(--c-primary-950) / <alpha-value>)',
         },
-        // 골드 (악기 황동, 성가대 빛, 음악적 따뜻함)
         accent: {
-          50:  '#fffbeb',
-          100: '#fef3c7',
-          200: '#fde68a',
-          300: '#fcd34d',
-          400: '#fbbf24',
-          500: '#f59e0b',
-          600: '#d97706',
-          700: '#b45309',
-          800: '#92400e',
-          900: '#78350f',
+          50:  'rgb(var(--c-accent-50) / <alpha-value>)',
+          100: 'rgb(var(--c-accent-100) / <alpha-value>)',
+          200: 'rgb(var(--c-accent-200) / <alpha-value>)',
+          300: 'rgb(var(--c-accent-300) / <alpha-value>)',
+          400: 'rgb(var(--c-accent-400) / <alpha-value>)',
+          500: 'rgb(var(--c-accent-500) / <alpha-value>)',
+          600: 'rgb(var(--c-accent-600) / <alpha-value>)',
+          700: 'rgb(var(--c-accent-700) / <alpha-value>)',
+          800: 'rgb(var(--c-accent-800) / <alpha-value>)',
+          900: 'rgb(var(--c-accent-900) / <alpha-value>)',
         },
-        // 따뜻한 크림 배경 (순백색보다 부드러움 — 종이/상아 느낌)
         canvas: {
-          50:  '#fdfcf8',
-          100: '#faf8f1',
-          200: '#f3efe2',
+          50:  'rgb(var(--c-canvas-50) / <alpha-value>)',
+          100: 'rgb(var(--c-canvas-100) / <alpha-value>)',
+          200: 'rgb(var(--c-canvas-200) / <alpha-value>)',
         },
-        // 정답 — 차분한 sage green (요란하지 않게)
         success: {
-          50:  '#f0fdf4',
-          100: '#dcfce7',
-          400: '#4ade80',
-          500: '#22c55e',
-          600: '#16a34a',
-          700: '#15803d',
+          50:  'rgb(var(--c-success-50) / <alpha-value>)',
+          100: 'rgb(var(--c-success-100) / <alpha-value>)',
+          400: 'rgb(var(--c-success-400) / <alpha-value>)',
+          500: 'rgb(var(--c-success-500) / <alpha-value>)',
+          600: 'rgb(var(--c-success-600) / <alpha-value>)',
+          700: 'rgb(var(--c-success-700) / <alpha-value>)',
         },
-        // 오답 — 따뜻한 rose (공격적이지 않게)
         danger: {
-          50:  '#fff1f2',
-          100: '#ffe4e6',
-          400: '#fb7185',
-          500: '#f43f5e',
-          600: '#e11d48',
-          700: '#be123c',
+          50:  'rgb(var(--c-danger-50) / <alpha-value>)',
+          100: 'rgb(var(--c-danger-100) / <alpha-value>)',
+          400: 'rgb(var(--c-danger-400) / <alpha-value>)',
+          500: 'rgb(var(--c-danger-500) / <alpha-value>)',
+          600: 'rgb(var(--c-danger-600) / <alpha-value>)',
+          700: 'rgb(var(--c-danger-700) / <alpha-value>)',
         },
       },
+      borderRadius: {
+        // Themed radius scale. `full`/`md`/`sm` keep Tailwind defaults so true
+        // circles (spinners, knobs) stay round in every theme.
+        lg:    'var(--radius-lg)',
+        xl:    'var(--radius-xl)',
+        '2xl': 'var(--radius-2xl)',
+        '3xl': 'var(--radius-3xl)',
+      },
       boxShadow: {
-        // 더 부드럽고 따뜻한 그림자 (인디고 톤이 살짝 섞임)
-        'soft':    '0 1px 2px 0 rgb(49 46 129 / 0.04), 0 1px 3px 0 rgb(49 46 129 / 0.06)',
-        'card':    '0 2px 4px -1px rgb(49 46 129 / 0.06), 0 4px 12px -2px rgb(49 46 129 / 0.08)',
-        'lifted':  '0 10px 25px -5px rgb(49 46 129 / 0.12), 0 6px 12px -4px rgb(49 46 129 / 0.08)',
-        'glow-primary': '0 0 0 4px rgb(99 102 241 / 0.15)',
-        'glow-accent':  '0 0 0 4px rgb(245 158 11 / 0.2)',
+        // Themed shadows — soft/blurred for default & M, hard offsets for G & J,
+        // none for I. Defined per-theme in src/index.css.
+        'soft':    'var(--shadow-soft)',
+        'card':    'var(--shadow-card)',
+        'lifted':  'var(--shadow-lifted)',
+        'glow-primary': 'var(--shadow-glow-primary)',
+        'glow-accent':  'var(--shadow-glow-accent)',
       },
       animation: {
         'fade-in':   'fadeIn 0.2s ease-out',

@@ -32,7 +32,7 @@ export function Lab() {
   }
 
   return (
-    <div className="min-h-screen bg-canvas-50 pb-10">
+    <div className="min-h-screen pb-10">
       <header className="bg-gradient-to-br from-primary-700 via-primary-800 to-primary-900 text-white">
         <div className="max-w-lg mx-auto px-5 pt-6 pb-8">
           <button
