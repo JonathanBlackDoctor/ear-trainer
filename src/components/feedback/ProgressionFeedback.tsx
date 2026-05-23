@@ -1,24 +1,15 @@
 import React from 'react';
 import type { ProgressionJudgeDetails } from '../../engine/judge';
+import { formatDegree } from '../../modes/progressionMode';
 
 interface Props {
   details: ProgressionJudgeDetails;
   notation: 'roman' | 'number';
 }
 
-const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
-
-function romanize(degree: number, quality: string): string {
-  const r = ROMAN[degree] ?? String(degree);
-  const isMinor = ['m', 'dim', 'm7', 'm7b5'].includes(quality);
-  return isMinor ? r.toLowerCase() : r;
-}
-
 function formatStep(degree: number | undefined, quality: string | undefined, notation: 'roman' | 'number'): string {
   if (degree === undefined || quality === undefined) return '—';
-  if (notation === 'roman') return romanize(degree, quality);
-  const suffix = ['m', 'dim', 'm7', 'm7b5'].includes(quality) ? 'm' : '';
-  return `${degree}${suffix}`;
+  return formatDegree(degree, quality, notation);
 }
 
 export function ProgressionFeedback({ details, notation }: Props) {
@@ -44,10 +35,6 @@ export function ProgressionFeedback({ details, notation }: Props) {
               <div className="text-center">
                 {s.fullOk ? (
                   <span className="text-emerald-500 font-bold">✓</span>
-                ) : s.degreeOk ? (
-                  <span className="text-amber-600 text-[10px]">자리○ 성질✗</span>
-                ) : s.qualityOk ? (
-                  <span className="text-amber-600 text-[10px]">자리✗ 성질○</span>
                 ) : (
                   <span className="text-red-500 font-bold">✗</span>
                 )}

@@ -28,7 +28,7 @@ import { ModeFeedback } from '../components/feedback';
 import { getIntervalChoices } from '../modes/intervalMode';
 import { getChordChoices } from '../modes/chordMode';
 import { getSolfegeChoices, getNoteNameChoices } from '../modes/solfegeMode';
-import { getDegreeChoices } from '../modes/progressionMode';
+import { getDegreeChoices, formatDegree } from '../modes/progressionMode';
 import {
   getScaleChoices, getCadenceChoices, getInversionChoices,
   getIntervalCompareChoices, getOddNoteChoices, getContourChoices, getTuningChoices,
@@ -1032,7 +1032,7 @@ export function Train() {
                     <div className="flex gap-2 flex-wrap justify-center">
                       {progressionInput.map((p, i) => (
                         <span key={i} className="bg-primary-100 text-primary-700 px-3 py-1.5 rounded-lg font-semibold text-sm">
-                          {settings.notation === 'number' ? `${p.degree}${['m','dim','m7','m7b5'].includes(p.quality) ? 'm' : ''}` : romanize(p.degree, p.quality)}
+                          {formatDegree(p.degree, p.quality, settings.notation)}
                         </span>
                       ))}
                     </div>
@@ -1226,9 +1226,7 @@ export function Train() {
                 <div className="flex gap-2 flex-wrap justify-center">
                   {(feedbackResult.correctAnswer as ProgressionAnswer[]).map((p, i) => (
                     <span key={i} className="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg font-semibold text-sm">
-                      {settings.notation === 'number'
-                        ? `${p.degree}${['m','dim','m7','m7b5'].includes(p.quality) ? 'm' : ''}`
-                        : romanize(p.degree, p.quality)}
+                      {formatDegree(p.degree, p.quality, settings.notation)}
                     </span>
                   ))}
                 </div>
@@ -1292,21 +1290,12 @@ function formatAnswer(answer: unknown, mode: ModeKey, notation: 'roman' | 'numbe
   if (Array.isArray(answer)) {
     if (mode === 'progression') {
       return (answer as ProgressionAnswer[])
-        .map((p) => notation === 'number'
-          ? `${p.degree}${['m','dim','m7','m7b5'].includes(p.quality) ? 'm' : ''}`
-          : romanize(p.degree, p.quality))
+        .map((p) => formatDegree(p.degree, p.quality, notation))
         .join(' → ');
     }
     return (answer as string[]).join(', ');
   }
   return String(answer);
-}
-
-const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
-function romanize(degree: number, quality: string): string {
-  const r = ROMAN[degree] ?? degree.toString();
-  const isMinor = ['m', 'dim', 'm7', 'm7b5'].includes(quality);
-  return isMinor ? r.toLowerCase() : r;
 }
 
 // ─── Progression Input Component ────────────────────────────────────────────
