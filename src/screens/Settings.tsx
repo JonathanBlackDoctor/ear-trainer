@@ -13,6 +13,7 @@ export function Settings() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [orderOpen, setOrderOpen] = useState(false);
   const { canInstall, isStandalone, isIOS, promptInstall } = usePwaInstall();
 
   async function handleRefresh() {
@@ -176,57 +177,78 @@ export function Settings() {
           </div>
         </div>
 
-        {/* Training order — reorder the mode cards on the Home screen */}
+        {/* Training order — collapsible; reorders the mode cards on Home */}
         <div className="card">
-          <div className="flex items-center justify-between mb-1">
-            <div className="text-sm font-semibold text-slate-600">훈련 순서</div>
-            <button
-              type="button"
-              className="text-xs text-primary-600 font-semibold focus-ring"
-              onClick={resetModeOrder}
+          <button
+            type="button"
+            className="w-full flex items-center justify-between focus-ring"
+            onClick={() => setOrderOpen((v) => !v)}
+            aria-expanded={orderOpen}
+            aria-controls="mode-order-list"
+          >
+            <div className="text-left">
+              <div className="text-sm font-semibold text-slate-600">훈련 순서</div>
+              <div className="text-xs text-slate-400 mt-0.5">
+                홈 화면 훈련 카드의 순서를 바꿉니다 · {modeOrder.length}개
+              </div>
+            </div>
+            <span
+              className={`text-slate-400 transition-transform ${orderOpen ? 'rotate-180' : ''}`}
+              aria-hidden
             >
-              기본값
-            </button>
-          </div>
-          <div className="text-xs text-slate-400 mb-3">
-            홈 화면에 표시되는 훈련 카드의 순서를 바꿉니다.
-          </div>
-          <ul className="space-y-1.5">
-            {modeOrder.map((key, i) => {
-              const info = MODE_REGISTRY[key as ModeKey];
-              if (!info) return null;
-              return (
-                <li
-                  key={key}
-                  className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2"
+              ▾
+            </span>
+          </button>
+
+          {orderOpen && (
+            <div id="mode-order-list" className="mt-3">
+              <div className="flex justify-end mb-2">
+                <button
+                  type="button"
+                  className="text-xs text-primary-600 font-semibold focus-ring"
+                  onClick={resetModeOrder}
                 >
-                  <span className="text-lg" aria-hidden>{info.emoji}</span>
-                  <span className="flex-1 text-sm font-medium text-slate-700 leading-tight">
-                    {info.name}
-                  </span>
-                  <span className="text-[11px] tabular-nums text-slate-400 w-5 text-right">{i + 1}</span>
-                  <button
-                    type="button"
-                    className="w-8 h-8 rounded-md bg-white border border-slate-200 text-slate-600 disabled:opacity-30 focus-ring active:scale-95"
-                    onClick={() => moveMode(i, -1)}
-                    disabled={i === 0}
-                    aria-label={`${info.name} 위로`}
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    className="w-8 h-8 rounded-md bg-white border border-slate-200 text-slate-600 disabled:opacity-30 focus-ring active:scale-95"
-                    onClick={() => moveMode(i, 1)}
-                    disabled={i === modeOrder.length - 1}
-                    aria-label={`${info.name} 아래로`}
-                  >
-                    ↓
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+                  기본값으로
+                </button>
+              </div>
+              <ul className="space-y-1.5">
+                {modeOrder.map((key, i) => {
+                  const info = MODE_REGISTRY[key as ModeKey];
+                  if (!info) return null;
+                  return (
+                    <li
+                      key={key}
+                      className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2"
+                    >
+                      <span className="text-lg" aria-hidden>{info.emoji}</span>
+                      <span className="flex-1 text-sm font-medium text-slate-700 leading-tight">
+                        {info.name}
+                      </span>
+                      <span className="text-[11px] tabular-nums text-slate-400 w-5 text-right">{i + 1}</span>
+                      <button
+                        type="button"
+                        className="w-8 h-8 rounded-md bg-white border border-slate-200 text-slate-600 disabled:opacity-30 focus-ring active:scale-95"
+                        onClick={() => moveMode(i, -1)}
+                        disabled={i === 0}
+                        aria-label={`${info.name} 위로`}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        className="w-8 h-8 rounded-md bg-white border border-slate-200 text-slate-600 disabled:opacity-30 focus-ring active:scale-95"
+                        onClick={() => moveMode(i, 1)}
+                        disabled={i === modeOrder.length - 1}
+                        aria-label={`${info.name} 아래로`}
+                      >
+                        ↓
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </div>
 
         {/* Reference tone */}
