@@ -19,7 +19,35 @@ export type ModeKey =
   | 'lab-function'
   | 'lab-extended'
   | 'lab-bass'
-  | 'lab-tension';
+  | 'lab-tension'
+  // Audio-engineer (mixing) modes: EQ/FX listening on noise or a synthesized loop.
+  | 'mix-eq-freq'
+  | 'mix-eq-boostcut'
+  | 'mix-filter'
+  | 'mix-compression'
+  | 'mix-reverb-amount'
+  | 'mix-reverb-type'
+  | 'mix-delay-time'
+  | 'mix-pan'
+  | 'mix-width'
+  | 'mix-level'
+  | 'mix-distortion'
+  | 'mix-modulation';
+
+// Discriminator for the unified MixData payload — one per audio-engineer mode.
+export type MixEffect =
+  | 'eq-freq'
+  | 'eq-boostcut'
+  | 'filter'
+  | 'compression'
+  | 'reverb-amount'
+  | 'reverb-type'
+  | 'delay-time'
+  | 'pan'
+  | 'width'
+  | 'level'
+  | 'distortion'
+  | 'modulation';
 
 // ─── Question & Answer ────────────────────────────────────────────────────────
 export interface Question {
@@ -53,7 +81,8 @@ export type QuestionData =
   | ContourData
   | TuningData
   | FunctionData
-  | TensionData;
+  | TensionData
+  | MixData;
 
 export interface IntervalData {
   type: 'interval';
@@ -183,6 +212,18 @@ export interface TensionData {
   tension: string;       // tension code, e.g. "9", "b9"
 }
 
+// Unified payload for every audio-engineer (mix-*) mode. One shape instead of
+// twelve so the playback dispatch and judge stay small; `effect` selects the
+// Tone.js processing chain and `params` carries its numeric/string settings.
+export interface MixData {
+  type: 'mix';
+  effect: MixEffect;
+  source: 'pink' | 'loop';   // pink noise or the synthesized groove bed
+  compare: 'none' | 'ab';    // 'ab' plays bypassed → gap → processed
+  params: Record<string, number | string>;
+  detail: string;            // human-readable answer detail, e.g. "2 kHz · +6 dB"
+}
+
 export interface BpmData {
   type: 'bpm';
   bpm: number;          // actual BPM played
@@ -248,6 +289,9 @@ export interface AppSettings {
   // User-defined ordering of training modes on the Home screen. Reconciled
   // against the current mode registry at read time (see resolveModeOrder).
   modeOrder?: ModeKey[];
+  // Modes the user has hidden from the Home screen. They remain in the order
+  // editor (so they can be un-hidden) and stay directly reachable by URL.
+  hiddenModes?: ModeKey[];
 }
 
 // Visual theme. 'default' is the original classic look; g/i/j/m are the four

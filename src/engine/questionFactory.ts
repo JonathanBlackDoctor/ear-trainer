@@ -1,5 +1,6 @@
 import { Note, Scale } from 'tonal';
-import type { Question, ChordStep, ProgressionAnswer, ModeSrs, ModeStats } from '../types';
+import type { Question, ChordStep, ProgressionAnswer, ModeSrs, ModeStats, ModeKey, MixEffect } from '../types';
+import { getMixChoices, buildMix } from '../modes/mixModes';
 import {
   INTERVAL_LEVELS,
   type IntervalDirection,
@@ -742,6 +743,33 @@ export function makeTensionQuestion(level: number, opts?: SelectOpts): Question 
     itemKey,
     data: { type: 'tension', root: rootNote, baseNotes, fullNotes, tension: code },
     answer: TENSION_LABEL[code],
+    context: { key: 'C', absoluteMode: true },
+  };
+}
+
+// ─── Audio-engineer (mix) modes ─────────────────────────────────────────────
+export function makeMixQuestion(mode: ModeKey, level: number, opts?: SelectOpts): Question {
+  const effect = mode.replace(/^mix-/, '') as MixEffect;
+  const choices = getMixChoices(effect, level);
+  const itemKeys = choices.map((c) => `${effect}_${c.value}`);
+  const itemKey = selectItemKey(itemKeys, opts);
+  const value = itemKey.slice(effect.length + 1);
+  const build = buildMix(effect, level, value);
+
+  return {
+    id: genId(),
+    mode,
+    level,
+    itemKey,
+    data: {
+      type: 'mix',
+      effect,
+      source: build.source,
+      compare: build.compare,
+      params: build.params,
+      detail: build.detail,
+    },
+    answer: value,
     context: { key: 'C', absoluteMode: true },
   };
 }

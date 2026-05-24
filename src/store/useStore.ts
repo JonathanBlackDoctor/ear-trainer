@@ -53,56 +53,17 @@ const defaultSettings: AppSettings = {
   reducedMotion: 'system',
   design: 'default',
   modeOrder: DEFAULT_MODE_ORDER,
+  hiddenModes: [],
 };
 
-const emptyModeStats = (): ModeStats => ({});
-const emptyModeSrs = (): ModeSrs => ({});
+// Stats and SRS maps cover every registered mode. Building them from
+// DEFAULT_MODE_ORDER (instead of a hand-maintained literal) means newly added
+// modes are included automatically and the two maps can never drift.
+const defaultStats = (): Record<ModeKey, ModeStats> =>
+  Object.fromEntries(DEFAULT_MODE_ORDER.map((k) => [k, {}])) as Record<ModeKey, ModeStats>;
 
-const defaultStats = (): Record<ModeKey, ModeStats> => ({
-  interval: emptyModeStats(),
-  chord: emptyModeStats(),
-  progression: emptyModeStats(),
-  melody: emptyModeStats(),
-  solfege: emptyModeStats(),
-  transpose: emptyModeStats(),
-  rhythm: emptyModeStats(),
-  tempo: emptyModeStats(),
-  bpm: emptyModeStats(),
-  'lab-scale': emptyModeStats(),
-  'lab-cadence': emptyModeStats(),
-  'lab-inversion': emptyModeStats(),
-  'lab-interval-compare': emptyModeStats(),
-  'lab-odd-note': emptyModeStats(),
-  'lab-contour': emptyModeStats(),
-  'lab-tuning': emptyModeStats(),
-  'lab-function': emptyModeStats(),
-  'lab-extended': emptyModeStats(),
-  'lab-bass': emptyModeStats(),
-  'lab-tension': emptyModeStats(),
-});
-
-const defaultSrs = (): Record<ModeKey, ModeSrs> => ({
-  interval: emptyModeSrs(),
-  chord: emptyModeSrs(),
-  progression: emptyModeSrs(),
-  melody: emptyModeSrs(),
-  solfege: emptyModeSrs(),
-  transpose: emptyModeSrs(),
-  rhythm: emptyModeSrs(),
-  tempo: emptyModeSrs(),
-  bpm: emptyModeSrs(),
-  'lab-scale': emptyModeSrs(),
-  'lab-cadence': emptyModeSrs(),
-  'lab-inversion': emptyModeSrs(),
-  'lab-interval-compare': emptyModeSrs(),
-  'lab-odd-note': emptyModeSrs(),
-  'lab-contour': emptyModeSrs(),
-  'lab-tuning': emptyModeSrs(),
-  'lab-function': emptyModeSrs(),
-  'lab-extended': emptyModeSrs(),
-  'lab-bass': emptyModeSrs(),
-  'lab-tension': emptyModeSrs(),
-});
+const defaultSrs = (): Record<ModeKey, ModeSrs> =>
+  Object.fromEntries(DEFAULT_MODE_ORDER.map((k) => [k, {}])) as Record<ModeKey, ModeSrs>;
 
 const defaultGamification = (): GamificationState => ({
   totalXp: 0,

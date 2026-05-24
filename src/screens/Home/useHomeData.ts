@@ -47,7 +47,10 @@ export function useHomeData(): HomeData {
   const navigate = useNavigate();
   const { settings, stats, sessions, gamification } = useStore();
 
-  const modes: ModeWithStats[] = resolveModeOrder(settings.modeOrder).map((k) => {
+  const hidden = new Set(settings.hiddenModes ?? []);
+  const modes: ModeWithStats[] = resolveModeOrder(settings.modeOrder)
+    .filter((k) => !hidden.has(k))
+    .map((k) => {
     const info = MODE_REGISTRY[k];
     const modeStats = stats[k];
     const items = modeStats ? Object.values(modeStats) : [];
