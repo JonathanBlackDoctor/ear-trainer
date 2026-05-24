@@ -29,7 +29,7 @@ import { ComboOverlay } from '../components/ComboOverlay';
 import { ModeFeedback } from '../components/feedback';
 import { getIntervalChoices } from '../modes/intervalMode';
 import { getChordChoices } from '../modes/chordMode';
-import { getSolfegeChoices, getNoteNameChoices } from '../modes/solfegeMode';
+import { getSolfegeChoices } from '../modes/solfegeMode';
 import { getDegreeChoices, formatDegree } from '../modes/progressionMode';
 import {
   getScaleChoices, getCadenceChoices, getInversionChoices,
@@ -53,13 +53,6 @@ import { semitoneToSolfege } from '../theory/solfege';
 import { topWeakItems, weakFocusLevel } from '../engine/weakness';
 
 const MODE_INFO = MODE_REGISTRY;
-
-// Modes for which the absolute-pitch toggle should be available
-// (pitch-based modes; excludes rhythm/tempo/bpm).
-const ABSOLUTE_TOGGLE_MODES = new Set<ModeKey>([
-  'interval', 'chord', 'solfege', 'progression', 'melody', 'transpose',
-  'lab-scale', 'lab-cadence', 'lab-inversion',
-]);
 
 type TrainPhase = 'setup' | 'playing' | 'answering' | 'feedback' | 'done';
 
@@ -107,7 +100,6 @@ export function Train() {
   const [playbackStage, setPlaybackStage] = useState<'reference' | 'progression' | null>(null);
   const [audioQuality, setAudioQuality] = useState<AudioQuality>('synth');
   const [solfegeInputMethod, setSolfegeInputMethod] = useState<'choice' | 'piano'>('choice');
-  const [absoluteMode, setAbsoluteMode] = useState(false);
 
   const modeKey = mode as ModeKey;
   const modeInfo: ModeInfo = MODE_INFO[modeKey] ?? {
@@ -223,9 +215,7 @@ export function Train() {
   }
 
   function generateQuestion(idx: number): Question {
-    // Force random keys when in absolute mode so the user can't infer the
-    // tonic from a fixed-key session.
-    const k = absoluteMode ? 'random' : settings.keyMode;
+    const k = settings.keyMode;
     const fk = settings.fixedKey;
     const last = session?.questions[idx - 1]?.itemKey;
     const modeSrs = srs[modeKey];
@@ -235,7 +225,7 @@ export function Train() {
     switch (modeKey) {
       case 'interval': q = makeIntervalQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter); break;
       case 'chord': q = makeChordQuestion(level, k, fk, false, last, modeSrs, modeStats, candidateFilter); break;
-      case 'solfege': q = makeSolfegeQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter, absoluteMode); break;
+      case 'solfege': q = makeSolfegeQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter); break;
       case 'progression': q = makeProgressionQuestion(level, k, fk, progressionSource); break;
       case 'melody': q = makeMelodyQuestion(level, k, fk); break;
       case 'transpose': q = makeTransposeQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter); break;
@@ -254,15 +244,6 @@ export function Train() {
       case 'lab-bass': return makeBassQuestion(level, sel);
       case 'lab-tension': return makeTensionQuestion(level, sel);
       default: q = makeIntervalQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter);
-    }
-    // Stamp absoluteMode flag on the question so downstream playback/UI
-    // (reference-tone gate, key badge) honours the session-level toggle even
-    // for factories that don't accept the flag explicitly.
-    if (absoluteMode) {
-      q = {
-        ...q,
-        context: { ...q.context, absoluteMode: true, referenceToneNote: undefined },
-      };
     }
     return q;
   }
@@ -482,11 +463,6 @@ export function Train() {
       const q = currentQuestion;
       if (!q) return;
       setPianoInput([note]);
-      if (q.context?.absoluteMode) {
-        // Absolute mode: submit the pressed key's pitch class directly.
-        submitAnswer(Note.pitchClass(note));
-        return;
-      }
       const tonic = q.context.key || 'C';
       const tonicMidi = Note.midi(tonic + '4') ?? 60;
       const pressedMidi = Note.midi(note) ?? 60;
@@ -719,9 +695,6 @@ export function Train() {
         setTotalQuestions={setTotalQuestions}
         level={level}
         setLevel={setLevel}
-        showAbsoluteToggle={ABSOLUTE_TOGGLE_MODES.has(modeKey)}
-        absoluteMode={absoluteMode}
-        setAbsoluteMode={setAbsoluteMode}
         isProgression={modeKey === 'progression'}
         progressionSource={progressionSource}
         setProgressionSource={setProgressionSource}
@@ -914,7 +887,7 @@ export function Train() {
               {/* Choice-based modes */}
               {(isInterval || isChord || (isSolfege && solfegeInputMethod === 'choice') || isLabChoice) && (
                 <ChoiceGrid
-                  options={getChoiceOptions(modeKey, level, isAbsolute)}
+                  options={getChoiceOptions(modeKey, level)}
                   selected={selectedAnswer ?? undefined}
                   answered={false}
                   onSelect={handleChoiceSelect}
@@ -1144,7 +1117,7 @@ export function Train() {
             <>
               {(isInterval || isChord || (isSolfege && solfegeInputMethod === 'choice') || isLabChoice) && (
                 <ChoiceGrid
-                  options={getChoiceOptions(modeKey, level, isAbsolute)}
+                  options={getChoiceOptions(modeKey, level)}
                   selected={selectedAnswer ?? undefined}
                   correct={feedbackResult?.correctAnswer as string}
                   answered
@@ -1244,10 +1217,10 @@ export function Train() {
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-function getChoiceOptions(mode: ModeKey, level: number, absolute = false): ChoiceOption[] {
+function getChoiceOptions(mode: ModeKey, level: number): ChoiceOption[] {
   if (mode === 'interval') return getIntervalChoices(level);
   if (mode === 'chord') return getChordChoices(level);
-  if (mode === 'solfege') return absolute ? getNoteNameChoices(level) : getSolfegeChoices(level);
+  if (mode === 'solfege') return getSolfegeChoices(level);
   if (mode === 'lab-scale') return getScaleChoices(level);
   if (mode === 'lab-cadence') return getCadenceChoices(level);
   if (mode === 'lab-inversion') return getInversionChoices(level);

@@ -6,7 +6,6 @@ import type { TrainSetupProps } from '../index';
 
 export function SetupM({
   modeKey, modeInfo, isWeakSession, totalQuestions, questionOptions, setTotalQuestions, level, setLevel,
-  showAbsoluteToggle, absoluteMode, setAbsoluteMode,
   isProgression, progressionSource, setProgressionSource,
   loading, onStart, onBack,
 }: TrainSetupProps) {
@@ -94,20 +93,6 @@ export function SetupM({
           </div>
         </MCard>
       </div>
-
-      {showAbsoluteToggle && (
-        <div style={{ padding: '12px 20px 0', position: 'relative' }}>
-          <MCard style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 800 }}>절대음감 모드</div>
-              <div style={{ fontSize: 11, color: M.inkMute, marginTop: 2 }}>기준음 없이 음이름만 듣기</div>
-            </div>
-            <button onClick={() => setAbsoluteMode(!absoluteMode)} role="switch" aria-checked={absoluteMode} style={{ width: 44, height: 26, borderRadius: 999, border: 'none', background: absoluteMode ? M.iridescent : 'rgba(26,31,58,0.08)', position: 'relative', padding: 0 }}>
-              <div style={{ position: 'absolute', top: 3, left: absoluteMode ? 21 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.15)', transition: 'left 0.15s' }} />
-            </button>
-          </MCard>
-        </div>
-      )}
 
       {isProgression && (
         <div style={{ padding: '12px 20px 0', position: 'relative' }}>
