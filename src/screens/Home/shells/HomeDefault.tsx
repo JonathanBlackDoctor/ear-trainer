@@ -1,55 +1,18 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { MODE_REGISTRY, MODE_ACCENT_CLASS, resolveModeOrder } from '../modes/registry';
-import type { ModeKey, ModeStats } from '../types';
-import { useStore } from '../store/useStore';
-import { topWeakItems } from '../engine/weakness';
-import { rankFor } from '../engine/xp';
-import { ACHIEVEMENTS_BY_ID } from '../engine/achievements';
+import { MODE_ACCENT_CLASS } from '../../../modes/registry';
+import type { HomeData } from '../useHomeData';
 
-export function Home() {
-  const navigate = useNavigate();
-  const { settings, stats, sessions, gamification } = useStore();
-
-  const orderedModes = resolveModeOrder(settings.modeOrder).map((k) => MODE_REGISTRY[k]);
-
-  const totalSessions = sessions.length;
-  const totalQuestions = sessions.reduce((s, ss) => s + ss.total, 0);
-  const totalCorrect = sessions.reduce((s, ss) => s + ss.correct, 0);
-  const overallPct = totalQuestions > 0
-    ? Math.round((totalCorrect / totalQuestions) * 100)
-    : 0;
-
-  const rank = rankFor(gamification.totalXp);
-  const recentAchievements = Object.entries(gamification.achievements)
-    .map(([id, info]) => ({ id, ...info, def: ACHIEVEMENTS_BY_ID[id] }))
-    .filter((a) => a.def)
-    .sort((a, b) => b.unlockedAt - a.unlockedAt)
-    .slice(0, 3);
-
-  function startMode(key: ModeKey) {
-    navigate(`/train/${key}`);
-  }
-
-  function startWeakSession(mode: string) {
-    navigate(`/train/${mode}?focus=weak`);
-  }
-
-  // Get top weak items across all modes — only include items the user has
-  // actually attempted, so brand-new users don't see a "weakness" card that's
-  // really just unseen items.
-  const weakItems = (Object.entries(stats) as [string, ModeStats][])
-    .flatMap(([mode, modeStats]) =>
-      topWeakItems(modeStats, 2)
-        .filter((w) => (modeStats[w.key]?.attempts ?? 0) > 0)
-        .map((w) => ({ ...w, mode })),
-    )
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3);
+// Classic (default) look — the original Home layout, unchanged. Data now comes
+// from useHomeData so every direction shares one source of truth.
+export function HomeDefault({ data }: { data: HomeData }) {
+  const {
+    rank, totalXp, overallPct, totalSessions, totalQuestions,
+    modes, weakItems, recentAchievements,
+    startMode, startWeakSession, goStats, goSettings, goBadges,
+  } = data;
 
   return (
     <div className="min-h-screen pb-10">
-      {/* Header — 더 강한 브랜드 표현 (인디고 그라데이션 + 골드 액센트) */}
       <header className="bg-gradient-to-br from-primary-700 via-primary-800 to-primary-900 text-white">
         <div className="max-w-lg mx-auto px-5 pt-8 pb-10 flex items-start justify-between gap-3">
           <div>
@@ -57,25 +20,20 @@ export function Home() {
               <span className="inline-block w-6 h-px bg-accent-300"></span>
               Ear Training
             </div>
-            <h1 className="font-display text-4xl font-bold tracking-tight">
-              음감 훈련
-            </h1>
-            <p className="text-sm text-primary-200 mt-2">
-              매일 5분, 자라나는 음감
-            </p>
+            <h1 className="font-display text-4xl font-bold tracking-tight">음감 훈련</h1>
+            <p className="text-sm text-primary-200 mt-2">매일 5분, 자라나는 음감</p>
           </div>
-          {/* 통계 / 설정 — 제목과 같은 줄 오른쪽 */}
           <div className="flex shrink-0 gap-2">
             <button
               className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 active:scale-95 transition-all rounded-full px-3 py-1.5 text-sm font-medium focus-ring"
-              onClick={() => navigate('/stats')}
+              onClick={goStats}
               aria-label="통계 화면 열기"
             >
               <span aria-hidden>📊</span> 통계
             </button>
             <button
               className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 active:scale-95 transition-all rounded-full px-3 py-1.5 text-sm font-medium focus-ring"
-              onClick={() => navigate('/settings')}
+              onClick={goSettings}
               aria-label="설정 화면 열기"
             >
               <span aria-hidden>⚙️</span> 설정
@@ -85,11 +43,10 @@ export function Home() {
       </header>
 
       <div className="max-w-lg mx-auto px-5 -mt-6 space-y-5">
-        {/* Rank & XP card — 등급/누적 XP 시각화 */}
-        {gamification.totalXp > 0 && (
+        {totalXp > 0 && (
           <button
             type="button"
-            onClick={() => navigate('/badges')}
+            onClick={goBadges}
             className="w-full card-hero animate-slide-up text-left active:scale-[0.99] transition-transform"
             aria-label="업적 화면 열기"
           >
@@ -103,7 +60,7 @@ export function Home() {
               <div className="text-right">
                 <div className="text-[10px] uppercase tracking-wider text-slate-500">누적 XP</div>
                 <div className="font-display text-2xl font-bold text-primary-900 tabular-nums">
-                  {gamification.totalXp.toLocaleString()}
+                  {totalXp.toLocaleString()}
                 </div>
               </div>
             </div>
@@ -124,17 +81,11 @@ export function Home() {
           </button>
         )}
 
-        {/* Recent achievements strip */}
         {recentAchievements.length > 0 && (
           <div className="bg-white rounded-2xl shadow-soft p-3 animate-slide-up">
             <div className="flex items-center justify-between mb-2 px-1">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                최근 획득 업적
-              </h2>
-              <button
-                className="text-xs text-primary-600 font-semibold hover:text-primary-700"
-                onClick={() => navigate('/badges')}
-              >
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">최근 획득 업적</h2>
+              <button className="text-xs text-primary-600 font-semibold hover:text-primary-700" onClick={goBadges}>
                 전체 →
               </button>
             </div>
@@ -143,22 +94,19 @@ export function Home() {
                 <button
                   key={a.id}
                   type="button"
-                  onClick={() => navigate('/badges')}
+                  onClick={goBadges}
                   className="flex-1 flex flex-col items-center gap-1 bg-accent-50 border border-accent-200 rounded-lg px-2 py-2 active:scale-95 transition-transform"
-                  title={a.def.description}
-                  aria-label={`${a.def.name} 업적`}
+                  title={a.description}
+                  aria-label={`${a.name} 업적`}
                 >
-                  <span className="text-2xl" aria-hidden>{a.def.emoji}</span>
-                  <span className="text-[10px] font-semibold text-accent-800 text-center leading-tight">
-                    {a.def.name}
-                  </span>
+                  <span className="text-2xl" aria-hidden>{a.emoji}</span>
+                  <span className="text-[10px] font-semibold text-accent-800 text-center leading-tight">{a.name}</span>
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        {/* Summary stats — hero number 스타일로 강조 */}
         {totalSessions > 0 && (
           <div className="card-hero animate-slide-up">
             <div className="grid grid-cols-3 gap-2 text-center">
@@ -180,20 +128,14 @@ export function Home() {
           </div>
         )}
 
-        {/* 빈 상태 — 첫 사용자에게 환영 메시지 */}
         {totalSessions === 0 && (
           <div className="card-hero text-center animate-slide-up">
             <div className="text-4xl mb-2">🎼</div>
-            <h2 className="font-display text-xl font-bold text-primary-900 mb-1">
-              훈련을 시작해보세요
-            </h2>
-            <p className="text-sm text-slate-500">
-              아래에서 원하는 훈련을 선택하면 됩니다
-            </p>
+            <h2 className="font-display text-xl font-bold text-primary-900 mb-1">훈련을 시작해보세요</h2>
+            <p className="text-sm text-slate-500">아래에서 원하는 훈련을 선택하면 됩니다</p>
           </div>
         )}
 
-        {/* Weakness shortcut — 골드 액센트로 강조 */}
         {weakItems.length > 0 && (
           <div className="bg-accent-50 border border-accent-200 rounded-2xl shadow-soft p-4 animate-slide-up">
             <div className="flex items-center justify-between mb-3">
@@ -201,10 +143,7 @@ export function Home() {
                 <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-accent-500 text-white text-xs">!</span>
                 보강이 필요한 항목
               </h2>
-              <button
-                className="text-xs text-primary-600 font-semibold hover:text-primary-700 transition-colors"
-                onClick={() => navigate('/stats')}
-              >
+              <button className="text-xs text-primary-600 font-semibold hover:text-primary-700 transition-colors" onClick={goStats}>
                 전체 보기 →
               </button>
             </div>
@@ -230,44 +169,30 @@ export function Home() {
           </div>
         )}
 
-        {/* Mode cards — 색상 띠로 모드별 차별화 */}
         <div>
-          <h2 className="text-sm font-semibold text-slate-500 mb-3 px-1 uppercase tracking-wider">
-            훈련 선택
-          </h2>
+          <h2 className="text-sm font-semibold text-slate-500 mb-3 px-1 uppercase tracking-wider">훈련 선택</h2>
           <div className="grid grid-cols-2 gap-3">
-            {orderedModes.map((mode) => {
-              const modeStats = stats[mode.key];
-              const items = modeStats ? Object.values(modeStats) : [];
-              const attempts = items.reduce((s, i) => s + i.attempts, 0);
-              const correct = items.reduce((s, i) => s + i.correct, 0);
-              const pct = attempts > 0 ? Math.round((correct / attempts) * 100) : null;
-
-              return (
-                <button
-                  key={mode.key}
-                  className={`mode-card ${MODE_ACCENT_CLASS[mode.key] ?? 'accent-interval'}`}
-                  onClick={() => startMode(mode.key)}
-                >
-                  <div className="text-3xl mb-2 mt-1">{mode.emoji}</div>
-                  <div className="font-semibold text-primary-900 text-sm leading-tight">{mode.name}</div>
-                  <div className="text-xs text-slate-500 mt-1 leading-snug">{mode.description}</div>
-                  {pct !== null ? (
-                    <div className="mt-3 flex items-center gap-2">
-                      <span className="text-xs font-semibold text-primary-600 tabular-nums">{pct}%</span>
-                      <div className="flex-1 h-1 bg-canvas-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-primary-500 rounded-full transition-all duration-500"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
+            {modes.map((mode) => (
+              <button
+                key={mode.key}
+                className={`mode-card ${MODE_ACCENT_CLASS[mode.key] ?? 'accent-interval'}`}
+                onClick={() => startMode(mode.key)}
+              >
+                <div className="text-3xl mb-2 mt-1">{mode.emoji}</div>
+                <div className="font-semibold text-primary-900 text-sm leading-tight">{mode.name}</div>
+                <div className="text-xs text-slate-500 mt-1 leading-snug">{mode.description}</div>
+                {mode.pct !== null ? (
+                  <div className="mt-3 flex items-center gap-2">
+                    <span className="text-xs font-semibold text-primary-600 tabular-nums">{mode.pct}%</span>
+                    <div className="flex-1 h-1 bg-canvas-200 rounded-full overflow-hidden">
+                      <div className="h-full bg-primary-500 rounded-full transition-all duration-500" style={{ width: `${mode.pct}%` }} />
                     </div>
-                  ) : (
-                    <div className="mt-3 text-xs text-slate-400 font-medium">아직 기록 없음</div>
-                  )}
-                </button>
-              );
-            })}
+                  </div>
+                ) : (
+                  <div className="mt-3 text-xs text-slate-400 font-medium">아직 기록 없음</div>
+                )}
+              </button>
+            ))}
           </div>
         </div>
       </div>

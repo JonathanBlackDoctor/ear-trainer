@@ -405,11 +405,48 @@
   [data-theme="m"] .card-lifted,
   [data-theme="m"] .card-hero,
   [data-theme="m"] .choice-btn,
-  [data-theme="m"] .btn-secondary {
-    background: #fdfcff;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
+  [data-theme="m"] .btn-secondary,
+  .m-glass {
+    background: #fdfcff !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
+  /* 오로라 오브는 투명도/블러 의존 장식이라 숨김 */
+  .m-orb { display: none !important; }
+}
+
+/* ── 방향별 장식 모티프 애니메이션 ─────────────────────────────────────── */
+/* J · 카세트 릴 회전 (재생 중에만 spinning prop으로 활성). prefers-reduced-motion
+   사용자는 위 @layer base의 전역 가드로 자동 정지된다. */
+@keyframes j-reel-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── 방향별 선택(picked) 보기 강조 — 시안 시그니처 ───────────────────────
+   ChoiceGrid는 .choice-btn-selected로 picked 상태를 표시한다. 토큰만으로는
+   각 방향의 시그니처(민트/라임/틸+회전/이리데센트)가 드러나지 않아 여기서
+   보강한다. data-theme 접두로 기본 .choice-btn-selected보다 우선한다. */
+[data-theme="g"] .choice-btn-selected {
+  background: #5af2c2;
+  color: #0a0a0a;
+  box-shadow: 5px 5px 0 #0a0a0a;
+}
+[data-theme="i"] .choice-btn-selected {
+  background: #ecfccb;
+  color: #0f1419;
+  border-color: #65a30d;
+}
+[data-theme="j"] .choice-btn-selected {
+  background: #00c4b4;
+  color: #fff;
+  transform: rotate(-1deg);
+  box-shadow: 4px 4px 0 #1a0d1f;
+}
+[data-theme="m"] .choice-btn-selected {
+  background: var(--iridescent);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 8px 20px rgba(168, 85, 247, 0.4);
 }
 
 @layer utilities {
