@@ -72,6 +72,7 @@ export function useHomeData(): HomeData {
     .map((a) => ({ id: a.id, emoji: a.def.emoji, name: a.def.name, description: a.def.description }));
 
   const weakItems: WeakItemView[] = (Object.entries(stats) as [ModeKey, ModeStats][])
+    .filter(([mode]) => mode in MODE_REGISTRY)
     .flatMap(([mode, modeStats]) =>
       topWeakItems(modeStats, 2)
         .filter((w) => (modeStats[w.key]?.attempts ?? 0) > 0)
