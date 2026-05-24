@@ -85,12 +85,26 @@ export function Train() {
   // user's weak items — otherwise the candidate filter matches nothing and the
   // factory silently falls back to a normal full-pool session. Compute that
   // level once on mount (the user can still override it on the setup screen).
-  const [level, setLevel] = useState<number>(() => {
-    if (focusMode !== 'weak') return 1;
+  // A normal session restores the last-used level for this mode (persisted in
+  // settings) so the difficulty is remembered across sessions and restarts.
+  const [level, setLevelState] = useState<number>(() => {
     const mk = mode as ModeKey;
     const maxLv = MODE_INFO[mk]?.maxLevel ?? MAX_LEVEL;
-    return weakFocusLevel(mk, stats[mk] ?? {}, maxLv, 1);
+    if (focusMode === 'weak') {
+      return weakFocusLevel(mk, stats[mk] ?? {}, maxLv, 1);
+    }
+    const saved = settings.levelByMode?.[mk] ?? 1;
+    return Math.min(Math.max(1, saved), maxLv);
   });
+  // Persist the chosen level per mode (skip weak sessions — their starting
+  // level is computed from current weakness, not a user practice preference).
+  const setLevel = (n: number) => {
+    setLevelState(n);
+    if (focusMode !== 'weak') {
+      const mk = mode as ModeKey;
+      updateSettings({ levelByMode: { ...settings.levelByMode, [mk]: n } });
+    }
+  };
   const [progressionSource, setProgressionSource] = useState<'diatonic' | 'praise'>('diatonic');
   const [rhythmTaps, setRhythmTaps] = useState<number[]>([]);
   const [rhythmStartTime, setRhythmStartTime] = useState<number>(0);
