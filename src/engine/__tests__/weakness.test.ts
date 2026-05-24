@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { weaknessScore, weightedPool, pickWeighted, topWeakItems, suggestLevel } from '../weakness';
+import { weaknessScore, weightedPool, pickWeighted, topWeakItems, suggestLevel, weakFocusLevel } from '../weakness';
 import type { StatsItem, ModeStats } from '../../types';
 
 const item = (overrides: Partial<StatsItem> = {}): StatsItem => ({
@@ -70,6 +70,39 @@ describe('topWeakItems', () => {
     };
     const top = topWeakItems(stats, 2);
     expect(top.map((x) => x.key)).toEqual(['c', 'b']);
+  });
+});
+
+describe('weakFocusLevel', () => {
+  const weak = item({ attempts: 10, correct: 1, recent: [0, 0, 0, 0] });
+
+  it('falls back when there are no attempted items', () => {
+    expect(weakFocusLevel('interval', {}, 10, 1)).toBe(1);
+  });
+
+  it('picks the lowest interval level whose pool contains the weak item', () => {
+    // m2_up only appears from Lv4 (PLUS_2_6); _down only from Lv2.
+    expect(weakFocusLevel('interval', { 'm2_up': weak }, 10)).toBe(4);
+    expect(weakFocusLevel('interval', { 'P5_down': weak }, 10)).toBe(2);
+  });
+
+  it('picks a level covering the hardest weak item across a set', () => {
+    // P5_up (Lv1) + M6_down (Lv4) → need Lv4 to cover both.
+    const lv = weakFocusLevel('interval', { 'P5_up': weak, 'M6_down': weak }, 10);
+    expect(lv).toBe(4);
+  });
+
+  it('picks the chord level that introduces the weak quality', () => {
+    // dominant7 first appears at Lv6.
+    expect(weakFocusLevel('chord', { 'dominant7_inv0': weak }, 10)).toBe(6);
+  });
+
+  it('parses the level from level-encoded item keys (transpose)', () => {
+    expect(weakFocusLevel('transpose', { 'transpose_lv3': weak }, 10)).toBe(3);
+  });
+
+  it('falls back for modes with no enumerable pool', () => {
+    expect(weakFocusLevel('melody', { 'whatever': weak }, 10, 2)).toBe(2);
   });
 });
 

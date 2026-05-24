@@ -45,6 +45,12 @@ export const INTERVAL_LEVELS: Record<number, IntervalLevelConfig> = {
   10: { label: '하행만 듣기',                intervals: ALL_12,       directions: ['down'],                   noteRangeLow: 'A2', noteRangeHigh: 'C6' },
 };
 
+/** All item keys (`${interval}_${direction}`) for a given interval level. */
+export function intervalItemKeys(level: number): string[] {
+  const cfg = INTERVAL_LEVELS[level] ?? INTERVAL_LEVELS[1];
+  return cfg.intervals.flatMap((n) => cfg.directions.map((d) => `${n}_${d}`));
+}
+
 /** Given a root note and interval name, return the second note */
 export function buildInterval(
   root: string,

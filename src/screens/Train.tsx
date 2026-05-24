@@ -49,7 +49,7 @@ import {
 import type { ChordStep } from '../types';
 import { Note } from 'tonal';
 import { semitoneToSolfege } from '../theory/solfege';
-import { topWeakItems } from '../engine/weakness';
+import { topWeakItems, weakFocusLevel } from '../engine/weakness';
 
 const MODE_INFO = MODE_REGISTRY;
 
@@ -87,7 +87,16 @@ export function Train() {
   const [feedbackResult, setFeedbackResult] = useState<ReturnType<typeof judge> | null>(null);
   const [loading, setLoading] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
-  const [level, setLevel] = useState(1);
+  // A weak session must start at a level whose item pool actually contains the
+  // user's weak items — otherwise the candidate filter matches nothing and the
+  // factory silently falls back to a normal full-pool session. Compute that
+  // level once on mount (the user can still override it on the setup screen).
+  const [level, setLevel] = useState<number>(() => {
+    if (focusMode !== 'weak') return 1;
+    const mk = mode as ModeKey;
+    const maxLv = MODE_INFO[mk]?.maxLevel ?? MAX_LEVEL;
+    return weakFocusLevel(mk, stats[mk] ?? {}, maxLv, 1);
+  });
   const [progressionSource, setProgressionSource] = useState<'diatonic' | 'praise'>('diatonic');
   const [rhythmTaps, setRhythmTaps] = useState<number[]>([]);
   const [rhythmStartTime, setRhythmStartTime] = useState<number>(0);

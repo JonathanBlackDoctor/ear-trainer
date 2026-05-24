@@ -60,6 +60,14 @@ export function solfegeToSemitone(syllable: string): number {
   return map[syllable] ?? -1;
 }
 
+/** All item keys (`solfege_${syllable}`) for a given solfege level. */
+export function solfegeItemKeys(level: number): string[] {
+  const cfg = SOLFEGE_LEVELS[level] ?? SOLFEGE_LEVELS[1];
+  return cfg.candidates
+    .filter((syl) => solfegeToSemitone(syl) >= 0)
+    .map((syl) => `solfege_${syl}`);
+}
+
 /** Get solfege syllable for a note given a tonic (movable-do) */
 export function noteToSolfege(note: string, tonic: string): string {
   const noteMidi = Note.midi(note);
