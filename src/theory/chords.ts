@@ -57,6 +57,12 @@ export const CHORD_LEVELS: Record<number, ChordLevelConfig> = {
   10: { label: '1전위 추가',          qualities: ALL_9,      inversions: [0, 1], arpeggio: false },
 };
 
+/** All item keys (`${quality}_inv${inversion}`) for a given chord level. */
+export function chordItemKeys(level: number): string[] {
+  const cfg = CHORD_LEVELS[level] ?? CHORD_LEVELS[1];
+  return cfg.qualities.flatMap((q) => cfg.inversions.map((inv) => `${q}_inv${inv}`));
+}
+
 /** Build chord notes from root and quality */
 export function buildChord(
   root: string,   // e.g. "C4"

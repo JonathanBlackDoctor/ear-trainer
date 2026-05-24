@@ -5,8 +5,9 @@ import {
   type IntervalDirection,
   randomNote,
   pickRandom,
+  intervalItemKeys,
 } from '../theory/intervals';
-import { CHORD_LEVELS, buildChord, chordLabel } from '../theory/chords';
+import { CHORD_LEVELS, buildChord, chordLabel, chordItemKeys } from '../theory/chords';
 import {
   PROGRESSION_LEVELS,
   COMMON_KEYS,
@@ -19,6 +20,7 @@ import {
   SOLFEGE_LEVELS,
   semitoneToSolfege,
   solfegeToSemitone,
+  solfegeItemKeys,
 } from '../theory/solfege';
 import {
   MELODY_LEVELS,
@@ -67,7 +69,7 @@ export function makeIntervalQuestion(
   candidateFilter?: (key: string) => boolean
 ): Question {
   const cfg = INTERVAL_LEVELS[level] ?? INTERVAL_LEVELS[1];
-  const allItemKeys = cfg.intervals.flatMap((n) => cfg.directions.map((d) => `${n}_${d}`));
+  const allItemKeys = intervalItemKeys(level);
   const filteredKeys = candidateFilter
     ? allItemKeys.filter(candidateFilter)
     : allItemKeys;
@@ -112,7 +114,7 @@ export function makeChordQuestion(
   candidateFilter?: (key: string) => boolean
 ): Question {
   const cfg = CHORD_LEVELS[level] ?? CHORD_LEVELS[1];
-  const allItemKeys = cfg.qualities.flatMap((q) => cfg.inversions.map((inv) => `${q}_inv${inv}`));
+  const allItemKeys = chordItemKeys(level);
   const filtered = candidateFilter ? allItemKeys.filter(candidateFilter) : allItemKeys;
   const itemKeys = filtered.length > 0 ? filtered : allItemKeys;
   const itemKey = nextTarget(itemKeys, srs, stats, lastItemKey);
