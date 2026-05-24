@@ -358,49 +358,6 @@ export function Settings() {
           )}
         </div>
 
-        {/* Questions per session */}
-        <div className="card">
-          <div className="text-sm font-semibold text-slate-600 mb-3">
-            세션 문항 수: <span className="text-primary-600 font-bold">{settings.questionsPerSession}</span>
-          </div>
-          <input
-            type="range"
-            min={5}
-            max={30}
-            step={5}
-            value={settings.questionsPerSession}
-            onChange={(e) => updateSettings({ questionsPerSession: Number(e.target.value) })}
-            className="w-full accent-primary-600"
-            aria-label="세션 문항 수"
-          />
-          <div className="flex justify-between text-xs text-slate-400 mt-1">
-            <span>5</span><span>10</span><span>15</span><span>20</span><span>25</span><span>30</span>
-          </div>
-        </div>
-
-        {/* Weak-session length */}
-        <div className="card">
-          <div className="text-sm font-semibold text-slate-600 mb-3">
-            약점 집중 세션 문항 수: <span className="text-accent-600 font-bold">{settings.weakSessionLength}</span>
-          </div>
-          <input
-            type="range"
-            min={5}
-            max={20}
-            step={5}
-            value={settings.weakSessionLength}
-            onChange={(e) => updateSettings({ weakSessionLength: Number(e.target.value) })}
-            className="w-full accent-accent-500"
-            aria-label="약점 집중 세션 문항 수"
-          />
-          <div className="flex justify-between text-xs text-slate-400 mt-1">
-            <span>5</span><span>10</span><span>15</span><span>20</span>
-          </div>
-          <p className="text-xs text-slate-400 mt-2">
-            홈 화면에서 약점 항목을 누르면 이 길이만큼 집중 연습합니다.
-          </p>
-        </div>
-
         {/* Difficulty */}
         <div className="card">
           <div className="text-sm font-semibold text-slate-600 mb-3">난이도 모드</div>

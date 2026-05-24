@@ -76,7 +76,7 @@ export function Train() {
   const { mode } = useParams<{ mode: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { settings, stats, srs, recordResult, addSession } = useStore();
+  const { settings, stats, srs, recordResult, addSession, updateSettings } = useStore();
   const focusMode = searchParams.get('focus'); // 'weak' | null
 
   const [phase, setPhase] = useState<TrainPhase>('setup');
@@ -114,6 +114,11 @@ export function Train() {
   };
   const isWeakSession = focusMode === 'weak';
   const totalQuestions = isWeakSession ? settings.weakSessionLength : settings.questionsPerSession;
+  // The question count is chosen on the setup screen and persisted in the store
+  // so it is remembered across sessions and app restarts.
+  const questionOptions = isWeakSession ? [5, 10, 15, 20] : [5, 10, 15, 20, 25, 30];
+  const setTotalQuestions = (n: number) =>
+    updateSettings(isWeakSession ? { weakSessionLength: n } : { questionsPerSession: n });
 
   // In weak-session mode, restrict the candidate pool to the top weak items
   // (by mode). The factory uses this as a filter — falls back to full pool
@@ -673,6 +678,8 @@ export function Train() {
         modeInfo={modeInfo}
         isWeakSession={isWeakSession}
         totalQuestions={totalQuestions}
+        questionOptions={questionOptions}
+        setTotalQuestions={setTotalQuestions}
         level={level}
         setLevel={setLevel}
         showAbsoluteToggle={ABSOLUTE_TOGGLE_MODES.has(modeKey)}

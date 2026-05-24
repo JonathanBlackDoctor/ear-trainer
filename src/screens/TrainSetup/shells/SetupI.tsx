@@ -5,7 +5,7 @@ import { ICorners, IChip } from '../../../theme/decorations/grid';
 import type { TrainSetupProps } from '../index';
 
 export function SetupI({
-  modeKey, modeInfo, isWeakSession, totalQuestions, level, setLevel,
+  modeKey, modeInfo, isWeakSession, totalQuestions, questionOptions, setTotalQuestions, level, setLevel,
   showAbsoluteToggle, absoluteMode, setAbsoluteMode,
   isProgression, progressionSource, setProgressionSource,
   loading, onStart, onBack,
@@ -78,6 +78,25 @@ export function SetupI({
               const done = n < level;
               return (
                 <button key={n} onClick={() => setLevel(n)} aria-label={`레벨 ${n}`} style={{ height: 28, border: 'none', borderRight: i < maxLevel - 1 ? `1px solid ${I.hair}` : 'none', background: active ? I.lime : done ? I.limeSoft : I.card }} />
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* question count */}
+      <div style={{ padding: '14px 20px 0' }}>
+        <div style={{ background: I.card, border: `1px solid ${I.hairDark}`, padding: 12, position: 'relative' }}>
+          <ICorners />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ ...mono, fontSize: 10, color: I.inkMute, fontWeight: 800, letterSpacing: 1.5 }}>COUNT · 문항</div>
+            <div style={{ ...mono, fontSize: 11, fontWeight: 800, color: I.lime }}>N={totalQuestions}</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${questionOptions.length}, 1fr)`, border: `1px solid ${I.hairDark}` }}>
+            {questionOptions.map((n, i) => {
+              const active = n === totalQuestions;
+              return (
+                <button key={n} onClick={() => setTotalQuestions(n)} aria-label={`${n}문항`} aria-pressed={active} style={{ ...mono, height: 34, fontSize: 12, fontWeight: 800, border: 'none', borderRight: i < questionOptions.length - 1 ? `1px solid ${I.hair}` : 'none', background: active ? I.lime : I.card, color: active ? I.card : I.inkSoft }}>{n}</button>
               );
             })}
           </div>
