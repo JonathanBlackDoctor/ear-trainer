@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { MAX_LEVEL, getLevelLabel } from '../../../modes/levels';
 import { G } from '../../../theme/decorations/palette';
 import { GBlock, NeoSticker } from '../../../theme/decorations/neo';
@@ -11,6 +11,7 @@ export function SetupG({
   loading, onStart, onBack,
 }: TrainSetupProps) {
   const maxLevel = modeInfo.maxLevel ?? MAX_LEVEL;
+  const [showTheory, setShowTheory] = useState(false);
   return (
     <div style={{ maxWidth: 512, margin: '0 auto', color: G.ink, paddingBottom: 28 }}>
       <div style={{ padding: '18px 20px 0', display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -35,6 +36,18 @@ export function SetupG({
           <GBlock bg={G.card} sh={G.shadowS} style={{ padding: 14 }}>
             <NeoSticker bg={G.lavender} rot={0} style={{ border: `2px solid ${G.ink}`, padding: '2px 8px', fontSize: 10, letterSpacing: 1 }}>사용법</NeoSticker>
             <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.5, fontWeight: 600 }}>{modeInfo.howTo}</div>
+          </GBlock>
+        </div>
+      )}
+
+      {modeInfo.theory && (
+        <div style={{ padding: '14px 20px 0' }}>
+          <GBlock bg={G.card} sh={G.shadowS} style={{ padding: 14 }}>
+            <button onClick={() => setShowTheory((v) => !v)} aria-expanded={showTheory} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+              <NeoSticker bg={G.sky} rot={0} style={{ border: `2px solid ${G.ink}`, padding: '2px 8px', fontSize: 10, letterSpacing: 1 }}>음악 개념</NeoSticker>
+              <span style={{ fontSize: 16, fontWeight: 900, transform: showTheory ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} aria-hidden>▾</span>
+            </button>
+            {showTheory && <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.5, fontWeight: 600 }}>{modeInfo.theory}</div>}
           </GBlock>
         </div>
       )}

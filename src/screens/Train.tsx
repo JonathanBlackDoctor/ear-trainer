@@ -94,6 +94,7 @@ export function Train() {
   const [tempoTaps, setTempoTaps] = useState<number[]>([]);
   const [bpmSliderValue, setBpmSliderValue] = useState<number>(100);
   const [isCountingIn, setIsCountingIn] = useState(false);
+  const [playbackStage, setPlaybackStage] = useState<'reference' | 'progression' | null>(null);
   const [audioQuality, setAudioQuality] = useState<AudioQuality>('synth');
   const [solfegeInputMethod, setSolfegeInputMethod] = useState<'choice' | 'piano'>('choice');
   const [absoluteMode, setAbsoluteMode] = useState(false);
@@ -188,6 +189,7 @@ export function Train() {
     setRhythmStartTime(0);
     setTempoTaps([]);
     setBpmSliderValue(100);
+    setPlaybackStage(null);
     setFeedbackResult(null);
     setTimeout(() => playQuestion(q), 100);
   }
@@ -259,6 +261,7 @@ export function Train() {
         settings.referenceTone === 'perQuestion' &&
         q.context?.referenceToneNote
       ) {
+        if (q.mode === 'progression') setPlaybackStage('reference');
         await playReferenceTone(q.context.referenceToneNote, '2n');
         if (gen !== getPlaybackGen()) return;
         await delay(700 / speed);
@@ -268,7 +271,10 @@ export function Train() {
     } finally {
       // Only release the loading state if we're still the active playback;
       // otherwise the newer playback owns it.
-      if (gen === getPlaybackGen()) setLoading(false);
+      if (gen === getPlaybackGen()) {
+        setLoading(false);
+        setPlaybackStage(null);
+      }
     }
   }
 
@@ -295,6 +301,7 @@ export function Train() {
       }
       case 'progression': {
         const d = data as ProgressionData;
+        setPlaybackStage('progression');
         if (d.playback === 'arpeggio') {
           for (const c of d.chords) {
             await playArpeggio(c.notes, '8n', speed);
@@ -735,6 +742,25 @@ export function Train() {
             <div className="text-center">
               <span className="inline-block bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1 rounded-full">
                 조성: {currentQuestion.context.key}장조
+              </span>
+            </div>
+          )}
+
+          {/* Progression playback-stage indicator — distinguishes the leading
+              key-reference tone (not an input) from the chords to be entered, so
+              "2 chords to input" doesn't get confused with "3 sounds heard". */}
+          {isProgression && phase !== 'feedback' && playbackStage && (
+            <div className="text-center">
+              <span
+                className={`inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-full ${
+                  playbackStage === 'reference'
+                    ? 'bg-amber-100 text-amber-700'
+                    : 'bg-primary-100 text-primary-700'
+                }`}
+              >
+                {playbackStage === 'reference'
+                  ? '🔑 기준음 (조성 잡기) · 입력 대상 아님'
+                  : `🎵 코드 진행 ${(currentQuestion.data as ProgressionData).chords.length}개 재생 중`}
               </span>
             </div>
           )}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { MAX_LEVEL, getLevelLabel } from '../../../modes/levels';
 import type { TrainSetupProps } from '../index';
 
@@ -9,6 +9,7 @@ export function SetupDefault({
   isProgression, progressionSource, setProgressionSource,
   loading, onStart, onBack,
 }: TrainSetupProps) {
+  const [showTheory, setShowTheory] = useState(false);
   return (
     <div className="min-h-screen flex flex-col">
       <div className="bg-white border-b border-slate-100 px-4 py-4">
@@ -29,6 +30,16 @@ export function SetupDefault({
           <div className="card w-full max-w-sm">
             <div className="text-sm font-semibold text-slate-600 mb-2">사용법</div>
             <p className="text-sm text-slate-600 leading-relaxed">{modeInfo.howTo}</p>
+          </div>
+        )}
+
+        {modeInfo.theory && (
+          <div className="card w-full max-w-sm">
+            <button className="w-full flex items-center justify-between gap-2 text-left" onClick={() => setShowTheory((v) => !v)} aria-expanded={showTheory}>
+              <span className="text-sm font-semibold text-slate-600">음악 개념</span>
+              <span className={`text-slate-400 transition-transform ${showTheory ? 'rotate-180' : ''}`} aria-hidden>▾</span>
+            </button>
+            {showTheory && <p className="mt-2 text-sm text-slate-600 leading-relaxed">{modeInfo.theory}</p>}
           </div>
         )}
 

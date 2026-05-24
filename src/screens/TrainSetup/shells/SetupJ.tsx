@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { MAX_LEVEL, getLevelLabel } from '../../../modes/levels';
 import { J } from '../../../theme/decorations/palette';
 import { JReel, JStripes, JSticker } from '../../../theme/decorations/cassette';
@@ -12,6 +12,7 @@ export function SetupJ({
 }: TrainSetupProps) {
   const tnum: React.CSSProperties = { fontVariantNumeric: 'tabular-nums' };
   const maxLevel = modeInfo.maxLevel ?? MAX_LEVEL;
+  const [showTheory, setShowTheory] = useState(false);
 
   return (
     <div style={{ maxWidth: 512, margin: '0 auto', color: J.ink, paddingBottom: 24 }}>
@@ -40,6 +41,18 @@ export function SetupJ({
           <div style={{ background: J.card, border: `2px solid ${J.ink}`, boxShadow: `3px 3px 0 ${J.ink}`, padding: '12px 14px' }}>
             <div style={{ ...tnum, fontSize: 9, color: J.pinkDeep, fontWeight: 900, letterSpacing: 2 }}>// LINER NOTES</div>
             <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.55, fontWeight: 700 }}>{modeInfo.howTo}</div>
+          </div>
+        </div>
+      )}
+
+      {modeInfo.theory && (
+        <div style={{ padding: '14px 20px 0' }}>
+          <div style={{ background: J.card, border: `2px solid ${J.ink}`, boxShadow: `3px 3px 0 ${J.ink}`, padding: '12px 14px' }}>
+            <button onClick={() => setShowTheory((v) => !v)} aria-expanded={showTheory} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+              <span style={{ ...tnum, fontSize: 9, color: J.tealDeep, fontWeight: 900, letterSpacing: 2 }}>// 음악 개념</span>
+              <span style={{ fontSize: 14, fontWeight: 900, transform: showTheory ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} aria-hidden>▾</span>
+            </button>
+            {showTheory && <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.55, fontWeight: 700 }}>{modeInfo.theory}</div>}
           </div>
         </div>
       )}

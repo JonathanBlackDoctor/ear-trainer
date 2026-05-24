@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { MAX_LEVEL, getLevelLabel } from '../../../modes/levels';
 import { I } from '../../../theme/decorations/palette';
 import { ICorners, IChip } from '../../../theme/decorations/grid';
@@ -12,6 +12,7 @@ export function SetupI({
 }: TrainSetupProps) {
   const mono: React.CSSProperties = { fontVariantNumeric: 'tabular-nums slashed-zero' };
   const maxLevel = modeInfo.maxLevel ?? MAX_LEVEL;
+  const [showTheory, setShowTheory] = useState(false);
 
   return (
     <div style={{ maxWidth: 512, margin: '0 auto', color: I.ink, paddingBottom: 24 }}>
@@ -44,6 +45,18 @@ export function SetupI({
           <div style={{ background: I.card, border: `1px dashed ${I.hairDark}`, padding: '10px 12px' }}>
             <div style={{ ...mono, fontSize: 9, fontWeight: 800, color: I.inkMute, letterSpacing: 1.5 }}>// HOWTO</div>
             <div style={{ marginTop: 4, fontSize: 12.5, lineHeight: 1.55 }}>{modeInfo.howTo}</div>
+          </div>
+        </div>
+      )}
+
+      {modeInfo.theory && (
+        <div style={{ padding: '12px 20px 0' }}>
+          <div style={{ background: I.card, border: `1px dashed ${I.hairDark}`, padding: '10px 12px' }}>
+            <button onClick={() => setShowTheory((v) => !v)} aria-expanded={showTheory} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+              <span style={{ ...mono, fontSize: 9, fontWeight: 800, color: I.inkMute, letterSpacing: 1.5 }}>// THEORY · 음악 개념</span>
+              <span style={{ fontSize: 12, color: I.inkMute, transform: showTheory ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} aria-hidden>▾</span>
+            </button>
+            {showTheory && <div style={{ marginTop: 6, fontSize: 12.5, lineHeight: 1.55 }}>{modeInfo.theory}</div>}
           </div>
         </div>
       )}

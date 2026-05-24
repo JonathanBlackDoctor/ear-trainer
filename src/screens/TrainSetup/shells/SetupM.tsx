@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { MAX_LEVEL, getLevelLabel } from '../../../modes/levels';
 import { M } from '../../../theme/decorations/palette';
 import { MCard, MText, MChip, MOrb } from '../../../theme/decorations/aurora';
@@ -11,6 +11,7 @@ export function SetupM({
   loading, onStart, onBack,
 }: TrainSetupProps) {
   const maxLevel = modeInfo.maxLevel ?? MAX_LEVEL;
+  const [showTheory, setShowTheory] = useState(false);
 
   return (
     <div style={{ maxWidth: 512, margin: '0 auto', color: M.ink, position: 'relative', overflow: 'hidden', paddingBottom: 28 }}>
@@ -41,6 +42,18 @@ export function SetupM({
           <MCard style={{ padding: '12px 16px' }}>
             <div style={{ fontSize: 10, color: M.violet, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase' }}>사용법</div>
             <div style={{ marginTop: 6, fontSize: 12.5, lineHeight: 1.55 }}>{modeInfo.howTo}</div>
+          </MCard>
+        </div>
+      )}
+
+      {modeInfo.theory && (
+        <div style={{ padding: '12px 20px 0', position: 'relative' }}>
+          <MCard style={{ padding: '12px 16px' }}>
+            <button onClick={() => setShowTheory((v) => !v)} aria-expanded={showTheory} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+              <span style={{ fontSize: 10, color: M.violet, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase' }}>음악 개념</span>
+              <span style={{ fontSize: 13, color: M.inkMute, transform: showTheory ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} aria-hidden>▾</span>
+            </button>
+            {showTheory && <div style={{ marginTop: 6, fontSize: 12.5, lineHeight: 1.55 }}>{modeInfo.theory}</div>}
           </MCard>
         </div>
       )}
