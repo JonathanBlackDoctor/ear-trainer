@@ -6,7 +6,7 @@ import type { ResultData } from '../useResultData';
 export function ResultG({ data }: { data: ResultData }) {
   const {
     pct, emoji, comment, correct, wrong, mins, secs, bestCombo,
-    xpEarned, xpDisplayed, currRank, prevRank, rankedUp, unlocked,
+    xpEarned, xpDisplayed, currRank, prevRank, rankedUp, unlocked, weakSummary,
     again, goBadges, goStats, goHome,
   } = data;
   const tnum: React.CSSProperties = { fontVariantNumeric: 'tabular-nums' };
@@ -77,6 +77,15 @@ export function ResultG({ data }: { data: ResultData }) {
           </GBlock>
         </div>
       ))}
+
+      {weakSummary && (
+        <div style={{ padding: '14px 20px 0' }}>
+          <GBlock bg={G.mustard} sh={G.shadowS} style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1.5 }}>⚡ 약점 개선</div>
+            <div style={{ ...tnum, fontSize: 14, fontWeight: 900 }}>{weakSummary.practiced}개 연습 · {weakSummary.improved}개 향상</div>
+          </GBlock>
+        </div>
+      )}
 
       {/* actions */}
       <div style={{ padding: '18px 20px 0' }}>

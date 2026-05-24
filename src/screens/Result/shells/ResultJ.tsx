@@ -6,7 +6,7 @@ import type { ResultData } from '../useResultData';
 export function ResultJ({ data }: { data: ResultData }) {
   const {
     pct, correct, wrong, mins, secs, bestCombo,
-    xpEarned, xpDisplayed, currRank, prevRank, rankedUp, unlocked, again,
+    xpEarned, xpDisplayed, currRank, prevRank, rankedUp, unlocked, weakSummary, again,
   } = data;
   const tnum: React.CSSProperties = { fontVariantNumeric: 'tabular-nums' };
   const time = `${mins}:${String(secs).padStart(2, '0')}`;
@@ -79,6 +79,15 @@ export function ResultJ({ data }: { data: ResultData }) {
           </div>
         </div>
       ))}
+
+      {weakSummary && (
+        <div style={{ padding: '14px 20px 0' }}>
+          <div style={{ background: J.card, border: `2px solid ${J.ink}`, boxShadow: `3px 3px 0 ${J.ink}`, padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <JSticker bg={J.yellow} rot={-2}>⚡ 약점</JSticker>
+            <div style={{ ...tnum, fontSize: 13, fontWeight: 900 }}>{weakSummary.practiced}개 연습 · {weakSummary.improved}개 향상</div>
+          </div>
+        </div>
+      )}
 
       <div style={{ padding: '18px 20px 24px' }}>
         <button onClick={again} style={{ width: '100%', padding: '14px 0', border: `2.5px solid ${J.ink}`, background: J.pink, color: '#fff', fontSize: 14, fontWeight: 900, boxShadow: `4px 4px 0 ${J.ink}` }}>◁◁ REW · 한 번 더</button>
