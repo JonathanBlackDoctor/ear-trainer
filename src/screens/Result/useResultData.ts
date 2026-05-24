@@ -6,6 +6,13 @@ import type { RankProgress } from '../../engine/xp';
 import { useStore } from '../../store/useStore';
 import { ACHIEVEMENTS_BY_ID } from '../../engine/achievements';
 
+export interface WeakProgressItem {
+  itemKey: string;
+  practiced: number;       // how many times this item appeared this session
+  beforePct: number | null; // accuracy before the session (null = no prior data)
+  afterPct: number | null;  // accuracy now (including this session)
+}
+
 interface ResultState {
   mode: ModeKey;
   total: number;
@@ -16,6 +23,7 @@ interface ResultState {
   bestCombo: number;
   previousTotalXp: number;
   sessionUnlockedIds: string[];
+  weakFocus?: WeakProgressItem[];
 }
 
 export interface UnlockedAchievementView {
@@ -50,6 +58,8 @@ export interface ResultData {
   rankedUp: boolean;
   unlocked: UnlockedAchievementView[];
   wrongItems: WrongItemView[];
+  weakProgress: WeakProgressItem[];
+  weakSummary: { practiced: number; improved: number } | null;
   again: () => void;
   goBadges: () => void;
   goStats: () => void;
@@ -91,6 +101,7 @@ export function useResultData(): ResultData | null {
   const {
     mode, total, correct, results, durationSec,
     xpEarned = 0, bestCombo = 0, previousTotalXp = 0, sessionUnlockedIds = [],
+    weakFocus = [],
   } = state;
 
   const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
@@ -122,6 +133,13 @@ export function useResultData(): ResultData | null {
       .filter(Boolean)
       .map((a) => ({ id: a.id, emoji: a.emoji, name: a.name, description: a.description })),
     wrongItems: results.filter((r) => !r.correct).map((r) => ({ itemKey: r.itemKey, skipped: r.skipped, partialScore: r.partialScore })),
+    weakProgress: weakFocus,
+    weakSummary: weakFocus.length > 0
+      ? {
+          practiced: weakFocus.length,
+          improved: weakFocus.filter((w) => w.beforePct != null && w.afterPct != null && w.afterPct > w.beforePct).length,
+        }
+      : null,
     again: () => navigate(`/train/${mode}`),
     goBadges: () => navigate('/badges'),
     goStats: () => navigate('/stats'),

@@ -17,6 +17,7 @@ import {
 } from '../engine/questionFactory';
 import { MAX_LEVEL } from '../modes/levels';
 import { TrainSetup } from './TrainSetup';
+import type { WeakProgressItem } from './Result/useResultData';
 import { judge } from '../engine/judge';
 import { awardXp } from '../engine/xp';
 import { PlaybackControls } from '../components/PlaybackControls';
@@ -168,7 +169,20 @@ export function Train() {
   }, []);
 
   // ─── Session Management ─────────────────────────────────────────────────────
+  // Snapshot of weak-item accuracy taken at the start of a weak-focus session,
+  // so the Result screen can show before→after improvement on what was drilled.
+  const weakSnapshotRef = useRef<Record<string, { attempts: number; correct: number }>>({});
+
   function beginSession() {
+    if (isWeakSession && weakItemKeys) {
+      const ms = useStore.getState().stats[modeKey] ?? {};
+      const snap: Record<string, { attempts: number; correct: number }> = {};
+      weakItemKeys.forEach((key) => {
+        const it = ms[key];
+        snap[key] = { attempts: it?.attempts ?? 0, correct: it?.correct ?? 0 };
+      });
+      weakSnapshotRef.current = snap;
+    }
     const startTime = Date.now();
     setSession({
       questions: [],
@@ -211,6 +225,7 @@ export function Train() {
     const last = session?.questions[idx - 1]?.itemKey;
     const modeSrs = srs[modeKey];
     const modeStats = stats[modeKey];
+    const sel = { lastItemKey: last, srs: modeSrs, stats: modeStats, candidateFilter };
     let q: Question;
     switch (modeKey) {
       case 'interval': q = makeIntervalQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter); break;
@@ -222,17 +237,17 @@ export function Train() {
       case 'rhythm': return makeRhythmQuestion(level);
       case 'tempo': return makeTempoQuestion(level);
       case 'bpm': return makeBpmQuestion(level);
-      case 'lab-scale': return makeScaleQuestion(level);
-      case 'lab-cadence': q = makeCadenceQuestion(level, k, fk); break;
-      case 'lab-inversion': return makeInversionQuestion(level);
-      case 'lab-interval-compare': return makeIntervalCompareQuestion(level);
-      case 'lab-odd-note': return makeOddNoteQuestion(level);
-      case 'lab-contour': return makeContourQuestion(level);
-      case 'lab-tuning': return makeTuningQuestion(level);
-      case 'lab-function': return makeFunctionQuestion(level);
-      case 'lab-extended': return makeExtendedQuestion(level);
-      case 'lab-bass': return makeBassQuestion(level);
-      case 'lab-tension': return makeTensionQuestion(level);
+      case 'lab-scale': return makeScaleQuestion(level, sel);
+      case 'lab-cadence': q = makeCadenceQuestion(level, sel); break;
+      case 'lab-inversion': return makeInversionQuestion(level, sel);
+      case 'lab-interval-compare': return makeIntervalCompareQuestion(level, sel);
+      case 'lab-odd-note': return makeOddNoteQuestion(level, sel);
+      case 'lab-contour': return makeContourQuestion(level, sel);
+      case 'lab-tuning': return makeTuningQuestion(level, sel);
+      case 'lab-function': return makeFunctionQuestion(level, sel);
+      case 'lab-extended': return makeExtendedQuestion(level, sel);
+      case 'lab-bass': return makeBassQuestion(level, sel);
+      case 'lab-tension': return makeTensionQuestion(level, sel);
       default: q = makeIntervalQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter);
     }
     // Stamp absoluteMode flag on the question so downstream playback/UI
@@ -646,6 +661,27 @@ export function Train() {
       results,
     );
 
+    // Weak-focus improvement: compare each drilled weak item's accuracy before
+    // the session vs now. Only report items actually practiced this session.
+    let weakFocus: WeakProgressItem[] | undefined;
+    if (isWeakSession) {
+      const ms = useStore.getState().stats[modeKey] ?? {};
+      const snap = weakSnapshotRef.current;
+      const items = Object.keys(snap)
+        .map((key) => {
+          const before = snap[key];
+          const after = ms[key] ?? before;
+          return {
+            itemKey: key,
+            practiced: after.attempts - before.attempts,
+            beforePct: before.attempts > 0 ? Math.round((before.correct / before.attempts) * 100) : null,
+            afterPct: after.attempts > 0 ? Math.round((after.correct / after.attempts) * 100) : null,
+          };
+        })
+        .filter((x) => x.practiced > 0);
+      weakFocus = items.length > 0 ? items : undefined;
+    }
+
     navigate('/result', {
       state: {
         mode: modeKey,
@@ -657,6 +693,7 @@ export function Train() {
         bestCombo,
         previousTotalXp,
         sessionUnlockedIds: newlyUnlocked,
+        weakFocus,
       },
     });
   }

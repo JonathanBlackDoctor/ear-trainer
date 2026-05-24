@@ -1,7 +1,5 @@
 import type { StatsItem, ModeKey, ModeStats } from '../types';
-import { intervalItemKeys } from '../theory/intervals';
-import { chordItemKeys } from '../theory/chords';
-import { solfegeItemKeys } from '../theory/solfege';
+import { itemKeysForLevel } from './itemPool';
 
 const RECENT_WINDOW = 8;
 const MIN_WEIGHT = 0.05;
@@ -73,15 +71,6 @@ export function topWeakItems(
     .slice(0, n);
 }
 
-// Modes whose per-level item pools we can enumerate, so a weak-focus session
-// can run at a level that actually contains the user's weak items. Other modes
-// either encode the level in the item key (handled below) or can't focus.
-const ITEM_KEYS_FOR_LEVEL: Partial<Record<ModeKey, (level: number) => string[]>> = {
-  interval: intervalItemKeys,
-  chord: chordItemKeys,
-  solfege: solfegeItemKeys,
-};
-
 /**
  * Pick the level a weak-focus session should run at for a mode.
  *
@@ -114,14 +103,13 @@ export function weakFocusLevel(
     return lv >= 1 && lv <= maxLevel ? lv : fallback;
   }
 
-  const itemKeysFor = ITEM_KEYS_FOR_LEVEL[modeKey];
-  if (!itemKeysFor) return fallback;
-
   const weakSet = new Set(weakKeys);
   let bestLevel = fallback;
   let bestCoverage = -1;
   for (let lv = 1; lv <= maxLevel; lv++) {
-    const coverage = itemKeysFor(lv).filter((k) => weakSet.has(k)).length;
+    const pool = itemKeysForLevel(modeKey, lv);
+    if (pool.length === 0) return fallback; // mode isn't item-poolable
+    const coverage = pool.filter((k) => weakSet.has(k)).length;
     if (coverage > bestCoverage) {
       bestCoverage = coverage;
       bestLevel = lv;
