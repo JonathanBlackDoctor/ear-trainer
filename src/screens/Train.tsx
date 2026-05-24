@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 import type {
   Question, ModeKey, SessionResult, ProgressionAnswer,
   IntervalData, ChordData, SolfegeData, MelodyData, ProgressionData, RhythmData,
@@ -701,6 +701,11 @@ export function Train() {
   const currentQuestion = session?.questions[session.currentIdx] ?? null;
   const currentIdx = session?.currentIdx ?? 0;
   const correctCount = (session?.results ?? []).filter((r) => r.correct).length;
+
+  // Unknown mode key (e.g. a renamed/removed mode lingering in old persisted
+  // stats): there's no input UI for it, so a session would render only the
+  // playback controls. Bounce home rather than show a half-broken screen.
+  if (!MODE_INFO[modeKey]) return <Navigate to="/" replace />;
 
   // ─── Setup Screen ─────────────────────────────────────────────────────────
   if (phase === 'setup' || !audioReady) {

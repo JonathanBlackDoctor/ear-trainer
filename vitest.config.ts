@@ -1,11 +1,14 @@
 import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
 
-// Pure-logic test config. No jsdom — component tests (RTL) are deferred. Run
-// with `npm test` (watch) or `npm run test:run` (CI).
+// Logic tests run in node; component tests (*.test.tsx) opt into jsdom via
+// environmentMatchGlobs. Run with `npm test` (watch) or `npm run test:run` (CI).
 export default defineConfig({
+  plugins: [react()],
   test: {
     environment: 'node',
-    include: ['src/**/*.{test,spec}.ts'],
+    environmentMatchGlobs: [['src/**/*.test.tsx', 'jsdom']],
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
     globals: false,
     coverage: {
       provider: 'v8',

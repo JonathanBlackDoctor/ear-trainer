@@ -64,6 +64,7 @@ export function useStatsData(): StatsData {
     .map((s) => (s.total > 0 ? Math.round((s.correct / s.total) * 100) : 0));
 
   const modeAccuracy: ModeAccuracy[] = (Object.entries(stats) as [ModeKey, (typeof stats)[ModeKey]][])
+    .filter(([mode]) => mode in MODE_REGISTRY)
     .map(([mode, ms]) => {
       const items = Object.values(ms);
       const att = items.reduce((s, i) => s + i.attempts, 0);
@@ -81,6 +82,7 @@ export function useStatsData(): StatsData {
     .sort((a, b) => b.pct - a.pct);
 
   const weakItems: WeakRow[] = (Object.entries(stats) as [ModeKey, (typeof stats)[ModeKey]][])
+    .filter(([mode]) => mode in MODE_REGISTRY)
     .flatMap(([mode, ms]) =>
       Object.entries(ms).map(([key, item]) => ({
         key,
