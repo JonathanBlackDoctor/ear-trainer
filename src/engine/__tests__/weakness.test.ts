@@ -97,6 +97,16 @@ describe('weakFocusLevel', () => {
     expect(weakFocusLevel('chord', { 'dominant7_inv0': weak }, 10)).toBe(6);
   });
 
+  it('handles lab modes via the shared item pool (scale)', () => {
+    // dorian first appears at scale Lv4.
+    expect(weakFocusLevel('lab-scale', { 'scale_dorian': weak }, 10)).toBe(4);
+  });
+
+  it('handles lab modes via the shared item pool (cadence)', () => {
+    // deceptive cadence first appears at Lv3.
+    expect(weakFocusLevel('lab-cadence', { 'cadence_deceptive': weak }, 10)).toBe(3);
+  });
+
   it('parses the level from level-encoded item keys (transpose)', () => {
     expect(weakFocusLevel('transpose', { 'transpose_lv3': weak }, 10)).toBe(3);
   });

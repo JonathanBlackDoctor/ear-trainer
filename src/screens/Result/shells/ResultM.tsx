@@ -6,7 +6,7 @@ import type { ResultData } from '../useResultData';
 export function ResultM({ data }: { data: ResultData }) {
   const {
     pct, comment, correct, wrong, mins, secs, bestCombo,
-    xpEarned, xpDisplayed, currRank, prevRank, rankedUp, unlocked, again,
+    xpEarned, xpDisplayed, currRank, prevRank, rankedUp, unlocked, weakSummary, again,
   } = data;
   const tnum: React.CSSProperties = { fontVariantNumeric: 'tabular-nums' };
   const time = `${mins}:${String(secs).padStart(2, '0')}`;
@@ -82,6 +82,17 @@ export function ResultM({ data }: { data: ResultData }) {
           </MCard>
         </div>
       ))}
+
+      {weakSummary && (
+        <div style={{ padding: '14px 20px 0', position: 'relative' }}>
+          <MCard style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ fontSize: 11, color: M.violet, fontWeight: 800, letterSpacing: 1.5 }}>⚡ 약점 개선</div>
+            <div style={{ flex: 1, textAlign: 'right', fontSize: 13, fontWeight: 700 }}>
+              {weakSummary.practiced}개 연습 · <MText size={13}>{weakSummary.improved}개 향상</MText>
+            </div>
+          </MCard>
+        </div>
+      )}
 
       <div style={{ padding: '20px 20px 28px', position: 'relative' }}>
         <button onClick={again} style={{ width: '100%', padding: '16px 0', borderRadius: 18, border: 'none', background: M.iridescent, color: '#fff', fontSize: 15, fontWeight: 800, boxShadow: '0 14px 30px rgba(168,85,247,0.5)' }}>한 번 더</button>

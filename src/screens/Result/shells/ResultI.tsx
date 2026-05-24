@@ -6,7 +6,7 @@ import type { ResultData } from '../useResultData';
 export function ResultI({ data }: { data: ResultData }) {
   const {
     pct, correct, wrong, total, mins, secs, bestCombo,
-    xpEarned, totalXp, currRank, prevRank, rankedUp, unlocked,
+    xpEarned, totalXp, currRank, prevRank, rankedUp, unlocked, weakSummary,
     again, goBadges, goStats, goHome,
   } = data;
   const mono: React.CSSProperties = { fontVariantNumeric: 'tabular-nums slashed-zero' };
@@ -86,6 +86,15 @@ export function ResultI({ data }: { data: ResultData }) {
           </div>
         </div>
       ))}
+
+      {weakSummary && (
+        <div style={{ padding: '12px 20px 0' }}>
+          <div style={{ ...mono, background: I.card, border: `1px solid ${I.hairDark}`, padding: '10px 12px', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: I.inkMute, letterSpacing: 1.5 }}>WEAK · FOCUS</div>
+            <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: '-0.01em' }}>{weakSummary.practiced} 연습 · <span style={{ color: I.lime }}>{weakSummary.improved} 향상</span></div>
+          </div>
+        </div>
+      )}
 
       {/* actions */}
       <div style={{ padding: '16px 20px 0' }}>
