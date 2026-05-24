@@ -32,7 +32,7 @@ export interface Question {
   context: {
     key: string;         // tonic, e.g. "C"
     referenceToneNote?: string; // full note to play as reference, e.g. "C4"
-    absoluteMode?: boolean;     // session-flag: absolute-pitch mode (no reference)
+    absoluteMode?: boolean;     // lab modes that present absolute pitches (no reference tone)
   };
 }
 

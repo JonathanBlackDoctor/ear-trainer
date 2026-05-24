@@ -6,7 +6,6 @@ import type { TrainSetupProps } from '../index';
 
 export function SetupI({
   modeKey, modeInfo, isWeakSession, totalQuestions, questionOptions, setTotalQuestions, level, setLevel,
-  showAbsoluteToggle, absoluteMode, setAbsoluteMode,
   isProgression, progressionSource, setProgressionSource,
   loading, onStart, onBack,
 }: TrainSetupProps) {
@@ -104,31 +103,20 @@ export function SetupI({
       </div>
 
       {/* options */}
-      {(showAbsoluteToggle || isProgression) && (
+      {isProgression && (
         <div style={{ padding: '14px 20px 0' }}>
           <div style={{ background: I.card, border: `1px solid ${I.hairDark}` }}>
-            {showAbsoluteToggle && (
-              <div style={{ padding: '10px 12px', borderBottom: isProgression ? `1px solid ${I.hair}` : 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700 }}>절대음감 모드</div>
-                  <div style={{ ...mono, fontSize: 10, color: I.inkMute, marginTop: 1 }}>NO_REF</div>
-                </div>
-                <button onClick={() => setAbsoluteMode(!absoluteMode)} role="switch" aria-checked={absoluteMode} style={{ ...mono, fontSize: 10, fontWeight: 800, padding: '3px 8px', border: `1px solid ${I.hairDark}`, background: absoluteMode ? I.lime : I.card, color: absoluteMode ? I.card : I.inkMute }}>{absoluteMode ? 'ON' : 'OFF'}</button>
+            <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 700 }}>출제 소스</div>
+                <div style={{ ...mono, fontSize: 10, color: I.inkMute, marginTop: 1 }}>SOURCE</div>
               </div>
-            )}
-            {isProgression && (
-              <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700 }}>출제 소스</div>
-                  <div style={{ ...mono, fontSize: 10, color: I.inkMute, marginTop: 1 }}>SOURCE</div>
-                </div>
-                <div style={{ display: 'flex', border: `1px solid ${I.hairDark}` }}>
-                  {([{ value: 'diatonic', label: 'DIA' }, { value: 'praise', label: '찬양' }] as const).map((opt, idx) => (
-                    <button key={opt.value} onClick={() => setProgressionSource(opt.value)} style={{ ...mono, padding: '4px 10px', fontSize: 11, fontWeight: 800, background: progressionSource === opt.value ? I.ink : I.card, color: progressionSource === opt.value ? I.card : I.inkSoft, border: 'none', borderLeft: idx > 0 ? `1px solid ${I.hairDark}` : 'none', letterSpacing: 0.5 }}>{opt.label}</button>
-                  ))}
-                </div>
+              <div style={{ display: 'flex', border: `1px solid ${I.hairDark}` }}>
+                {([{ value: 'diatonic', label: 'DIA' }, { value: 'praise', label: '찬양' }] as const).map((opt, idx) => (
+                  <button key={opt.value} onClick={() => setProgressionSource(opt.value)} style={{ ...mono, padding: '4px 10px', fontSize: 11, fontWeight: 800, background: progressionSource === opt.value ? I.ink : I.card, color: progressionSource === opt.value ? I.card : I.inkSoft, border: 'none', borderLeft: idx > 0 ? `1px solid ${I.hairDark}` : 'none', letterSpacing: 0.5 }}>{opt.label}</button>
+                ))}
               </div>
-            )}
+            </div>
           </div>
         </div>
       )}

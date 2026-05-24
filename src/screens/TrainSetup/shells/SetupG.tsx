@@ -6,7 +6,6 @@ import type { TrainSetupProps } from '../index';
 
 export function SetupG({
   modeKey, modeInfo, isWeakSession, totalQuestions, questionOptions, setTotalQuestions, level, setLevel,
-  showAbsoluteToggle, absoluteMode, setAbsoluteMode,
   isProgression, progressionSource, setProgressionSource,
   loading, onStart, onBack,
 }: TrainSetupProps) {
@@ -103,20 +102,6 @@ export function SetupG({
           </div>
         </GBlock>
       </div>
-
-      {showAbsoluteToggle && (
-        <div style={{ padding: '14px 20px 0' }}>
-          <GBlock bg={G.card} sh={G.shadowS} style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 900 }}>절대음감 모드</div>
-              <div style={{ fontSize: 11, color: G.inkSoft, fontWeight: 600, marginTop: 2 }}>기준음 없이 음이름만 듣기</div>
-            </div>
-            <button onClick={() => setAbsoluteMode(!absoluteMode)} role="switch" aria-checked={absoluteMode} style={{ width: 52, height: 28, border: `2.5px solid ${G.ink}`, background: absoluteMode ? G.mint : G.card, position: 'relative', padding: 0 }}>
-              <div style={{ position: 'absolute', top: 1, left: absoluteMode ? 25 : 1, width: 22, height: 22, background: absoluteMode ? G.ink : G.inkMute, border: `2px solid ${G.ink}`, transition: 'left 0.15s' }} />
-            </button>
-          </GBlock>
-        </div>
-      )}
 
       {isProgression && (
         <div style={{ padding: '14px 20px 0' }}>

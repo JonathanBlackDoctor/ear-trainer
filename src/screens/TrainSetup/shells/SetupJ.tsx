@@ -6,7 +6,6 @@ import type { TrainSetupProps } from '../index';
 
 export function SetupJ({
   modeKey, modeInfo, isWeakSession, totalQuestions, questionOptions, setTotalQuestions, level, setLevel,
-  showAbsoluteToggle, absoluteMode, setAbsoluteMode,
   isProgression, progressionSource, setProgressionSource,
   loading, onStart, onBack,
 }: TrainSetupProps) {
@@ -94,20 +93,6 @@ export function SetupJ({
           </div>
         </div>
       </div>
-
-      {showAbsoluteToggle && (
-        <div style={{ padding: '14px 20px 0' }}>
-          <div style={{ background: J.card, border: `2px solid ${J.ink}`, boxShadow: `3px 3px 0 ${J.ink}`, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 900 }}>NO_REF · 절대음감</div>
-              <div style={{ fontSize: 10.5, color: J.inkMute, fontWeight: 700 }}>기준음 없이 진행</div>
-            </div>
-            <button onClick={() => setAbsoluteMode(!absoluteMode)} role="switch" aria-checked={absoluteMode} style={{ width: 48, height: 24, border: `2px solid ${J.ink}`, background: absoluteMode ? J.teal : J.card, position: 'relative', padding: 0 }}>
-              <div style={{ position: 'absolute', top: 0, left: absoluteMode ? 24 : 0, width: 20, height: 20, background: absoluteMode ? J.ink : J.inkMute, border: `1.5px solid ${J.ink}`, transition: 'left 0.15s' }} />
-            </button>
-          </div>
-        </div>
-      )}
 
       {isProgression && (
         <div style={{ padding: '14px 20px 0' }}>

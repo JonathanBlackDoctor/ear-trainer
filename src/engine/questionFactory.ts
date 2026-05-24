@@ -246,7 +246,6 @@ export function makeSolfegeQuestion(
   srs?: ModeSrs,
   stats?: ModeStats,
   candidateFilter?: (key: string) => boolean,
-  absoluteMode = false,
 ): Question {
   const cfg = SOLFEGE_LEVELS[level] ?? SOLFEGE_LEVELS[1];
   const key = cfg.keyMode === 'random' ? pickRandom(cfg.keyPool) : fixedKey;
@@ -272,22 +271,6 @@ export function makeSolfegeQuestion(
     : baseOctave + (Math.random() < 0.5 ? -1 : Math.random() < 0.5 ? 0 : 1);
   const tonicMidi = Note.midi(key + octave) ?? 60;
   const note = Note.fromMidi(tonicMidi + semis) ?? key + octave;
-
-  // Absolute-pitch mode: answer is the note-name pitch class (C, D, E…) and
-  // no reference tone is supplied. itemKey is namespaced so stats don't mix
-  // with relative-do solfege.
-  if (absoluteMode) {
-    const pc = Note.pitchClass(note);
-    return {
-      id: genId(),
-      mode: 'solfege',
-      level,
-      itemKey: `abs_${pc}`,
-      data: { type: 'solfege', note, solfege: pc, key },
-      answer: pc,
-      context: { key, absoluteMode: true },
-    };
-  }
 
   return {
     id: genId(),

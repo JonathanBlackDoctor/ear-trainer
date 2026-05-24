@@ -5,7 +5,6 @@ import type { TrainSetupProps } from '../index';
 // Classic (default) setup layout — unchanged from the original Train setup block.
 export function SetupDefault({
   modeKey, modeInfo, isWeakSession, totalQuestions, questionOptions, setTotalQuestions, level, setLevel,
-  showAbsoluteToggle, absoluteMode, setAbsoluteMode,
   isProgression, progressionSource, setProgressionSource,
   loading, onStart, onBack,
 }: TrainSetupProps) {
@@ -76,25 +75,6 @@ export function SetupDefault({
             ))}
           </div>
         </div>
-
-        {showAbsoluteToggle && (
-          <div className="card w-full max-w-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-sm font-semibold text-slate-700">🎯 절대음감 모드</div>
-                <div className="text-xs text-slate-500 mt-1 leading-snug">기준음 없이 음이름만 듣고 맞히기</div>
-              </div>
-              <button
-                role="switch"
-                aria-checked={absoluteMode}
-                onClick={() => setAbsoluteMode(!absoluteMode)}
-                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${absoluteMode ? 'bg-primary-600' : 'bg-slate-300'}`}
-              >
-                <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${absoluteMode ? 'translate-x-5' : 'translate-x-0.5'}`} />
-              </button>
-            </div>
-          </div>
-        )}
 
         {isProgression && (
           <div className="card w-full max-w-sm">

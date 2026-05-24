@@ -17,9 +17,6 @@ export interface TrainSetupProps {
   setTotalQuestions: (n: number) => void;
   level: number;
   setLevel: (n: number) => void;
-  showAbsoluteToggle: boolean;
-  absoluteMode: boolean;
-  setAbsoluteMode: (v: boolean) => void;
   isProgression: boolean;
   progressionSource: 'diatonic' | 'praise';
   setProgressionSource: (s: 'diatonic' | 'praise') => void;
