@@ -5,7 +5,7 @@ import { MCard, MText, MChip, MOrb } from '../../../theme/decorations/aurora';
 import type { TrainSetupProps } from '../index';
 
 export function SetupM({
-  modeKey, modeInfo, isWeakSession, totalQuestions, level, setLevel,
+  modeKey, modeInfo, isWeakSession, totalQuestions, questionOptions, setTotalQuestions, level, setLevel,
   showAbsoluteToggle, absoluteMode, setAbsoluteMode,
   isProgression, progressionSource, setProgressionSource,
   loading, onStart, onBack,
@@ -71,6 +71,24 @@ export function SetupM({
               const done = n < level;
               return (
                 <button key={n} onClick={() => setLevel(n)} aria-label={`레벨 ${n}`} style={{ fontVariantNumeric: 'tabular-nums', height: 42, borderRadius: 14, border: 'none', background: active ? M.iridescent : done ? M.iridescentSoft : 'rgba(26,31,58,0.04)', color: active ? '#fff' : done ? M.violet : M.inkSoft, fontSize: 14, fontWeight: 800, letterSpacing: '-0.02em', boxShadow: active ? '0 6px 14px rgba(168,85,247,0.45)' : 'none' }}>{n}</button>
+              );
+            })}
+          </div>
+        </MCard>
+      </div>
+
+      {/* question count */}
+      <div style={{ padding: '12px 20px 0', position: 'relative' }}>
+        <MCard style={{ padding: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 13, fontWeight: 800 }}>문항 수</div>
+            <div style={{ fontSize: 11, color: M.pink, fontWeight: 800 }}>{totalQuestions} 문항</div>
+          </div>
+          <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: `repeat(${questionOptions.length}, 1fr)`, gap: 6 }}>
+            {questionOptions.map((n) => {
+              const active = n === totalQuestions;
+              return (
+                <button key={n} onClick={() => setTotalQuestions(n)} aria-label={`${n}문항`} aria-pressed={active} style={{ fontVariantNumeric: 'tabular-nums', height: 42, borderRadius: 14, border: 'none', background: active ? M.iridescent : 'rgba(26,31,58,0.04)', color: active ? '#fff' : M.inkSoft, fontSize: 14, fontWeight: 800, letterSpacing: '-0.02em', boxShadow: active ? '0 6px 14px rgba(168,85,247,0.45)' : 'none' }}>{n}</button>
               );
             })}
           </div>

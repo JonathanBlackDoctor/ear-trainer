@@ -5,7 +5,7 @@ import { GBlock, NeoSticker } from '../../../theme/decorations/neo';
 import type { TrainSetupProps } from '../index';
 
 export function SetupG({
-  modeKey, modeInfo, isWeakSession, totalQuestions, level, setLevel,
+  modeKey, modeInfo, isWeakSession, totalQuestions, questionOptions, setTotalQuestions, level, setLevel,
   showAbsoluteToggle, absoluteMode, setAbsoluteMode,
   isProgression, progressionSource, setProgressionSource,
   loading, onStart, onBack,
@@ -69,6 +69,32 @@ export function SetupG({
                   onClick={() => setLevel(n)}
                   aria-label={`레벨 ${n}`}
                   style={{ fontVariantNumeric: 'tabular-nums', height: 46, fontSize: 16, fontWeight: 900, letterSpacing: '-0.02em', border: `2.5px solid ${G.ink}`, background: active ? G.ink : done ? G.mint : G.card, color: active ? G.mustard : G.ink, boxShadow: active ? '3px 3px 0 #ff5a8c' : 'none' }}
+                >
+                  {n}
+                </button>
+              );
+            })}
+          </div>
+        </GBlock>
+      </div>
+
+      <div style={{ padding: '14px 20px 0' }}>
+        <GBlock bg={G.card} sh={G.shadowS} style={{ padding: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <div style={{ fontSize: 14, fontWeight: 900 }}>문항</div>
+            <div style={{ flex: 1 }} />
+            <div style={{ background: G.sky, border: `2px solid ${G.ink}`, padding: '2px 8px', fontSize: 10, fontWeight: 900 }}>{totalQuestions} 문항</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${questionOptions.length}, 1fr)`, gap: 6 }}>
+            {questionOptions.map((n) => {
+              const active = n === totalQuestions;
+              return (
+                <button
+                  key={n}
+                  onClick={() => setTotalQuestions(n)}
+                  aria-label={`${n}문항`}
+                  aria-pressed={active}
+                  style={{ fontVariantNumeric: 'tabular-nums', height: 46, fontSize: 16, fontWeight: 900, letterSpacing: '-0.02em', border: `2.5px solid ${G.ink}`, background: active ? G.ink : G.card, color: active ? G.mustard : G.ink, boxShadow: active ? '3px 3px 0 #ff5a8c' : 'none' }}
                 >
                   {n}
                 </button>

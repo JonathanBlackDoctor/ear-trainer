@@ -5,7 +5,7 @@ import { JReel, JStripes, JSticker } from '../../../theme/decorations/cassette';
 import type { TrainSetupProps } from '../index';
 
 export function SetupJ({
-  modeKey, modeInfo, isWeakSession, totalQuestions, level, setLevel,
+  modeKey, modeInfo, isWeakSession, totalQuestions, questionOptions, setTotalQuestions, level, setLevel,
   showAbsoluteToggle, absoluteMode, setAbsoluteMode,
   isProgression, progressionSource, setProgressionSource,
   loading, onStart, onBack,
@@ -71,6 +71,24 @@ export function SetupJ({
               const done = n < level;
               return (
                 <button key={n} onClick={() => setLevel(n)} aria-label={`레벨 ${n}`} style={{ ...tnum, height: 44, border: `2px solid ${J.ink}`, fontSize: 14, fontWeight: 900, background: active ? J.pink : done ? '#ffe1f1' : J.card, color: active ? '#fff' : J.ink, boxShadow: active ? `2px 2px 0 ${J.ink}` : 'none' }}>{n}</button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ padding: '14px 20px 0' }}>
+        <div style={{ background: J.chrome, border: `2.5px solid ${J.ink}`, boxShadow: `4px 4px 0 ${J.ink}`, padding: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <div style={{ background: J.ink, color: J.yellow, padding: '3px 8px', fontSize: 10, fontWeight: 900, letterSpacing: 2 }}>곡 수</div>
+            <div style={{ flex: 1 }} />
+            <div style={{ ...tnum, fontSize: 12, fontWeight: 900, color: J.pinkDeep }}>{totalQuestions} 곡</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${questionOptions.length}, 1fr)`, gap: 6 }}>
+            {questionOptions.map((n) => {
+              const active = n === totalQuestions;
+              return (
+                <button key={n} onClick={() => setTotalQuestions(n)} aria-label={`${n}문항`} aria-pressed={active} style={{ ...tnum, height: 44, border: `2px solid ${J.ink}`, fontSize: 14, fontWeight: 900, background: active ? J.pink : J.card, color: active ? '#fff' : J.ink, boxShadow: active ? `2px 2px 0 ${J.ink}` : 'none' }}>{n}</button>
               );
             })}
           </div>

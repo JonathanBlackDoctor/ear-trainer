@@ -13,6 +13,8 @@ export interface TrainSetupProps {
   modeInfo: ModeInfo;
   isWeakSession: boolean;
   totalQuestions: number;
+  questionOptions: number[];
+  setTotalQuestions: (n: number) => void;
   level: number;
   setLevel: (n: number) => void;
   showAbsoluteToggle: boolean;

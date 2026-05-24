@@ -4,7 +4,7 @@ import type { TrainSetupProps } from '../index';
 
 // Classic (default) setup layout — unchanged from the original Train setup block.
 export function SetupDefault({
-  modeKey, modeInfo, isWeakSession, totalQuestions, level, setLevel,
+  modeKey, modeInfo, isWeakSession, totalQuestions, questionOptions, setTotalQuestions, level, setLevel,
   showAbsoluteToggle, absoluteMode, setAbsoluteMode,
   isProgression, progressionSource, setProgressionSource,
   loading, onStart, onBack,
@@ -19,9 +19,9 @@ export function SetupDefault({
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4 gap-6">
-        <div className="text-6xl" aria-hidden>{modeInfo.emoji}</div>
-        <h1 className="text-xl font-bold text-slate-800">{modeInfo.name}</h1>
+      <div className="flex-1 flex flex-col items-center justify-start px-4 pt-3 pb-8 gap-3">
+        <div className="text-4xl" aria-hidden>{modeInfo.emoji}</div>
+        <h1 className="text-lg font-bold text-slate-800">{modeInfo.name}</h1>
         {isWeakSession && (
           <div className="badge-accent text-xs">⚡ 약점 집중 세션 · {totalQuestions}문항</div>
         )}
@@ -58,6 +58,23 @@ export function SetupDefault({
             ))}
           </div>
           <div className="mt-3 text-xs text-slate-500 min-h-[1.25rem] leading-snug">Lv{level} · {getLevelLabel(modeKey, level)}</div>
+        </div>
+
+        <div className="card w-full max-w-sm">
+          <div className="text-sm font-semibold text-slate-600 mb-3">문항 수</div>
+          <div className="grid grid-cols-6 gap-2">
+            {questionOptions.map((n) => (
+              <button
+                key={n}
+                className={`py-2 rounded-lg font-semibold text-sm transition-colors ${totalQuestions === n ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-600 active:bg-slate-200'}`}
+                onClick={() => setTotalQuestions(n)}
+                aria-label={`${n}문항`}
+                aria-pressed={totalQuestions === n}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
         </div>
 
         {showAbsoluteToggle && (
