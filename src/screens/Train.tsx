@@ -13,7 +13,7 @@ import {
   makeScaleQuestion, makeCadenceQuestion, makeInversionQuestion,
   makeIntervalCompareQuestion, makeOddNoteQuestion, makeContourQuestion,
   makeTuningQuestion, makeFunctionQuestion, makeExtendedQuestion,
-  makeBassQuestion, makeTensionQuestion,
+  makeBassQuestion, makeTensionQuestion, makeMixQuestion,
 } from '../engine/questionFactory';
 import { MAX_LEVEL } from '../modes/levels';
 import { TrainSetup } from './TrainSetup';
@@ -36,16 +36,18 @@ import {
   getIntervalCompareChoices, getOddNoteChoices, getContourChoices, getTuningChoices,
   getFunctionChoices, getExtendedChoices, getBassChoices, getTensionChoices,
 } from '../modes/labModes';
+import { getMixChoices, mixColumns, mixLabel } from '../modes/mixModes';
 import { MODE_REGISTRY, type ModeInfo } from '../modes/registry';
 import type {
   ScaleData, CadenceData,
   IntervalCompareData, OddNoteData, ContourData, TuningData, FunctionData, TensionData,
+  MixData,
 } from '../types';
 import {
   startAudio, playNote, playChord, playSequence, playProgression, playArpeggio,
   playMetronomeClick, playRhythmClick,
   playMetronome, stopAllAudio, getAudioStatus, getPlaybackGen, type AudioQuality,
-  playReferenceTone,
+  playReferenceTone, playMixSample,
 } from '../audio/piano';
 import type { ChordStep } from '../types';
 import { Note } from 'tonal';
@@ -243,6 +245,19 @@ export function Train() {
       case 'lab-extended': return makeExtendedQuestion(level, sel);
       case 'lab-bass': return makeBassQuestion(level, sel);
       case 'lab-tension': return makeTensionQuestion(level, sel);
+      case 'mix-eq-freq':
+      case 'mix-eq-boostcut':
+      case 'mix-filter':
+      case 'mix-compression':
+      case 'mix-reverb-amount':
+      case 'mix-reverb-type':
+      case 'mix-delay-time':
+      case 'mix-pan':
+      case 'mix-width':
+      case 'mix-level':
+      case 'mix-distortion':
+      case 'mix-modulation':
+        return makeMixQuestion(modeKey, level, sel);
       default: q = makeIntervalQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter);
     }
     return q;
@@ -407,6 +422,10 @@ export function Train() {
         await playChord(d.baseNotes, '2n');
         await delay(800 / speed);
         await playChord(d.fullNotes, '2n');
+        break;
+      }
+      case 'mix': {
+        await playMixSample(data as MixData);
         break;
       }
     }
@@ -718,10 +737,12 @@ export function Train() {
   const isTempo = modeKey === 'tempo';
   const isBpm = modeKey === 'bpm';
   const isLabChoice = modeKey.startsWith('lab-');
+  const isMixChoice = modeKey.startsWith('mix-');
   const isAbsolute = !!currentQuestion?.context?.absoluteMode;
   const choiceColumns: 2 | 3 | 4 =
     isInterval ? 2
     : isChord ? 2
+    : isMixChoice ? mixColumns(modeKey.replace(/^mix-/, '') as MixData['effect'], level)
     : modeKey === 'lab-odd-note' ? 4
     : modeKey === 'lab-bass' ? 4
     : modeKey === 'lab-inversion' ? 2
@@ -885,7 +906,7 @@ export function Train() {
               )}
 
               {/* Choice-based modes */}
-              {(isInterval || isChord || (isSolfege && solfegeInputMethod === 'choice') || isLabChoice) && (
+              {(isInterval || isChord || (isSolfege && solfegeInputMethod === 'choice') || isLabChoice || isMixChoice) && (
                 <ChoiceGrid
                   options={getChoiceOptions(modeKey, level)}
                   selected={selectedAnswer ?? undefined}
@@ -1115,7 +1136,7 @@ export function Train() {
           ) : (
             /* After feedback: show correct answer highlight for choice modes */
             <>
-              {(isInterval || isChord || (isSolfege && solfegeInputMethod === 'choice') || isLabChoice) && (
+              {(isInterval || isChord || (isSolfege && solfegeInputMethod === 'choice') || isLabChoice || isMixChoice) && (
                 <ChoiceGrid
                   options={getChoiceOptions(modeKey, level)}
                   selected={selectedAnswer ?? undefined}
@@ -1232,6 +1253,7 @@ function getChoiceOptions(mode: ModeKey, level: number): ChoiceOption[] {
   if (mode === 'lab-extended') return getExtendedChoices(level);
   if (mode === 'lab-bass') return getBassChoices(level);
   if (mode === 'lab-tension') return getTensionChoices(level);
+  if (mode.startsWith('mix-')) return getMixChoices(mode.replace(/^mix-/, '') as MixData['effect'], level);
   return [];
 }
 
@@ -1240,7 +1262,10 @@ function formatAnswer(answer: unknown, mode: ModeKey, notation: 'roman' | 'numbe
     if (mode === 'tempo' || mode === 'bpm') return `${answer} BPM`;
     return String(answer);
   }
-  if (typeof answer === 'string') return answer;
+  if (typeof answer === 'string') {
+    if (mode.startsWith('mix-')) return mixLabel(mode.replace(/^mix-/, '') as MixData['effect'], answer);
+    return answer;
+  }
   if (Array.isArray(answer)) {
     if (mode === 'progression') {
       return (answer as ProgressionAnswer[])

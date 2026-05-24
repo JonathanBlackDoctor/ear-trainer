@@ -1,7 +1,7 @@
 import { Note, Interval } from 'tonal';
 import type {
   Question, AnswerValue, ProgressionAnswer,
-  IntervalData, ChordData, SolfegeData, MelodyData,
+  IntervalData, ChordData, SolfegeData, MelodyData, MixData, MixEffect,
 } from '../types';
 import { intervalLabel } from '../theory/intervals';
 
@@ -106,6 +106,14 @@ export interface LabJudgeDetails {
   correctAnswer: string;
 }
 
+export interface MixJudgeDetails {
+  kind: 'mix';
+  effect: MixEffect;
+  userAnswer: string;
+  correctAnswer: string;
+  detail: string;           // human-readable processing detail, e.g. "2 kHz · +6 dB"
+}
+
 export type JudgeDetails =
   | TempoJudgeDetails
   | IntervalJudgeDetails
@@ -115,7 +123,8 @@ export type JudgeDetails =
   | SolfegeJudgeDetails
   | RhythmJudgeDetails
   | BpmJudgeDetails
-  | LabJudgeDetails;
+  | LabJudgeDetails
+  | MixJudgeDetails;
 
 export interface JudgeResult {
   correct: boolean;
@@ -246,6 +255,32 @@ export function judge(question: Question, userAnswer: AnswerValue): JudgeResult 
         category,
         userAnswer: ua,
         correctAnswer: ca,
+      };
+      return { correct: isCorrect, partialScore: isCorrect ? 1 : 0, correctAnswer: correct, details };
+    }
+
+    case 'mix-eq-freq':
+    case 'mix-eq-boostcut':
+    case 'mix-filter':
+    case 'mix-compression':
+    case 'mix-reverb-amount':
+    case 'mix-reverb-type':
+    case 'mix-delay-time':
+    case 'mix-pan':
+    case 'mix-width':
+    case 'mix-level':
+    case 'mix-distortion':
+    case 'mix-modulation': {
+      const ua = userAnswer as string;
+      const ca = correct as string;
+      const isCorrect = ua === ca;
+      const mix = question.data as MixData;
+      const details: MixJudgeDetails = {
+        kind: 'mix',
+        effect: mix.effect,
+        userAnswer: ua,
+        correctAnswer: ca,
+        detail: mix.detail,
       };
       return { correct: isCorrect, partialScore: isCorrect ? 1 : 0, correctAnswer: correct, details };
     }

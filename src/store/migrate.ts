@@ -100,7 +100,23 @@ function v4Tov5(state: AnyState | null | undefined): AnyState | null | undefined
   };
 }
 
-export const CURRENT_SCHEMA_VERSION = 5;
+// v5 → v6: add the `hiddenModes` setting (empty = nothing hidden). Introduced
+// alongside the audio-engineer (mix-*) modes so users can hide modes they don't
+// use from Home. Stats/SRS for the new modes are filled lazily by the store's
+// default maps; no reset needed.
+function v5Tov6(state: AnyState | null | undefined): AnyState | null | undefined {
+  if (!state) return state;
+  const oldSettings = (state.settings ?? {}) as Record<string, unknown>;
+  return {
+    ...state,
+    settings: {
+      ...oldSettings,
+      hiddenModes: oldSettings.hiddenModes ?? [],
+    },
+  };
+}
+
+export const CURRENT_SCHEMA_VERSION = 6;
 
 export function migrate(persistedState: unknown, fromVersion: number): unknown {
   let state = persistedState as AnyState | null | undefined;
@@ -108,6 +124,7 @@ export function migrate(persistedState: unknown, fromVersion: number): unknown {
   if (fromVersion < 3) state = v2Tov3(state);
   if (fromVersion < 4) state = v3Tov4(state);
   if (fromVersion < 5) state = v4Tov5(state);
+  if (fromVersion < 6) state = v5Tov6(state);
   return state;
 }
 

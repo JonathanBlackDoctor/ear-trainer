@@ -10,6 +10,7 @@ import { RhythmFeedback } from './RhythmFeedback';
 import { TempoFeedback } from './TempoFeedback';
 import { BpmFeedback } from './BpmFeedback';
 import { LabFeedback } from './LabFeedback';
+import { MixFeedback } from './MixFeedback';
 
 export interface ModeFeedbackProps {
   question: Question;
@@ -45,6 +46,8 @@ export function ModeFeedback(props: ModeFeedbackProps) {
       return <BpmFeedback {...props} details={d} />;
     case 'lab':
       return <LabFeedback {...props} details={d} />;
+    case 'mix':
+      return <MixFeedback {...props} details={d} />;
     default:
       // Exhaustiveness — TS will catch missing cases at compile time.
       void question;

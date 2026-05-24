@@ -66,8 +66,9 @@ describe('migrate v2 → v3 (10-level curriculum reset)', () => {
       date: 1, mode: 'interval', total: 5, correct: 4, durationSec: 30,
       bestCombo: 0, xpEarned: 0,
     });
-    // v4→v5 adds the `design` theme setting (defaults to 'default').
-    expect(out.settings).toEqual({ ...v2State.settings, design: 'default' });
+    // v4→v5 adds the `design` theme setting (defaults to 'default'); v5→v6
+    // adds the `hiddenModes` setting (defaults to []).
+    expect(out.settings).toEqual({ ...v2State.settings, design: 'default', hiddenModes: [] });
     expect(out.customPatterns).toEqual(v2State.customPatterns);
   });
 
@@ -156,6 +157,30 @@ describe('migrate v4 → v5 (design theme setting)', () => {
   it('keeps an already-chosen design', () => {
     const out = migrate({ ...v4State, settings: { ...v4State.settings, design: 'm' } }, 4) as any;
     expect(out.settings.design).toBe('m');
+  });
+});
+
+describe('migrate v5 → v6 (hiddenModes setting)', () => {
+  const v5State = {
+    settings: { weakSessionLength: 10, reducedMotion: 'system', notation: 'number', design: 'default' },
+    stats: { interval: {} },
+    sessions: [],
+    customPatterns: [],
+    srs: { interval: {} },
+    gamification: { totalXp: 0, achievements: {} },
+  };
+
+  it('defaults hiddenModes to [] for existing users', () => {
+    const out = migrate(v5State, 5) as any;
+    expect(out.settings.hiddenModes).toEqual([]);
+    // unrelated settings preserved
+    expect(out.settings.design).toBe('default');
+    expect(out.settings.notation).toBe('number');
+  });
+
+  it('keeps already-hidden modes', () => {
+    const out = migrate({ ...v5State, settings: { ...v5State.settings, hiddenModes: ['bpm'] } }, 5) as any;
+    expect(out.settings.hiddenModes).toEqual(['bpm']);
   });
 });
 

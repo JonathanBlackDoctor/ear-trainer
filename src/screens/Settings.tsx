@@ -96,6 +96,8 @@ export function Settings() {
   }
 
   const modeOrder = resolveModeOrder(settings.modeOrder);
+  const hiddenModes = new Set<ModeKey>(settings.hiddenModes ?? []);
+  const visibleCount = modeOrder.length - hiddenModes.size;
   function moveMode(index: number, dir: -1 | 1) {
     const target = index + dir;
     if (target < 0 || target >= modeOrder.length) return;
@@ -103,8 +105,14 @@ export function Settings() {
     [next[index], next[target]] = [next[target], next[index]];
     updateSettings({ modeOrder: next });
   }
+  function toggleHidden(key: ModeKey) {
+    const next = new Set(hiddenModes);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    updateSettings({ hiddenModes: [...next] });
+  }
   function resetModeOrder() {
-    updateSettings({ modeOrder: undefined });
+    updateSettings({ modeOrder: undefined, hiddenModes: [] });
     toast.success('훈련 순서를 기본값으로 되돌렸어요.');
   }
 
@@ -230,9 +238,9 @@ export function Settings() {
             aria-controls="mode-order-list"
           >
             <div className="text-left">
-              <div className="text-sm font-semibold text-slate-600">훈련 순서</div>
+              <div className="text-sm font-semibold text-slate-600">훈련 순서 · 표시</div>
               <div className="text-xs text-slate-400 mt-0.5">
-                홈 화면 훈련 카드의 순서를 바꿉니다 · {modeOrder.length}개
+                홈 화면 훈련 카드의 순서와 표시 여부를 바꿉니다 · 표시 {visibleCount} · 숨김 {hiddenModes.size}
               </div>
             </div>
             <span
@@ -258,16 +266,33 @@ export function Settings() {
                 {modeOrder.map((key, i) => {
                   const info = MODE_REGISTRY[key as ModeKey];
                   if (!info) return null;
+                  const isHidden = hiddenModes.has(key as ModeKey);
                   return (
                     <li
                       key={key}
-                      className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2"
+                      className={`flex items-center gap-2 rounded-lg px-3 py-2 ${
+                        isHidden ? 'bg-slate-100 opacity-60' : 'bg-slate-50'
+                      }`}
                     >
                       <span className="text-lg" aria-hidden>{info.emoji}</span>
                       <span className="flex-1 text-sm font-medium text-slate-700 leading-tight">
                         {info.name}
+                        {isHidden && (
+                          <span className="ml-1.5 align-middle text-[10px] font-semibold text-slate-400 bg-slate-200 rounded px-1 py-0.5">
+                            숨김
+                          </span>
+                        )}
                       </span>
                       <span className="text-[11px] tabular-nums text-slate-400 w-5 text-right">{i + 1}</span>
+                      <button
+                        type="button"
+                        className="w-8 h-8 rounded-md bg-white border border-slate-200 text-slate-600 focus-ring active:scale-95"
+                        onClick={() => toggleHidden(key as ModeKey)}
+                        aria-pressed={!isHidden}
+                        aria-label={isHidden ? `${info.name} 표시하기` : `${info.name} 숨기기`}
+                      >
+                        {isHidden ? '🙈' : '👁'}
+                      </button>
                       <button
                         type="button"
                         className="w-8 h-8 rounded-md bg-white border border-slate-200 text-slate-600 disabled:opacity-30 focus-ring active:scale-95"

@@ -1,5 +1,6 @@
 // Audio engine: built-in synth (always works) + optional piano-sample upgrade.
 import * as Tone from 'tone';
+import type { MixData } from '../types';
 
 // ─── State ────────────────────────────────────────────────────────────────
 let sampler: Tone.Sampler | null = null;
@@ -542,6 +543,7 @@ export function stopAllAudio(): void {
   for (const id of pendingTimeouts) clearTimeout(id);
   pendingTimeouts.clear();
   playbackGen++;
+  disposeAllMix();
   try { sampler?.releaseAll(); } catch { /* ignore */ }
   try { synth?.releaseAll(); } catch { /* ignore */ }
   try { referenceSynth?.releaseAll(); } catch { /* ignore */ }
@@ -725,4 +727,211 @@ export async function playMetronome(bpm: number, beats: number): Promise<void> {
       await new Promise<void>((resolve) => setTimeout(resolve, beatMs));
     }
   }
+}
+
+// ─── Audio-engineer (mix) FX playback ───────────────────────────────────────
+// Mix modes play pink noise or a short synthesized groove through a Tone.js
+// effect chain. Unlike the note players above, these create per-question source
+// and effect nodes that must be torn down — they are tracked in `activeMixNodes`
+// and disposed by stopAllAudio() (via disposeAllMix) and by a cancellable
+// timeout at the natural end of playback.
+const activeMixNodes = new Set<{ dispose: () => void }>();
+
+function registerMix<T extends { dispose: () => void }>(n: T): T {
+  activeMixNodes.add(n);
+  return n;
+}
+
+/** Dispose every live mix node. Called from stopAllAudio and at playback end. */
+function disposeAllMix(): void {
+  for (const n of activeMixNodes) {
+    try { n.dispose(); } catch { /* already disposed */ }
+  }
+  activeMixNodes.clear();
+}
+
+function dbToGain(db: number): number {
+  return Math.pow(10, db / 20);
+}
+
+interface MixChain {
+  input: Tone.ToneAudioNode; // node the source(s) connect into
+  ready: Promise<unknown>;   // resolves once the chain is playable (reverb IR, etc.)
+}
+
+/** Dry reference: sources go straight to the output bus (no processing). */
+function buildPassChain(): MixChain {
+  return { input: getOutputGain(), ready: Promise.resolve() };
+}
+
+/** Build the processing chain for one mix question; head node is `input`. */
+function buildMixChain(d: MixData): MixChain {
+  const out = getOutputGain();
+  const p = d.params;
+  let ready: Promise<unknown> = Promise.resolve();
+  let head: Tone.ToneAudioNode;
+
+  switch (d.effect) {
+    case 'eq-freq':
+    case 'eq-boostcut': {
+      head = registerMix(new Tone.Filter({
+        type: 'peaking', frequency: Number(p.freq), Q: Number(p.q), gain: Number(p.gainDb),
+      }));
+      break;
+    }
+    case 'filter': {
+      head = registerMix(new Tone.Filter({
+        type: p.filterType as BiquadFilterType, frequency: Number(p.freq), Q: 1.2,
+      }));
+      break;
+    }
+    case 'compression': {
+      const comp = registerMix(new Tone.Compressor({
+        threshold: Number(p.threshold), ratio: Number(p.ratio), attack: 0.01, release: 0.15,
+      }));
+      const makeup = registerMix(new Tone.Gain(dbToGain(Number(p.makeupDb))));
+      comp.connect(makeup); makeup.connect(out);
+      return { input: comp, ready };
+    }
+    case 'reverb-amount':
+    case 'reverb-type': {
+      const rv = registerMix(new Tone.Reverb({
+        decay: Number(p.decay), preDelay: Number(p.preDelay ?? 0.01), wet: Number(p.wet),
+      }));
+      ready = rv.ready;
+      head = rv;
+      break;
+    }
+    case 'delay-time': {
+      head = registerMix(new Tone.FeedbackDelay({
+        delayTime: Number(p.delayTime), feedback: Number(p.feedback), wet: Number(p.wet),
+      }));
+      break;
+    }
+    case 'pan': {
+      head = registerMix(new Tone.Panner(Number(p.pan)));
+      break;
+    }
+    case 'width': {
+      head = registerMix(new Tone.StereoWidener(Number(p.width)));
+      break;
+    }
+    case 'level': {
+      head = registerMix(new Tone.Gain(dbToGain(Number(p.db))));
+      break;
+    }
+    case 'distortion': {
+      head = registerMix(new Tone.Distortion(Number(p.amount)));
+      break;
+    }
+    case 'modulation': {
+      const t = p.modType;
+      if (t === 'chorus') {
+        head = registerMix(new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0.7, wet: 0.7 }).start());
+      } else if (t === 'phaser') {
+        head = registerMix(new Tone.Phaser({ frequency: 0.6, octaves: 3, baseFrequency: 400, wet: 0.9 }));
+      } else {
+        head = registerMix(new Tone.Tremolo({ frequency: 5, depth: 0.85, wet: 0.9 }).start());
+      }
+      break;
+    }
+  }
+  head.connect(out);
+  return { input: head, ready };
+}
+
+// Click-free amplitude envelope for a continuous source over [at, at+dur].
+function rampEnvelope(env: Tone.Gain, at: number, dur: number): void {
+  env.gain.setValueAtTime(0, at);
+  env.gain.linearRampToValueAtTime(1, at + 0.02);
+  env.gain.setValueAtTime(1, Math.max(at + 0.02, at + dur - 0.06));
+  env.gain.linearRampToValueAtTime(0, at + dur);
+}
+
+function startPinkSource(input: Tone.ToneAudioNode, at: number, dur: number): void {
+  const env = registerMix(new Tone.Gain(0));
+  env.connect(input);
+  const noise = registerMix(new Tone.Noise({ type: 'pink' }));
+  noise.volume.value = -12;
+  noise.connect(env);
+  noise.start(at); noise.stop(at + dur);
+  rampEnvelope(env, at, dur);
+}
+
+// Stereo two-note pad (hard L/R) so StereoWidener has a real stereo image to act on.
+function startStereoPad(input: Tone.ToneAudioNode, at: number, dur: number): void {
+  const env = registerMix(new Tone.Gain(0));
+  env.connect(input);
+  const panL = registerMix(new Tone.Panner(-1)); panL.connect(env);
+  const panR = registerMix(new Tone.Panner(1));  panR.connect(env);
+  const oscA = registerMix(new Tone.Oscillator({ type: 'sawtooth', frequency: 220 }));    // A3
+  const oscB = registerMix(new Tone.Oscillator({ type: 'sawtooth', frequency: 277.18 })); // C#4
+  oscA.volume.value = -20; oscB.volume.value = -20;
+  oscA.connect(panL); oscB.connect(panR);
+  oscA.start(at); oscB.start(at); oscA.stop(at + dur); oscB.stop(at + dur);
+  rampEnvelope(env, at, dur);
+}
+
+// Simple 120 BPM groove (kick + hat + bass) repeated to fill [at, at+dur].
+function startGrooveSource(input: Tone.ToneAudioNode, at: number, dur: number): void {
+  const bus = registerMix(new Tone.Gain(1)); bus.connect(input);
+  const kick = registerMix(new Tone.MembraneSynth()); kick.volume.value = -4; kick.connect(bus);
+  const hat = registerMix(new Tone.NoiseSynth({
+    noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.03, sustain: 0, release: 0.01 },
+  })); hat.volume.value = -26; hat.connect(bus);
+  const bass = registerMix(new Tone.Synth({
+    oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 0.18, sustain: 0.25, release: 0.1 },
+  })); bass.volume.value = -8; bass.connect(bus);
+
+  const BAR = 2.0; // 120 BPM, 4/4
+  const end = at + dur;
+  for (let bar = at; bar < end; bar += BAR) {
+    const hit = (off: number, fn: (t: number) => void) => { if (bar + off < end) fn(bar + off); };
+    hit(0,   (t) => kick.triggerAttackRelease('C1', '8n', t));
+    hit(1.0, (t) => kick.triggerAttackRelease('C1', '8n', t));
+    for (const off of [0, 0.5, 1.0, 1.5]) hit(off, (t) => hat.triggerAttackRelease('16n', t));
+    hit(0,   (t) => bass.triggerAttackRelease('C2', '8n', t));
+    hit(1.0, (t) => bass.triggerAttackRelease('G1', '8n', t));
+    hit(1.5, (t) => bass.triggerAttackRelease('A1', '8n', t));
+  }
+}
+
+function startMixSource(d: MixData, input: Tone.ToneAudioNode, at: number, dur: number): void {
+  if (d.effect === 'width') { startStereoPad(input, at, dur); return; }
+  if (d.source === 'pink') { startPinkSource(input, at, dur); return; }
+  startGrooveSource(input, at, dur);
+}
+
+/**
+ * Play one audio-engineer (mix) question. For `compare: 'ab'` it plays a dry
+ * reference, a gap, then the processed signal; otherwise just the processed
+ * signal. Resolves once playback is scheduled (not when it finishes), matching
+ * the other play* helpers. Cleanup runs on stopAllAudio or a cancellable
+ * end-of-playback timeout.
+ */
+export async function playMixSample(d: MixData): Promise<void> {
+  if (!audioStarted) await startAudio();
+  await ensureRunning();
+  const gen = playbackGen;
+
+  const seg = d.compare === 'ab' ? 1.6 : 2.6;
+  const gap = 0.4;
+
+  const processed = buildMixChain(d);
+  const dry = d.compare === 'ab' ? buildPassChain() : null;
+  try { await processed.ready; } catch { /* reverb IR failed — play dry-ish */ }
+  if (gen !== playbackGen) { disposeAllMix(); return; } // stopped during IR generation
+
+  const base = scheduleStart();
+  let total: number;
+  if (d.compare === 'ab' && dry) {
+    startMixSource(d, dry.input, base, seg);
+    startMixSource(d, processed.input, base + seg + gap, seg);
+    total = seg + gap + seg;
+  } else {
+    startMixSource(d, processed.input, base, seg);
+    total = seg;
+  }
+
+  trackTimeout(() => { if (gen === playbackGen) disposeAllMix(); }, (total + 0.4) * 1000);
 }
