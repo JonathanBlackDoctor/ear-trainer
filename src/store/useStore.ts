@@ -49,6 +49,7 @@ const defaultSettings: AppSettings = {
   questionsPerSession: 10,
   showStaffFeedback: true,
   weakSessionLength: 10,
+  levelByMode: {},
   reducedMotion: 'system',
   design: 'default',
   modeOrder: DEFAULT_MODE_ORDER,

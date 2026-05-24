@@ -239,6 +239,10 @@ export interface AppSettings {
   questionsPerSession: number;
   showStaffFeedback: boolean;
   weakSessionLength: number;
+  // Last-used difficulty level per mode, so the setup screen restores the
+  // level the user practiced at (per-mode because each mode's maxLevel and
+  // difficulty meaning differ). Weak-focus sessions are excluded.
+  levelByMode?: Partial<Record<ModeKey, number>>;
   reducedMotion: 'system' | 'on' | 'off';
   design: DesignTheme;
   // User-defined ordering of training modes on the Home screen. Reconciled
