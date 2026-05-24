@@ -51,6 +51,30 @@ export function IField({ label, value, valueColor = I.ink, size = 'md' }: IField
   );
 }
 
+// Oscilloscope waveform on a faint grid — the signature play-card motif.
+export function Oscilloscope({ color = I.lime }: { color?: string }) {
+  return (
+    <svg
+      width="100%"
+      viewBox="0 0 340 70"
+      preserveAspectRatio="none"
+      aria-hidden
+      style={{
+        display: 'block',
+        height: 70,
+        background: `linear-gradient(${I.hair} 1px, transparent 1px) 0 0 / 100% 16.66%, linear-gradient(90deg, ${I.hair} 1px, transparent 1px) 0 0 / 14px 100%`,
+      }}
+    >
+      <path
+        d="M0,35 Q20,5 40,35 T80,35 Q100,55 120,35 T160,35 Q180,15 200,35 T240,35 Q260,55 280,35 T340,35"
+        stroke={color}
+        strokeWidth="1.6"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
 export function IChip({ children, color = I.lime }: { children: React.ReactNode; color?: string }) {
   return (
     <span
