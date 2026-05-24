@@ -72,6 +72,31 @@ export function MText({ children, size, weight = 700, style }: MTextProps) {
   );
 }
 
+// Frosted pill chip.
+export function MChip({ children, color }: { children: React.ReactNode; color?: string }) {
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4,
+        padding: '4px 10px',
+        borderRadius: 999,
+        fontSize: 11,
+        fontWeight: 700,
+        background: 'rgba(255,255,255,0.7)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
+        color: color || M.inkSoft,
+        border: '1px solid rgba(255,255,255,0.9)',
+        boxShadow: '0 2px 6px rgba(26,31,58,0.05)',
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
 // Blurred aurora orb. Decorative only; never animated (static composition).
 export function MOrb({ size = 80, style }: { size?: number; style?: React.CSSProperties }) {
   return (
