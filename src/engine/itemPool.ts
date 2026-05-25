@@ -8,6 +8,8 @@ import {
   ODD_LEVELS, CONTOUR_LEVELS, FUNCTION_LEVELS, EXTENDED_LEVELS,
   BASS_LEVELS, TENSION_LEVELS, DEGREE_FUNCTION,
   FUNCTION_TONIC, FUNCTION_SUBDOMINANT,
+  WIDE_LEVELS, NOTE_STACK_LEVELS, MICROTUNING_LEVELS, HARMONICS_LEVELS,
+  centsCode,
 } from '../modes/labModes';
 
 // ─── Per-mode itemKey formatters / reverse-maps ─────────────────────────────
@@ -92,6 +94,26 @@ export function tensionItemKeys(level: number): string[] {
   return (TENSION_LEVELS[level] ?? TENSION_LEVELS[1]).tensions.map((t) => `tension_${t}`);
 }
 
+export function wideIntervalItemKeys(level: number): string[] {
+  const cfg = WIDE_LEVELS[level] ?? WIDE_LEVELS[1];
+  return cfg.names.flatMap((n) => cfg.directions.map((d) => `wide_${n}_${d}`));
+}
+
+/** Note-stack items are focused by note-count (2..4), e.g. "stack_n3". */
+export function noteStackItemKeys(level: number): string[] {
+  const counts = new Set<number>();
+  for (const p of NOTE_STACK_LEVELS[level] ?? NOTE_STACK_LEVELS[1]) counts.add(p.steps.length + 1);
+  return [...counts].map((n) => `stack_n${n}`);
+}
+
+export function microtuningItemKeys(level: number): string[] {
+  return (MICROTUNING_LEVELS[level] ?? MICROTUNING_LEVELS[1]).cents.map((c) => `microtune_${centsCode(c)}`);
+}
+
+export function harmonicItemKeys(level: number): string[] {
+  return (HARMONICS_LEVELS[level] ?? HARMONICS_LEVELS[1]).partials.map((p) => `harmonic_${p}`);
+}
+
 // ─── Registry: modes whose per-level item pool can be enumerated ────────────
 // Used by the question factories (candidate list) and by weakFocusLevel (to
 // pick a level that actually contains the user's weak items). Modes absent
@@ -112,6 +134,10 @@ const POOL_BY_MODE: Partial<Record<ModeKey, (level: number) => string[]>> = {
   'lab-extended': extendedItemKeys,
   'lab-bass': bassItemKeys,
   'lab-tension': tensionItemKeys,
+  'lab-wide-interval': wideIntervalItemKeys,
+  'lab-note-stack': noteStackItemKeys,
+  'lab-microtuning': microtuningItemKeys,
+  'lab-harmonics': harmonicItemKeys,
 };
 
 /** Enumerate the itemKeys a mode can produce at a level, or [] if not poolable. */

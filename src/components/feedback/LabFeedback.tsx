@@ -17,6 +17,10 @@ const CATEGORY_LABEL: Record<LabJudgeDetails['category'], string> = {
   extended: '확장 화음',
   bass: '베이스',
   tension: '텐션',
+  'wide-interval': '광역 음정',
+  'note-stack': '다성 음',
+  microtuning: '정밀 조율',
+  harmonics: '배음렬',
 };
 
 export function LabFeedback({ details }: Props) {

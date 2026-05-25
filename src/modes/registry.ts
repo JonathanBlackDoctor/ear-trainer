@@ -11,6 +11,8 @@ import {
   LAB_INTERVAL_COMPARE_MODE_INFO, LAB_ODD_NOTE_MODE_INFO, LAB_CONTOUR_MODE_INFO,
   LAB_TUNING_MODE_INFO, LAB_FUNCTION_MODE_INFO, LAB_EXTENDED_MODE_INFO,
   LAB_BASS_MODE_INFO, LAB_TENSION_MODE_INFO,
+  LAB_WIDE_INTERVAL_MODE_INFO, LAB_NOTE_STACK_MODE_INFO,
+  LAB_MICROTUNING_MODE_INFO, LAB_HARMONICS_MODE_INFO,
 } from './labModes';
 import { MIX_MODE_INFOS } from './mixModes';
 
@@ -48,6 +50,10 @@ const MODE_LIST: ModeInfo[] = [
   LAB_EXTENDED_MODE_INFO,
   LAB_BASS_MODE_INFO,
   LAB_TENSION_MODE_INFO,
+  LAB_WIDE_INTERVAL_MODE_INFO,
+  LAB_NOTE_STACK_MODE_INFO,
+  LAB_MICROTUNING_MODE_INFO,
+  LAB_HARMONICS_MODE_INFO,
   ...MIX_MODE_INFOS,
 ];
 
@@ -80,6 +86,10 @@ export const MODE_ACCENT_CLASS: Record<ModeKey, string> = {
   'lab-extended': 'accent-chord',
   'lab-bass': 'accent-chord',
   'lab-tension': 'accent-chord',
+  'lab-wide-interval': 'accent-interval',
+  'lab-note-stack': 'accent-chord',
+  'lab-microtuning': 'accent-solfege',
+  'lab-harmonics': 'accent-tempo',
   'mix-eq-freq': 'accent-tempo',
   'mix-eq-boostcut': 'accent-interval',
   'mix-filter': 'accent-bpm',
