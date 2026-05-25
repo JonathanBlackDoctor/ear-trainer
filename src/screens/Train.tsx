@@ -45,6 +45,7 @@ import type {
 } from '../types';
 import {
   startAudio, playNote, playChord, playSequence, playProgression, playArpeggio,
+  playArpeggioProgression,
   playMetronomeClick, playRhythmClick,
   playMetronome, stopAllAudio, getAudioStatus, getPlaybackGen, type AudioQuality,
   playReferenceTone, playMixSample,
@@ -342,9 +343,7 @@ export function Train() {
         const d = data as ProgressionData;
         setPlaybackStage('progression');
         if (d.playback === 'arpeggio') {
-          for (const c of d.chords) {
-            await playArpeggio(c.notes, '8n', speed);
-          }
+          await playArpeggioProgression(d.chords.map((c) => c.notes), '8n', speed);
         } else {
           const chordNotes = d.chords.map((c) => c.notes);
           await playProgression(chordNotes, '2n', speed);
