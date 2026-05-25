@@ -692,3 +692,81 @@ export function getHarmonicsChoices(level: number): ChoiceOption[] {
     label: harmonicAnswer(p),
   }));
 }
+
+// ─── Per-level setup labels ───────────────────────────────────────────────--
+// Short summary of "what changes at this level", shown on the setup screen.
+// Derived from each mode's *_LEVELS table so it stays in sync automatically.
+const invLabel = (max: number) => (max === 0 ? '기본 위치' : `${max}전위까지`);
+
+export function getLabLevelLabel(modeKey: ModeKey, level: number): string {
+  switch (modeKey) {
+    case 'lab-scale': {
+      const types = SCALE_LEVELS[level] ?? SCALE_LEVELS[1];
+      const desc = SCALE_DESCENDING_PROB[level];
+      return `스케일 ${types.length}종${desc ? ` · 하행 ${Math.round(desc * 100)}%` : ''}`;
+    }
+    case 'lab-cadence': {
+      const c = CADENCE_LEVELS[level] ?? CADENCE_LEVELS[1];
+      return `종지 ${c.types.length}종 · 키 ${c.keys.length}개`;
+    }
+    case 'lab-inversion': {
+      const c = INVERSION_LEVELS[level] ?? INVERSION_LEVELS[1];
+      return `${invLabel(Math.max(...c.inversions))} · 화음 ${c.qualities.length}종`;
+    }
+    case 'lab-interval-compare': {
+      const c = COMPARE_LEVELS[level] ?? COMPARE_LEVELS[1];
+      return `최소 차이 ${c.minGap}반음${c.allowSame ? ' · 같음 포함' : ''}`;
+    }
+    case 'lab-odd-note': {
+      const c = ODD_LEVELS[level] ?? ODD_LEVELS[1];
+      return `스케일 ${c.scales.length}종${c.allowEnds ? ' · 양끝 포함' : ''}${c.descending ? ' · 하행' : ''}`;
+    }
+    case 'lab-contour': {
+      const c = CONTOUR_LEVELS[level] ?? CONTOUR_LEVELS[1];
+      return `${c.shapes.length}모양 · ${c.length}음${c.jitter ? ' · 비정형 시작' : ''}`;
+    }
+    case 'lab-tuning': {
+      const [lo, hi] = TUNING_CENTS[level] ?? TUNING_CENTS[1];
+      return `±${lo}~${hi} 센트`;
+    }
+    case 'lab-function': {
+      const c = FUNCTION_LEVELS[level] ?? FUNCTION_LEVELS[1];
+      return `다이아토닉 ${c.degrees.length}개 · ${c.randomKey ? '랜덤 키' : '고정 키'}`;
+    }
+    case 'lab-extended': {
+      const c = EXTENDED_LEVELS[level] ?? EXTENDED_LEVELS[1];
+      const max = Math.max(...c.inversions);
+      return `${c.qualities.length}종 · ${c.arpeggio ? '아르페지오' : '동시'}${max > 0 ? ` · ${max}전위` : ''}`;
+    }
+    case 'lab-bass': {
+      const c = BASS_LEVELS[level] ?? BASS_LEVELS[1];
+      return `${c.roots.length === 7 ? '자연음' : '반음계'} · 화음 ${c.qualities.length}종 · ${invLabel(Math.max(...c.inversions))}`;
+    }
+    case 'lab-tension': {
+      const c = TENSION_LEVELS[level] ?? TENSION_LEVELS[1];
+      return `텐션 ${c.tensions.length}종 · 기반화음 ${c.bases.length}종`;
+    }
+    case 'lab-wide-interval': {
+      const c = WIDE_LEVELS[level] ?? WIDE_LEVELS[1];
+      const dirTxt = c.directions.includes('harmonic')
+        ? '상하행+동시'
+        : c.directions.length > 1 ? '상하행' : '상행';
+      return `음정 ${c.names.length}종 · ${dirTxt}`;
+    }
+    case 'lab-note-stack': {
+      const patterns = NOTE_STACK_LEVELS[level] ?? NOTE_STACK_LEVELS[1];
+      return `${patterns.length}종${level >= NOTE_STACK_RANDOM_REGISTER_LEVEL ? ' · 음역 랜덤' : ''}`;
+    }
+    case 'lab-microtuning': {
+      const c = MICROTUNING_LEVELS[level] ?? MICROTUNING_LEVELS[1];
+      const minMag = Math.min(...c.cents.filter((n) => n !== 0).map(Math.abs));
+      return `최소 ±${minMag}센트 · 음정 ${c.intervals.length}종`;
+    }
+    case 'lab-harmonics': {
+      const c = HARMONICS_LEVELS[level] ?? HARMONICS_LEVELS[1];
+      return `${c.partials.length}택 · 최대 ${Math.max(...c.partials)}배음`;
+    }
+    default:
+      return '';
+  }
+}
