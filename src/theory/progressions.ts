@@ -45,7 +45,7 @@ export const COMMON_KEYS = ['C','G','D','A','E','F','Bb','Eb'];
 
 export interface ProgressionLevelConfig {
   label: string;
-  length: 2 | 3 | 4 | 5;
+  length: 2 | 3 | 4 | 5 | 6;
   degreePool: number[];            // allowed degrees (1..7)
   playback: 'arpeggio' | 'block';
   keyMode: 'fixed' | 'random';
@@ -86,8 +86,8 @@ export const PROGRESSION_LEVELS: Record<number, ProgressionLevelConfig> = {
   6:  { label: '+ iii 추가',             length: 4, degreePool: CORE_PLUS_III, playback: 'arpeggio', keyMode: 'fixed'  },
   7:  { label: '블록 코드 재생',         length: 4, degreePool: CORE_PLUS_III, playback: 'block',    keyMode: 'fixed'  },
   8:  { label: '+ vii° 추가 (전 7도)',   length: 4, degreePool: ALL_7,         playback: 'block',    keyMode: 'fixed'  },
-  9:  { label: '+ 랜덤 키',              length: 4, degreePool: ALL_7,         playback: 'block',    keyMode: 'random' },
-  10: { label: '5화음 진행',             length: 5, degreePool: ALL_7,         playback: 'block',    keyMode: 'random' },
+  9:  { label: '5화음 · 랜덤 키',        length: 5, degreePool: ALL_7,         playback: 'block',    keyMode: 'random' },
+  10: { label: '6화음 진행 · 랜덤 키',   length: 6, degreePool: ALL_7,         playback: 'block',    keyMode: 'random' },
 };
 
 /**

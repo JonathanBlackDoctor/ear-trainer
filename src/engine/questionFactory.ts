@@ -31,7 +31,7 @@ import {
 } from '../modes/levels';
 import { pickDue } from './srs';
 import {
-  SCALE_LEVELS, CADENCE_PATTERNS, CADENCE_LEVELS,
+  SCALE_LEVELS, SCALE_DESCENDING_PROB, CADENCE_PATTERNS, CADENCE_LEVELS,
   INVERSION_LEVELS, INVERSION_SEVENTHS,
   COMPARE_FIRST, COMPARE_SECOND, COMPARE_SAME, COMPARE_LEVELS,
   ODD_LEVELS, CONTOUR_LEVELS, CONTOUR_LABEL,
@@ -123,9 +123,24 @@ export function makeIntervalQuestion(
 
 function getIntervalSemitones(name: string): number {
   const map: Record<string, number> = {
-    P1:0, m2:1, M2:2, m3:3, M3:4, P4:5, A4:6, P5:7, m6:8, M6:9, m7:10, M7:11, P8:12
+    P1:0, m2:1, M2:2, m3:3, M3:4, P4:5, A4:6, P5:7, m6:8, M6:9, m7:10, M7:11, P8:12,
+    m9:13, M9:14, P11:17, M13:21, P15:24,
   };
   return map[name] ?? 0;
+}
+
+// Higher levels randomize the register so chord quality / inversion / bass /
+// function must be identified regardless of where the chord sits — an
+// essence-preserving difficulty lever for the chord-ID family of modes.
+function registerRange(level: number): [string, string] {
+  if (level >= 9) return ['A1', 'C5'];
+  if (level >= 7) return ['G2', 'A4'];
+  return ['C3', 'G4'];
+}
+function registerOctave(level: number): number {
+  if (level >= 9) return pickRandom([2, 3, 4]);
+  if (level >= 7) return pickRandom([2, 3]);
+  return 3;
 }
 
 // ─── Chord ─────────────────────────────────────────────────────────────────────
@@ -147,7 +162,7 @@ export function makeChordQuestion(
   const [quality, invStr] = itemKey.split('_inv');
   const inversion = parseInt(invStr, 10) || 0;
 
-  const rootNote = randomNote('C3', 'G4');
+  const rootNote = randomNote(...registerRange(level));
   const notes = buildChord(rootNote, quality, inversion);
 
   return {
@@ -230,12 +245,11 @@ export function makeMelodyQuestion(
   };
 }
 
-function buildExtendedScale(tonic: string, octaves: 1 | 2): string[] {
-  const oct1 = getScaleNotes(tonic, 4);
-  if (octaves === 1) return oct1;
-  // For 2-octave span we use octave 4 + the first 7 notes of octave 5.
-  const oct2 = getScaleNotes(tonic, 5);
-  return [...oct1, ...oct2];
+function buildExtendedScale(tonic: string, octaves: 1 | 2 | 3): string[] {
+  const notes = getScaleNotes(tonic, 4);
+  if (octaves >= 2) notes.push(...getScaleNotes(tonic, 5));
+  if (octaves >= 3) notes.push(...getScaleNotes(tonic, 6));
+  return notes;
 }
 
 // ─── Solfege ───────────────────────────────────────────────────────────────────
@@ -265,11 +279,12 @@ export function makeSolfegeQuestion(
   const semis = keyToSemis.get(itemKey) ?? 0;
   const solfegeAnswer = semitoneToSolfege(semis);
 
-  // Choose an octave for the played note. With jitter, randomly ±1 octave.
+  // Choose an octave for the played note. With jitter j, pick uniformly from −j..+j.
   const baseOctave = 4;
-  const octave = cfg.octaveJitter === 0
+  const j = cfg.octaveJitter;
+  const octave = j === 0
     ? baseOctave
-    : baseOctave + (Math.random() < 0.5 ? -1 : Math.random() < 0.5 ? 0 : 1);
+    : baseOctave + (Math.floor(Math.random() * (2 * j + 1)) - j);
   const tonicMidi = Note.midi(key + octave) ?? 60;
   const note = Note.fromMidi(tonicMidi + semis) ?? key + octave;
 
@@ -453,8 +468,9 @@ export function makeScaleQuestion(level: number, opts?: SelectOpts): Question {
   // Add upper tonic (octave above) so it sounds like a complete scale
   const upper = Note.transpose(tonic + '4', '8P');
   const fullNotes = [...scaleNotes, upper];
-  // Descending playback only at the top tiers, where it adds difficulty.
-  const direction: 'up' | 'down' = level >= 9 && Math.random() < 0.5 ? 'down' : 'up';
+  // Descending playback at the top tiers, increasingly often, adds difficulty.
+  const direction: 'up' | 'down' =
+    Math.random() < (SCALE_DESCENDING_PROB[level] ?? 0) ? 'down' : 'up';
   const notes = direction === 'up' ? fullNotes : [...fullNotes].reverse();
 
   return {
@@ -498,7 +514,7 @@ export function makeInversionQuestion(level: number, opts?: SelectOpts): Questio
   const quality = inv === 3
     ? (sevenths.length > 0 ? pickRandom(sevenths) : 'dominant7')
     : pickRandom(cfg.qualities);
-  const rootNote = randomNote('C3', 'E4');
+  const rootNote = randomNote(...registerRange(level));
   const notes = buildChord(rootNote, quality, inv);
 
   return {
@@ -600,17 +616,26 @@ const CONTOUR_DEGREES_7: Record<string, number[]> = {
   'inv-arch': [6, 5, 3, 0, 3, 5, 6],
   'wave': [0, 2, 1, 3, 2, 4, 3],
 };
+const CONTOUR_DEGREES_9: Record<string, number[]> = {
+  'up': [0, 1, 2, 3, 4, 5, 6, 7, 8],
+  'down': [8, 7, 6, 5, 4, 3, 2, 1, 0],
+  'arch': [0, 1, 3, 5, 8, 5, 3, 1, 0],
+  'inv-arch': [8, 7, 5, 3, 0, 3, 5, 7, 8],
+  'wave': [0, 2, 1, 4, 3, 6, 5, 7, 6],
+};
 
 export function makeContourQuestion(level: number, opts?: SelectOpts): Question {
   const cfg = CONTOUR_LEVELS[level] ?? CONTOUR_LEVELS[1];
   const itemKey = selectItemKey(contourItemKeys(level), opts);
   const contour = itemKey.slice('contour_'.length);
   const tonic = pickRandom(COMMON_KEYS);
-  const scale = getScaleNotes(tonic, 4);
-  const upper = Note.transpose(tonic + '4', '8P');
-  const ext = [...scale, upper]; // 8 notes, indices 0..7
-  const pattern = (cfg.length === 7 ? CONTOUR_DEGREES_7 : CONTOUR_DEGREES_5)[contour]
-    ?? CONTOUR_DEGREES_5['up'];
+  // Length 9 spans two octaves; shorter shapes fit in one octave + upper tonic.
+  const ext = cfg.length === 9
+    ? [...getScaleNotes(tonic, 4), ...getScaleNotes(tonic, 5), Note.transpose(tonic + '5', '8P')]
+    : [...getScaleNotes(tonic, 4), Note.transpose(tonic + '4', '8P')];
+  const degreeTable = cfg.length === 9 ? CONTOUR_DEGREES_9
+    : cfg.length === 7 ? CONTOUR_DEGREES_7 : CONTOUR_DEGREES_5;
+  const pattern = degreeTable[contour] ?? CONTOUR_DEGREES_5['up'];
   // Jitter shifts the whole shape off the tonic so it can't be read by "starts on do".
   const offset = cfg.jitter ? Math.floor(Math.random() * 2) : 0;
   const maxIdx = ext.length - 1;
@@ -661,7 +686,7 @@ export function makeFunctionQuestion(level: number, opts?: SelectOpts): Question
   const key = cfg.randomKey ? pickRandom(COMMON_KEYS) : 'C';
   const tonicStep = buildProgressionSteps([[1, 'major']], key, 3)[0];
   const quality = DIATONIC_QUALITIES[(degree - 1) % 7];
-  const targetStep = buildProgressionSteps([[degree, quality]], key, 3)[0];
+  const targetStep = buildProgressionSteps([[degree, quality]], key, registerOctave(level))[0];
   const func = DEGREE_FUNCTION[degree];
 
   return {
@@ -681,7 +706,7 @@ export function makeExtendedQuestion(level: number, opts?: SelectOpts): Question
   const itemKey = selectItemKey(extendedItemKeys(level), opts);
   const quality = itemKey.slice('ext_'.length);
   const inversion = pickRandom(cfg.inversions);
-  const rootNote = randomNote('C3', 'F4');
+  const rootNote = randomNote(...registerRange(level));
   const notes = buildChord(rootNote, quality, inversion);
 
   return {
@@ -709,7 +734,7 @@ export function makeBassQuestion(level: number, opts?: SelectOpts): Question {
   const chosen = combos.length > 0
     ? pickRandom(combos)
     : { root: pickRandom(cfg.roots), quality: pickRandom(cfg.qualities), inversion: pickRandom(cfg.inversions) };
-  const rootNote = chosen.root + '3';
+  const rootNote = chosen.root + registerOctave(level);
   const notes = buildChord(rootNote, chosen.quality, chosen.inversion);
   const bass = Note.pitchClass(notes[0]);
 
@@ -730,7 +755,7 @@ export function makeTensionQuestion(level: number, opts?: SelectOpts): Question 
   const itemKey = selectItemKey(tensionItemKeys(level), opts);
   const code = itemKey.slice('tension_'.length);
   const base = pickRandom(cfg.bases);
-  const rootNote = randomNote('C3', 'E4');
+  const rootNote = randomNote(...registerRange(level));
   const baseNotes = buildChord(rootNote, base, 0);
   const semis = TENSION_SEMITONES[code] ?? 14;
   const tensionNote = Note.fromMidi((Note.midi(rootNote) ?? 60) + semis) ?? rootNote;

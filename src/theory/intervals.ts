@@ -14,6 +14,12 @@ export const INTERVAL_NAMES = [
   { name: 'm7', label: '단7도', semitones: 10 },
   { name: 'M7', label: '장7도', semitones: 11 },
   { name: 'P8', label: '완전8도 (옥타브)', semitones: 12 },
+  // Compound (beyond an octave) — top levels only.
+  { name: 'm9', label: '단9도', semitones: 13 },
+  { name: 'M9', label: '장9도', semitones: 14 },
+  { name: 'P11', label: '완전11도', semitones: 17 },
+  { name: 'M13', label: '장13도', semitones: 21 },
+  { name: 'P15', label: '완전15도 (2옥타브)', semitones: 24 },
 ];
 
 export type IntervalDirection = 'up' | 'down' | 'harmonic';
@@ -31,18 +37,20 @@ const PLUS_2_6 = [...CORE_5, 'M2', 'm2', 'M6', 'm6'];
 const PLUS_TRITONE = [...PLUS_2_6, 'A4'];
 const PLUS_M7 = [...PLUS_TRITONE, 'M7'];
 const ALL_12 = [...PLUS_M7, 'm7'];
+// Octave-spanning intervals — the wide-interval analogue used at the top tier.
+const PLUS_COMPOUND = [...ALL_12, 'm9', 'M9', 'P11', 'M13', 'P15'];
 
 export const INTERVAL_LEVELS: Record<number, IntervalLevelConfig> = {
-  1:  { label: '기본 5음 (P5·P4·3도·8도)', intervals: CORE_5,       directions: ['up', 'harmonic'],         noteRangeLow: 'C4', noteRangeHigh: 'C5' },
-  2:  { label: '하행 추가',                  intervals: CORE_5,       directions: ['up', 'down', 'harmonic'], noteRangeLow: 'C4', noteRangeHigh: 'C5' },
-  3:  { label: '음역 확장',                  intervals: CORE_5,       directions: ['up', 'down', 'harmonic'], noteRangeLow: 'C3', noteRangeHigh: 'G4' },
-  4:  { label: '2도·6도 추가',               intervals: PLUS_2_6,     directions: ['up', 'down', 'harmonic'], noteRangeLow: 'C3', noteRangeHigh: 'G4' },
-  5:  { label: '광역 음역',                  intervals: PLUS_2_6,     directions: ['up', 'down', 'harmonic'], noteRangeLow: 'A2', noteRangeHigh: 'C6' },
-  6:  { label: '트라이톤 추가',              intervals: PLUS_TRITONE, directions: ['up', 'down', 'harmonic'], noteRangeLow: 'A2', noteRangeHigh: 'C6' },
-  7:  { label: '장7도 추가',                 intervals: PLUS_M7,      directions: ['up', 'down', 'harmonic'], noteRangeLow: 'A2', noteRangeHigh: 'C6' },
-  8:  { label: '단7도 추가 (전음정)',        intervals: ALL_12,       directions: ['up', 'down', 'harmonic'], noteRangeLow: 'A2', noteRangeHigh: 'C6' },
-  9:  { label: '화성만 듣기',                intervals: ALL_12,       directions: ['harmonic'],               noteRangeLow: 'A2', noteRangeHigh: 'C6' },
-  10: { label: '하행만 듣기',                intervals: ALL_12,       directions: ['down'],                   noteRangeLow: 'A2', noteRangeHigh: 'C6' },
+  1:  { label: '기본 5음 (P5·P4·3도·8도)', intervals: CORE_5,        directions: ['up', 'harmonic'],         noteRangeLow: 'C4', noteRangeHigh: 'C5' },
+  2:  { label: '하행 추가',                  intervals: CORE_5,        directions: ['up', 'down', 'harmonic'], noteRangeLow: 'C4', noteRangeHigh: 'C5' },
+  3:  { label: '음역 확장',                  intervals: CORE_5,        directions: ['up', 'down', 'harmonic'], noteRangeLow: 'C3', noteRangeHigh: 'G4' },
+  4:  { label: '2도·6도 추가',               intervals: PLUS_2_6,      directions: ['up', 'down', 'harmonic'], noteRangeLow: 'C3', noteRangeHigh: 'G4' },
+  5:  { label: '광역 음역',                  intervals: PLUS_2_6,      directions: ['up', 'down', 'harmonic'], noteRangeLow: 'A2', noteRangeHigh: 'C6' },
+  6:  { label: '트라이톤 추가',              intervals: PLUS_TRITONE,  directions: ['up', 'down', 'harmonic'], noteRangeLow: 'A2', noteRangeHigh: 'C6' },
+  7:  { label: '장7도 추가',                 intervals: PLUS_M7,       directions: ['up', 'down', 'harmonic'], noteRangeLow: 'A2', noteRangeHigh: 'C6' },
+  8:  { label: '단7도 추가 (전음정)',        intervals: ALL_12,        directions: ['up', 'down', 'harmonic'], noteRangeLow: 'A2', noteRangeHigh: 'C6' },
+  9:  { label: '최광역 음역',                intervals: ALL_12,        directions: ['up', 'down', 'harmonic'], noteRangeLow: 'A1', noteRangeHigh: 'C7' },
+  10: { label: '컴파운드 음정 (옥타브 초과)', intervals: PLUS_COMPOUND, directions: ['up', 'down', 'harmonic'], noteRangeLow: 'A2', noteRangeHigh: 'C5' },
 };
 
 /** All item keys (`${interval}_${direction}`) for a given interval level. */

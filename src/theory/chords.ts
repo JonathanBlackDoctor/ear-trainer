@@ -50,11 +50,11 @@ export const CHORD_LEVELS: Record<number, ChordLevelConfig> = {
   3:  { label: '증화음 추가',         qualities: PLUS_AUG,   inversions: [0],    arpeggio: true  },
   4:  { label: 'Sus4 추가',           qualities: PLUS_SUS4,  inversions: [0],    arpeggio: true  },
   5:  { label: '블록 코드 (동시발음)', qualities: PLUS_SUS4,  inversions: [0],    arpeggio: false },
-  6:  { label: '속7화음(Dom7) 추가',   qualities: PLUS_DOM7,  inversions: [0],    arpeggio: false },
-  7:  { label: '장7화음(Major7) 추가', qualities: PLUS_MAJ7,  inversions: [0],    arpeggio: false },
-  8:  { label: '단7화음(Minor7) 추가', qualities: PLUS_MIN7,  inversions: [0],    arpeggio: false },
-  9:  { label: '반감화음(ø7) 추가',    qualities: ALL_9,      inversions: [0],    arpeggio: false },
-  10: { label: '1전위 추가',          qualities: ALL_9,      inversions: [0, 1], arpeggio: false },
+  6:  { label: '속7화음(Dom7) 추가',   qualities: PLUS_DOM7,  inversions: [0],          arpeggio: false },
+  7:  { label: '장7화음(Major7) 추가', qualities: PLUS_MAJ7,  inversions: [0],          arpeggio: false },
+  8:  { label: '단7화음(Minor7) 추가', qualities: PLUS_MIN7,  inversions: [0],          arpeggio: false },
+  9:  { label: '반감화음(ø7) · 1전위', qualities: ALL_9,      inversions: [0, 1],       arpeggio: false },
+  10: { label: '전위 전체 · 넓은 음역', qualities: ALL_9,      inversions: [0, 1, 2, 3], arpeggio: false },
 };
 
 /** All item keys (`${quality}_inv${inversion}`) for a given chord level. */
