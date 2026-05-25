@@ -34,10 +34,13 @@ export interface SolfegeLevelConfig {
   candidates: string[];          // syllables included (e.g. ['도','미','솔'])
   keyMode: 'fixed' | 'random';
   keyPool: string[];             // used when keyMode === 'random'
-  octaveJitter: 0 | 1;           // ±octaves from the tonic octave
+  octaveJitter: 0 | 1 | 2;       // ±octaves from the tonic octave
   suppressReferenceTone: boolean;
 }
 
+// The reference tone is always provided — solfège is relative-pitch training, so
+// the upper levels raise difficulty with wide octave-spanning leaps (octaveJitter
+// up to ±2) and key randomization, never by hiding the tonic.
 export const SOLFEGE_LEVELS: Record<number, SolfegeLevelConfig> = {
   1:  { label: '3음 (도·미·솔)',     candidates: TONIC_TRIAD,         keyMode: 'fixed',  keyPool: [],            octaveJitter: 0, suppressReferenceTone: false },
   2:  { label: '+ 레',                candidates: TONIC_TRIAD_PLUS_RE, keyMode: 'fixed',  keyPool: [],            octaveJitter: 0, suppressReferenceTone: false },
@@ -47,8 +50,8 @@ export const SOLFEGE_LEVELS: Record<number, SolfegeLevelConfig> = {
   6:  { label: '+ 파#/솔#',           candidates: PLUS_FA_SOL_SHARP,   keyMode: 'fixed',  keyPool: [],            octaveJitter: 1, suppressReferenceTone: false },
   7:  { label: '+ 라# (전 12음)',     candidates: CHROMATIC_12,        keyMode: 'fixed',  keyPool: [],            octaveJitter: 1, suppressReferenceTone: false },
   8:  { label: '+ 랜덤 키 (8개)',     candidates: CHROMATIC_12,        keyMode: 'random', keyPool: COMMON_KEYS_8, octaveJitter: 1, suppressReferenceTone: false },
-  9:  { label: '+ 기준음 생략',       candidates: CHROMATIC_12,        keyMode: 'random', keyPool: COMMON_KEYS_8, octaveJitter: 1, suppressReferenceTone: true  },
-  10: { label: '+ 12개 키 전체',      candidates: CHROMATIC_12,        keyMode: 'random', keyPool: ALL_12_KEYS,   octaveJitter: 1, suppressReferenceTone: true  },
+  9:  { label: '+ 넓은 옥타브 도약',  candidates: CHROMATIC_12,        keyMode: 'random', keyPool: COMMON_KEYS_8, octaveJitter: 2, suppressReferenceTone: false },
+  10: { label: '+ 12개 키 전체',      candidates: CHROMATIC_12,        keyMode: 'random', keyPool: ALL_12_KEYS,   octaveJitter: 2, suppressReferenceTone: false },
 };
 
 /** Map syllable → semitone offset from tonic (0..11). Returns -1 if unknown. */

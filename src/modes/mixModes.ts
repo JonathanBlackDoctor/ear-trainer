@@ -38,9 +38,9 @@ const EQ_FREQ_LEVELS: Record<number, { bands: number[]; gain: number; q: number;
   5:  { bands: ALL_BANDS, gain: 6, q: 2.2, cut: true },
   6:  { bands: ALL_BANDS, gain: 6, q: 2.6, cut: true },
   7:  { bands: ALL_BANDS, gain: 5, q: 3.0, cut: true },
-  8:  { bands: ALL_BANDS, gain: 4, q: 3.2, cut: true },
-  9:  { bands: ALL_BANDS, gain: 3, q: 3.5, cut: true },
-  10: { bands: ALL_BANDS, gain: 3, q: 4.0, cut: true },
+  8:  { bands: ALL_BANDS, gain: 4, q: 3.4, cut: true },
+  9:  { bands: ALL_BANDS, gain: 3, q: 4.0, cut: true },
+  10: { bands: ALL_BANDS, gain: 2, q: 5.0, cut: true },
 };
 
 // ─── EQ: boost vs cut ───────────────────────────────────────────────────────
@@ -52,9 +52,9 @@ const EQ_BOOSTCUT_LEVELS: Record<number, { bands: number[]; gain: number; q: num
   5:  { bands: ALL_BANDS, gain: 6, q: 2.6 },
   6:  { bands: ALL_BANDS, gain: 6, q: 3.0 },
   7:  { bands: ALL_BANDS, gain: 5, q: 3.2 },
-  8:  { bands: ALL_BANDS, gain: 4, q: 3.5 },
-  9:  { bands: ALL_BANDS, gain: 3, q: 3.8 },
-  10: { bands: ALL_BANDS, gain: 3, q: 4.0 },
+  8:  { bands: ALL_BANDS, gain: 4, q: 3.6 },
+  9:  { bands: ALL_BANDS, gain: 3, q: 4.0 },
+  10: { bands: ALL_BANDS, gain: 2, q: 4.5 },
 };
 
 // ─── Filter ─────────────────────────────────────────────────────────────────
@@ -88,17 +88,19 @@ const COMP_SETTINGS: Record<CompAmount, { ratio: number; threshold: number; make
   medium: { ratio: 4,  threshold: -24, makeupDb: 4 },
   strong: { ratio: 8,  threshold: -30, makeupDb: 6 },
 };
-const COMP_LEVELS: Record<number, { amounts: CompAmount[] }> = {
-  1:  { amounts: ['none', 'strong'] },
-  2:  { amounts: ['none', 'light', 'strong'] },
-  3:  { amounts: ['none', 'light', 'medium', 'strong'] },
-  4:  { amounts: ['none', 'light', 'medium', 'strong'] },
-  5:  { amounts: ['none', 'light', 'medium', 'strong'] },
-  6:  { amounts: ['none', 'light', 'medium', 'strong'] },
-  7:  { amounts: ['none', 'light', 'medium', 'strong'] },
-  8:  { amounts: ['none', 'light', 'medium', 'strong'] },
-  9:  { amounts: ['none', 'light', 'medium', 'strong'] },
-  10: { amounts: ['none', 'light', 'medium', 'strong'] },
+// makeupScale shrinks the make-up gain so loudness stops being a giveaway — at
+// the top levels you must judge by the dynamics (pumping/density), not volume.
+const COMP_LEVELS: Record<number, { amounts: CompAmount[]; makeupScale: number }> = {
+  1:  { amounts: ['none', 'strong'], makeupScale: 1 },
+  2:  { amounts: ['none', 'light', 'strong'], makeupScale: 1 },
+  3:  { amounts: ['none', 'light', 'medium', 'strong'], makeupScale: 1 },
+  4:  { amounts: ['none', 'light', 'medium', 'strong'], makeupScale: 1 },
+  5:  { amounts: ['none', 'light', 'medium', 'strong'], makeupScale: 0.8 },
+  6:  { amounts: ['none', 'light', 'medium', 'strong'], makeupScale: 0.65 },
+  7:  { amounts: ['none', 'light', 'medium', 'strong'], makeupScale: 0.5 },
+  8:  { amounts: ['none', 'light', 'medium', 'strong'], makeupScale: 0.35 },
+  9:  { amounts: ['none', 'light', 'medium', 'strong'], makeupScale: 0.2 },
+  10: { amounts: ['none', 'light', 'medium', 'strong'], makeupScale: 0 },
 };
 
 // ─── Reverb amount ──────────────────────────────────────────────────────────
@@ -107,17 +109,19 @@ const REV_AMT_LABEL: Record<RevAmount, string> = {
   dry: '드라이 (없음)', small: '살짝', medium: '중간', large: '많이',
 };
 const REV_AMT_WET: Record<RevAmount, number> = { dry: 0, small: 0.18, medium: 0.35, large: 0.6 };
-const REVERB_AMT_LEVELS: Record<number, { amounts: RevAmount[] }> = {
-  1:  { amounts: ['dry', 'large'] },
-  2:  { amounts: ['dry', 'medium', 'large'] },
-  3:  { amounts: ['dry', 'small', 'medium', 'large'] },
-  4:  { amounts: ['dry', 'small', 'medium', 'large'] },
-  5:  { amounts: ['dry', 'small', 'medium', 'large'] },
-  6:  { amounts: ['dry', 'small', 'medium', 'large'] },
-  7:  { amounts: ['dry', 'small', 'medium', 'large'] },
-  8:  { amounts: ['dry', 'small', 'medium', 'large'] },
-  9:  { amounts: ['dry', 'small', 'medium', 'large'] },
-  10: { amounts: ['dry', 'small', 'medium', 'large'] },
+// wetScale compresses the gap between adjacent amounts at higher levels, so the
+// differences in reverb wetness become progressively subtler to hear.
+const REVERB_AMT_LEVELS: Record<number, { amounts: RevAmount[]; wetScale: number }> = {
+  1:  { amounts: ['dry', 'large'], wetScale: 1 },
+  2:  { amounts: ['dry', 'medium', 'large'], wetScale: 1 },
+  3:  { amounts: ['dry', 'small', 'medium', 'large'], wetScale: 1 },
+  4:  { amounts: ['dry', 'small', 'medium', 'large'], wetScale: 1 },
+  5:  { amounts: ['dry', 'small', 'medium', 'large'], wetScale: 0.9 },
+  6:  { amounts: ['dry', 'small', 'medium', 'large'], wetScale: 0.8 },
+  7:  { amounts: ['dry', 'small', 'medium', 'large'], wetScale: 0.7 },
+  8:  { amounts: ['dry', 'small', 'medium', 'large'], wetScale: 0.6 },
+  9:  { amounts: ['dry', 'small', 'medium', 'large'], wetScale: 0.5 },
+  10: { amounts: ['dry', 'small', 'medium', 'large'], wetScale: 0.45 },
 };
 
 // ─── Reverb type ──────────────────────────────────────────────────────────--
@@ -136,33 +140,47 @@ const REVERB_TYPE_LEVELS: Record<number, { types: RevType[] }> = {
 };
 
 // ─── Delay time ──────────────────────────────────────────────────────────---
-type DelayNote = '16' | '8' | '8d' | '4';
-const DELAY_LABEL: Record<DelayNote, string> = { '16': '1/16', '8': '1/8', '8d': '점8분 (1/8.)', '4': '1/4' };
-const DELAY_MS: Record<DelayNote, number> = { '16': 125, '8': 250, '8d': 375, '4': 500 };
+type DelayNote = '16' | '16d' | '8t' | '8' | '8d' | '4' | '2';
+const DELAY_LABEL: Record<DelayNote, string> = {
+  '16': '1/16', '16d': '점16분 (1/16.)', '8t': '셋잇단8분 (1/8T)',
+  '8': '1/8', '8d': '점8분 (1/8.)', '4': '1/4', '2': '1/2',
+};
+const DELAY_MS: Record<DelayNote, number> = {
+  '16': 125, '16d': 187, '8t': 167, '8': 250, '8d': 375, '4': 500, '2': 1000,
+};
 const DELAY_LEVELS: Record<number, { notes: DelayNote[] }> = {
   1: { notes: ['16', '4'] },
   2: { notes: ['16', '8', '4'] },
   3: { notes: ['16', '8', '8d', '4'] },
+  4: { notes: ['16', '8', '8d', '4', '2'] },
+  5: { notes: ['16', '16d', '8', '8d', '4'] },
+  6: { notes: ['16', '16d', '8t', '8', '8d', '4'] },
+  7: { notes: ['16', '16d', '8t', '8', '8d', '4', '2'] },
 };
 
 // ─── Pan ─────────────────────────────────────────────────────────────────---
-const PAN_VALUE: Record<string, number> = { L: -1, C: 0, R: 1, L70: -0.7, L30: -0.35, R30: 0.35, R70: 0.7 };
+const PAN_VALUE: Record<string, number> = {
+  L: -1, C: 0, R: 1, L70: -0.7, L30: -0.35, R30: 0.35, R70: 0.7, L15: -0.15, R15: 0.15,
+};
 const PAN_LABEL: Record<string, string> = {
   L: '왼쪽', C: '가운데', R: '오른쪽',
   L70: '왼쪽 (강)', L30: '왼쪽 (약)', R30: '오른쪽 (약)', R70: '오른쪽 (강)',
+  L15: '왼쪽 (살짝)', R15: '오른쪽 (살짝)',
 };
 const PAN_LEVELS: Record<number, { positions: string[] }> = {
   1: { positions: ['L', 'C', 'R'] },
   2: { positions: ['L70', 'L30', 'C', 'R30', 'R70'] },
+  3: { positions: ['L70', 'L30', 'L15', 'C', 'R15', 'R30', 'R70'] },
 };
 
 // ─── Stereo width ─────────────────────────────────────────────────────────--
-type Width = 'mono' | 'narrow' | 'wide';
-const WIDTH_LABEL: Record<Width, string> = { mono: '모노', narrow: '좁게', wide: '넓게' };
-const WIDTH_VALUE: Record<Width, number> = { mono: 0, narrow: 0.45, wide: 1 };
+type Width = 'mono' | 'narrow' | 'mid' | 'wide';
+const WIDTH_LABEL: Record<Width, string> = { mono: '모노', narrow: '좁게', mid: '중간', wide: '넓게' };
+const WIDTH_VALUE: Record<Width, number> = { mono: 0, narrow: 0.3, mid: 0.6, wide: 1 };
 const WIDTH_LEVELS: Record<number, { widths: Width[] }> = {
   1: { widths: ['mono', 'wide'] },
   2: { widths: ['mono', 'narrow', 'wide'] },
+  3: { widths: ['mono', 'narrow', 'mid', 'wide'] },
 };
 
 // ─── Level (gain) ─────────────────────────────────────────────────────────--
@@ -175,18 +193,19 @@ const LEVEL_LEVELS: Record<number, { task: 'which' | 'amount'; dbs: number[] }> 
   6:  { task: 'amount', dbs: [1, 3, 6] },
   7:  { task: 'amount', dbs: [1, 3, 6] },
   8:  { task: 'amount', dbs: [1, 2, 3, 6] },
-  9:  { task: 'amount', dbs: [1, 2, 3, 6] },
-  10: { task: 'amount', dbs: [1, 2, 3, 6] },
+  9:  { task: 'amount', dbs: [0.5, 1, 2, 3] },
+  10: { task: 'amount', dbs: [0.5, 1, 1.5, 2, 3] },
 };
 
 // ─── Distortion ──────────────────────────────────────────────────────────---
-type DistAmount = 'clean' | 'light' | 'medium' | 'heavy';
-const DIST_LABEL: Record<DistAmount, string> = { clean: '클린', light: '약간', medium: '중간', heavy: '강하게' };
-const DIST_VALUE: Record<DistAmount, number> = { clean: 0, light: 0.15, medium: 0.4, heavy: 0.8 };
+type DistAmount = 'clean' | 'subtle' | 'light' | 'medium' | 'heavy';
+const DIST_LABEL: Record<DistAmount, string> = { clean: '클린', subtle: '아주 약간', light: '약간', medium: '중간', heavy: '강하게' };
+const DIST_VALUE: Record<DistAmount, number> = { clean: 0, subtle: 0.08, light: 0.18, medium: 0.4, heavy: 0.8 };
 const DIST_LEVELS: Record<number, { amounts: DistAmount[] }> = {
   1: { amounts: ['clean', 'heavy'] },
   2: { amounts: ['clean', 'light', 'heavy'] },
   3: { amounts: ['clean', 'light', 'medium', 'heavy'] },
+  4: { amounts: ['clean', 'subtle', 'light', 'medium', 'heavy'] },
 };
 
 // ─── Modulation ──────────────────────────────────────────────────────────---
@@ -280,14 +299,15 @@ export function buildMix(effect: MixEffect, level: number, value: string): MixBu
     }
     case 'compression': {
       const s = COMP_SETTINGS[value as CompAmount];
+      const makeupDb = s.makeupDb * cfgAt(COMP_LEVELS, level).makeupScale;
       return {
         source: 'loop', compare: 'ab',
-        params: { ratio: s.ratio, threshold: s.threshold, makeupDb: s.makeupDb },
+        params: { ratio: s.ratio, threshold: s.threshold, makeupDb },
         detail: value === 'none' ? '압축 없음' : `${COMP_LABEL[value as CompAmount]} · Ratio ${s.ratio}:1`,
       };
     }
     case 'reverb-amount': {
-      const wet = REV_AMT_WET[value as RevAmount];
+      const wet = REV_AMT_WET[value as RevAmount] * cfgAt(REVERB_AMT_LEVELS, level).wetScale;
       return {
         source: 'loop', compare: 'none',
         params: { wet, decay: 1.8 },

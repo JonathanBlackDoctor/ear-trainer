@@ -51,6 +51,12 @@ export const SCALE_LEVELS: Record<number, string[]> = {
   10: ['major', 'natural minor', 'harmonic minor', 'melodic minor', 'dorian', 'mixolydian', 'lydian', 'phrygian', 'locrian'],
 };
 
+// Once the scale pool is maxed (8 modes), the top tiers add descending playback
+// — increasingly often — so the same answer set keeps getting harder to hear.
+export const SCALE_DESCENDING_PROB: Record<number, number> = {
+  8: 0.4, 9: 0.7, 10: 1,
+};
+
 const SCALE_LABEL: Record<string, string> = {
   'major': '장조 (Major)',
   'natural minor': '자연단조',
@@ -90,9 +96,9 @@ export const CADENCE_LEVELS: Record<number, { types: string[]; keys: string[] }>
   5:  { types: CADENCE_ALL, keys: ['C', 'G', 'F', 'D', 'Bb'] },
   6:  { types: CADENCE_ALL, keys: ['C', 'G', 'F', 'D', 'Bb', 'A', 'Eb'] },
   7:  { types: CADENCE_ALL, keys: ['C', 'G', 'D', 'A', 'E', 'F', 'Bb', 'Eb'] },
-  8:  { types: CADENCE_ALL, keys: ['C', 'G', 'D', 'A', 'E', 'F', 'Bb', 'Eb'] },
-  9:  { types: CADENCE_ALL, keys: ['C', 'G', 'D', 'A', 'E', 'F', 'Bb', 'Eb'] },
-  10: { types: CADENCE_ALL, keys: ['C', 'G', 'D', 'A', 'E', 'F', 'Bb', 'Eb'] },
+  8:  { types: CADENCE_ALL, keys: ['C', 'G', 'D', 'A', 'E', 'F', 'Bb', 'Eb', 'Ab', 'B'] },
+  9:  { types: CADENCE_ALL, keys: ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'] },
+  10: { types: CADENCE_ALL, keys: ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'] },
 };
 
 const CADENCE_LABEL: Record<string, string> = {
@@ -174,8 +180,8 @@ export const COMPARE_LEVELS: Record<number, { minGap: number; allowSame: boolean
   6:  { minGap: 2, allowSame: true,  low: 'C3', high: 'C5' },
   7:  { minGap: 2, allowSame: true,  low: 'A2', high: 'C6' },
   8:  { minGap: 1, allowSame: true,  low: 'A2', high: 'C6' },
-  9:  { minGap: 1, allowSame: true,  low: 'A2', high: 'C6' },
-  10: { minGap: 1, allowSame: true,  low: 'A2', high: 'C6' },
+  9:  { minGap: 1, allowSame: true,  low: 'A1', high: 'C7' },
+  10: { minGap: 1, allowSame: true,  low: 'A1', high: 'C7' },
 };
 
 export function getIntervalCompareChoices(level: number): ChoiceOption[] {
@@ -210,8 +216,8 @@ export const ODD_LEVELS: Record<number, { scales: string[]; allowEnds: boolean; 
   6:  { scales: ['major', 'minor'], allowEnds: true,  descending: true },
   7:  { scales: ['major', 'minor', 'dorian'], allowEnds: true, descending: true },
   8:  { scales: ['major', 'minor', 'dorian', 'mixolydian'], allowEnds: true, descending: true },
-  9:  { scales: ['major', 'minor', 'dorian', 'phrygian', 'lydian', 'mixolydian'], allowEnds: true, descending: true },
-  10: { scales: ['major', 'minor', 'dorian', 'phrygian', 'lydian', 'mixolydian'], allowEnds: true, descending: true },
+  9:  { scales: ['major', 'minor', 'dorian', 'phrygian', 'lydian', 'mixolydian', 'harmonic minor', 'melodic minor'], allowEnds: true, descending: true },
+  10: { scales: ['major', 'minor', 'dorian', 'phrygian', 'lydian', 'mixolydian', 'harmonic minor', 'melodic minor', 'locrian'], allowEnds: true, descending: true },
 };
 
 // noteCount-aware: 8-note scale (octave inclusive) → positions 1..8.
@@ -238,7 +244,7 @@ const ALL_CONTOURS = ['up', 'down', 'arch', 'inv-arch', 'wave'];
 
 // Shapes unlock 1→4, then longer melodies and a non-tonic start (jitter) raise
 // the challenge while the answer set stays at the five named shapes.
-export const CONTOUR_LEVELS: Record<number, { shapes: string[]; length: 5 | 7; jitter: boolean }> = {
+export const CONTOUR_LEVELS: Record<number, { shapes: string[]; length: 5 | 7 | 9; jitter: boolean }> = {
   1:  { shapes: ['up', 'down'], length: 5, jitter: false },
   2:  { shapes: ['up', 'down', 'arch'], length: 5, jitter: false },
   3:  { shapes: ['up', 'down', 'arch', 'inv-arch'], length: 5, jitter: false },
@@ -246,9 +252,9 @@ export const CONTOUR_LEVELS: Record<number, { shapes: string[]; length: 5 | 7; j
   5:  { shapes: ALL_CONTOURS, length: 5, jitter: true },
   6:  { shapes: ALL_CONTOURS, length: 7, jitter: false },
   7:  { shapes: ALL_CONTOURS, length: 7, jitter: true },
-  8:  { shapes: ALL_CONTOURS, length: 7, jitter: true },
-  9:  { shapes: ALL_CONTOURS, length: 7, jitter: true },
-  10: { shapes: ALL_CONTOURS, length: 7, jitter: true },
+  8:  { shapes: ALL_CONTOURS, length: 9, jitter: false },
+  9:  { shapes: ALL_CONTOURS, length: 9, jitter: true },
+  10: { shapes: ALL_CONTOURS, length: 9, jitter: true },
 };
 
 export const CONTOUR_LABEL: Record<string, string> = {
@@ -298,11 +304,11 @@ export const TUNING_CENTS: Record<number, number[]> = {
   3:  [28, 32],
   4:  [23, 27],
   5:  [18, 22],
-  6:  [15, 18],
-  7:  [12, 15],
-  8:  [9, 12],
-  9:  [7, 9],
-  10: [5, 7],
+  6:  [14, 17],
+  7:  [11, 14],
+  8:  [7, 9],
+  9:  [5, 6],
+  10: [3, 4],
 };
 
 // ─── Harmonic Function (T/S/D) ──────────────────────────────────────────────
@@ -375,7 +381,7 @@ export const EXTENDED_LEVELS: Record<number, { qualities: string[]; inversions: 
   7:  { qualities: ALL_EXTENDED, inversions: [0], arpeggio: false },
   8:  { qualities: ALL_EXTENDED, inversions: [0, 1], arpeggio: false },
   9:  { qualities: ALL_EXTENDED, inversions: [0, 1, 2], arpeggio: false },
-  10: { qualities: ALL_EXTENDED, inversions: [0, 1, 2], arpeggio: false },
+  10: { qualities: ALL_EXTENDED, inversions: [0, 1, 2, 3], arpeggio: false },
 };
 
 export function getExtendedChoices(level: number): ChoiceOption[] {
@@ -455,9 +461,9 @@ export const TENSION_LEVELS: Record<number, { tensions: string[]; bases: string[
   5:  { tensions: ALL_TENSIONS, bases: ['dominant7'] },
   6:  { tensions: ALL_TENSIONS, bases: ['dominant7', 'major7'] },
   7:  { tensions: ALL_TENSIONS, bases: ['dominant7', 'major7', 'minor7'] },
-  8:  { tensions: ALL_TENSIONS, bases: ['dominant7', 'major7', 'minor7'] },
-  9:  { tensions: ALL_TENSIONS, bases: ['dominant7', 'major7', 'minor7'] },
-  10: { tensions: ALL_TENSIONS, bases: ['dominant7', 'major7', 'minor7'] },
+  8:  { tensions: ALL_TENSIONS, bases: ['dominant7', 'major7', 'minor7', 'm7b5'] },
+  9:  { tensions: ALL_TENSIONS, bases: ['dominant7', 'major7', 'minor7', 'm7b5'] },
+  10: { tensions: ALL_TENSIONS, bases: ['dominant7', 'major7', 'minor7', 'm7b5'] },
 };
 
 export function getTensionChoices(level: number): ChoiceOption[] {
