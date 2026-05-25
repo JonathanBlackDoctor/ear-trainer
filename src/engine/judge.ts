@@ -1,7 +1,8 @@
 import { Note, Interval } from 'tonal';
 import type {
   Question, AnswerValue, ProgressionAnswer,
-  IntervalData, ChordData, SolfegeData, MelodyData,
+  IntervalData, ChordData, SolfegeData, MelodyData, MixData, MixEffect,
+  NoteStackData,
 } from '../types';
 import { intervalLabel } from '../theory/intervals';
 
@@ -101,9 +102,18 @@ export interface LabJudgeDetails {
   category:
     | 'scale' | 'cadence' | 'inversion'
     | 'interval-compare' | 'odd-note' | 'contour' | 'tuning'
-    | 'function' | 'extended' | 'bass' | 'tension';
+    | 'function' | 'extended' | 'bass' | 'tension'
+    | 'wide-interval' | 'note-stack' | 'microtuning' | 'harmonics';
   userAnswer: string;
   correctAnswer: string;
+}
+
+export interface MixJudgeDetails {
+  kind: 'mix';
+  effect: MixEffect;
+  userAnswer: string;
+  correctAnswer: string;
+  detail: string;           // human-readable processing detail, e.g. "2 kHz · +6 dB"
 }
 
 export type JudgeDetails =
@@ -115,7 +125,8 @@ export type JudgeDetails =
   | SolfegeJudgeDetails
   | RhythmJudgeDetails
   | BpmJudgeDetails
-  | LabJudgeDetails;
+  | LabJudgeDetails
+  | MixJudgeDetails;
 
 export interface JudgeResult {
   correct: boolean;
@@ -226,6 +237,43 @@ export function judge(question: Question, userAnswer: AnswerValue): JudgeResult 
       return { correct: isCorrect, partialScore: isCorrect ? 1 : 0, correctAnswer: correct, details };
     }
 
+    case 'lab-note-stack': {
+      const data = question.data as NoteStackData;
+      // Choice input → a stack-code string; piano input → an array of notes.
+      if (typeof userAnswer === 'string') {
+        const isCorrect = userAnswer === data.stackCode;
+        return {
+          correct: isCorrect,
+          partialScore: isCorrect ? 1 : 0,
+          correctAnswer: data.stackCode,
+          details: { kind: 'lab', category: 'note-stack', userAnswer, correctAnswer: data.stackLabel },
+        };
+      }
+      const ua = Array.isArray(userAnswer) ? (userAnswer as string[]) : [];
+      const expectedPcs = data.notes.map((n) => Note.pitchClass(n));
+      const givenPcs = ua.map((n) => Note.pitchClass(n));
+      // Multiset intersection — octave-tolerant pitch-class match.
+      const remaining = [...expectedPcs];
+      let hits = 0;
+      for (const pc of givenPcs) {
+        const i = remaining.indexOf(pc);
+        if (i >= 0) { hits++; remaining.splice(i, 1); }
+      }
+      const score = expectedPcs.length > 0 ? hits / expectedPcs.length : 0;
+      const isCorrect = score === 1 && givenPcs.length === expectedPcs.length;
+      return {
+        correct: isCorrect,
+        partialScore: score,
+        correctAnswer: data.notes,
+        details: {
+          kind: 'lab',
+          category: 'note-stack',
+          userAnswer: givenPcs.join(' · ') || '—',
+          correctAnswer: expectedPcs.join(' · '),
+        },
+      };
+    }
+
     case 'lab-scale':
     case 'lab-cadence':
     case 'lab-inversion':
@@ -236,7 +284,10 @@ export function judge(question: Question, userAnswer: AnswerValue): JudgeResult 
     case 'lab-function':
     case 'lab-extended':
     case 'lab-bass':
-    case 'lab-tension': {
+    case 'lab-tension':
+    case 'lab-wide-interval':
+    case 'lab-microtuning':
+    case 'lab-harmonics': {
       const ua = userAnswer as string;
       const ca = correct as string;
       const isCorrect = ua === ca;
@@ -246,6 +297,32 @@ export function judge(question: Question, userAnswer: AnswerValue): JudgeResult 
         category,
         userAnswer: ua,
         correctAnswer: ca,
+      };
+      return { correct: isCorrect, partialScore: isCorrect ? 1 : 0, correctAnswer: correct, details };
+    }
+
+    case 'mix-eq-freq':
+    case 'mix-eq-boostcut':
+    case 'mix-filter':
+    case 'mix-compression':
+    case 'mix-reverb-amount':
+    case 'mix-reverb-type':
+    case 'mix-delay-time':
+    case 'mix-pan':
+    case 'mix-width':
+    case 'mix-level':
+    case 'mix-distortion':
+    case 'mix-modulation': {
+      const ua = userAnswer as string;
+      const ca = correct as string;
+      const isCorrect = ua === ca;
+      const mix = question.data as MixData;
+      const details: MixJudgeDetails = {
+        kind: 'mix',
+        effect: mix.effect,
+        userAnswer: ua,
+        correctAnswer: ca,
+        detail: mix.detail,
       };
       return { correct: isCorrect, partialScore: isCorrect ? 1 : 0, correctAnswer: correct, details };
     }

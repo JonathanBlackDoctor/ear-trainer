@@ -11,7 +11,10 @@ import {
   LAB_INTERVAL_COMPARE_MODE_INFO, LAB_ODD_NOTE_MODE_INFO, LAB_CONTOUR_MODE_INFO,
   LAB_TUNING_MODE_INFO, LAB_FUNCTION_MODE_INFO, LAB_EXTENDED_MODE_INFO,
   LAB_BASS_MODE_INFO, LAB_TENSION_MODE_INFO,
+  LAB_WIDE_INTERVAL_MODE_INFO, LAB_NOTE_STACK_MODE_INFO,
+  LAB_MICROTUNING_MODE_INFO, LAB_HARMONICS_MODE_INFO,
 } from './labModes';
+import { MIX_MODE_INFOS } from './mixModes';
 
 export interface ModeInfo {
   key: ModeKey;
@@ -19,6 +22,7 @@ export interface ModeInfo {
   emoji: string;
   description: string;
   howTo?: string;
+  theory?: string;
   maxLevel: number;
   defaultLevel: number;
 }
@@ -46,6 +50,11 @@ const MODE_LIST: ModeInfo[] = [
   LAB_EXTENDED_MODE_INFO,
   LAB_BASS_MODE_INFO,
   LAB_TENSION_MODE_INFO,
+  LAB_WIDE_INTERVAL_MODE_INFO,
+  LAB_NOTE_STACK_MODE_INFO,
+  LAB_MICROTUNING_MODE_INFO,
+  LAB_HARMONICS_MODE_INFO,
+  ...MIX_MODE_INFOS,
 ];
 
 export const MODE_REGISTRY: Record<ModeKey, ModeInfo> = Object.fromEntries(
@@ -77,6 +86,22 @@ export const MODE_ACCENT_CLASS: Record<ModeKey, string> = {
   'lab-extended': 'accent-chord',
   'lab-bass': 'accent-chord',
   'lab-tension': 'accent-chord',
+  'lab-wide-interval': 'accent-interval',
+  'lab-note-stack': 'accent-chord',
+  'lab-microtuning': 'accent-solfege',
+  'lab-harmonics': 'accent-tempo',
+  'mix-eq-freq': 'accent-tempo',
+  'mix-eq-boostcut': 'accent-interval',
+  'mix-filter': 'accent-bpm',
+  'mix-compression': 'accent-rhythm',
+  'mix-reverb-amount': 'accent-melody',
+  'mix-reverb-type': 'accent-progression',
+  'mix-delay-time': 'accent-transpose',
+  'mix-pan': 'accent-solfege',
+  'mix-width': 'accent-chord',
+  'mix-level': 'accent-interval',
+  'mix-distortion': 'accent-rhythm',
+  'mix-modulation': 'accent-melody',
 };
 
 /**

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 import type {
   Question, ModeKey, SessionResult, ProgressionAnswer,
   IntervalData, ChordData, SolfegeData, MelodyData, ProgressionData, RhythmData,
@@ -13,9 +13,13 @@ import {
   makeScaleQuestion, makeCadenceQuestion, makeInversionQuestion,
   makeIntervalCompareQuestion, makeOddNoteQuestion, makeContourQuestion,
   makeTuningQuestion, makeFunctionQuestion, makeExtendedQuestion,
-  makeBassQuestion, makeTensionQuestion,
+  makeBassQuestion, makeTensionQuestion, makeMixQuestion,
+  makeWideIntervalQuestion, makeNoteStackQuestion,
+  makeMicrotuningQuestion, makeHarmonicQuestion,
 } from '../engine/questionFactory';
-import { MAX_LEVEL, getLevelLabel } from '../modes/levels';
+import { MAX_LEVEL } from '../modes/levels';
+import { TrainSetup } from './TrainSetup';
+import type { WeakProgressItem } from './Result/useResultData';
 import { judge } from '../engine/judge';
 import { awardXp } from '../engine/xp';
 import { PlaybackControls } from '../components/PlaybackControls';
@@ -27,37 +31,35 @@ import { ComboOverlay } from '../components/ComboOverlay';
 import { ModeFeedback } from '../components/feedback';
 import { getIntervalChoices } from '../modes/intervalMode';
 import { getChordChoices } from '../modes/chordMode';
-import { getSolfegeChoices, getNoteNameChoices } from '../modes/solfegeMode';
-import { getDegreeChoices } from '../modes/progressionMode';
+import { getSolfegeChoices } from '../modes/solfegeMode';
+import { getDegreeChoices, formatDegree } from '../modes/progressionMode';
 import {
   getScaleChoices, getCadenceChoices, getInversionChoices,
   getIntervalCompareChoices, getOddNoteChoices, getContourChoices, getTuningChoices,
   getFunctionChoices, getExtendedChoices, getBassChoices, getTensionChoices,
+  getWideIntervalChoices, getNoteStackChoices, getMicrotuningChoices, getHarmonicsChoices,
 } from '../modes/labModes';
+import { getMixChoices, mixColumns, mixLabel } from '../modes/mixModes';
 import { MODE_REGISTRY, type ModeInfo } from '../modes/registry';
 import type {
   ScaleData, CadenceData,
   IntervalCompareData, OddNoteData, ContourData, TuningData, FunctionData, TensionData,
+  NoteStackData, MicrotuningData, HarmonicData,
+  MixData,
 } from '../types';
 import {
   startAudio, playNote, playChord, playSequence, playProgression, playArpeggio,
+  playArpeggioProgression,
   playMetronomeClick, playRhythmClick,
   playMetronome, stopAllAudio, getAudioStatus, getPlaybackGen, type AudioQuality,
-  playReferenceTone,
+  playReferenceTone, playMixSample, playDetunedDyad,
 } from '../audio/piano';
 import type { ChordStep } from '../types';
 import { Note } from 'tonal';
 import { semitoneToSolfege } from '../theory/solfege';
-import { topWeakItems } from '../engine/weakness';
+import { topWeakItems, weakFocusLevel } from '../engine/weakness';
 
 const MODE_INFO = MODE_REGISTRY;
-
-// Modes for which the absolute-pitch toggle should be available
-// (pitch-based modes; excludes rhythm/tempo/bpm).
-const ABSOLUTE_TOGGLE_MODES = new Set<ModeKey>([
-  'interval', 'chord', 'solfege', 'progression', 'melody', 'transpose',
-  'lab-scale', 'lab-cadence', 'lab-inversion',
-]);
 
 type TrainPhase = 'setup' | 'playing' | 'answering' | 'feedback' | 'done';
 
@@ -75,7 +77,7 @@ export function Train() {
   const { mode } = useParams<{ mode: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { settings, stats, srs, recordResult, addSession } = useStore();
+  const { settings, stats, srs, recordResult, addSession, updateSettings } = useStore();
   const focusMode = searchParams.get('focus'); // 'weak' | null
 
   const [phase, setPhase] = useState<TrainPhase>('setup');
@@ -86,16 +88,40 @@ export function Train() {
   const [feedbackResult, setFeedbackResult] = useState<ReturnType<typeof judge> | null>(null);
   const [loading, setLoading] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
-  const [level, setLevel] = useState(1);
+  // A weak session must start at a level whose item pool actually contains the
+  // user's weak items — otherwise the candidate filter matches nothing and the
+  // factory silently falls back to a normal full-pool session. Compute that
+  // level once on mount (the user can still override it on the setup screen).
+  // A normal session restores the last-used level for this mode (persisted in
+  // settings) so the difficulty is remembered across sessions and restarts.
+  const [level, setLevelState] = useState<number>(() => {
+    const mk = mode as ModeKey;
+    const maxLv = MODE_INFO[mk]?.maxLevel ?? MAX_LEVEL;
+    if (focusMode === 'weak') {
+      return weakFocusLevel(mk, stats[mk] ?? {}, maxLv, 1);
+    }
+    const saved = settings.levelByMode?.[mk] ?? 1;
+    return Math.min(Math.max(1, saved), maxLv);
+  });
+  // Persist the chosen level per mode (skip weak sessions — their starting
+  // level is computed from current weakness, not a user practice preference).
+  const setLevel = (n: number) => {
+    setLevelState(n);
+    if (focusMode !== 'weak') {
+      const mk = mode as ModeKey;
+      updateSettings({ levelByMode: { ...settings.levelByMode, [mk]: n } });
+    }
+  };
   const [progressionSource, setProgressionSource] = useState<'diatonic' | 'praise'>('diatonic');
   const [rhythmTaps, setRhythmTaps] = useState<number[]>([]);
   const [rhythmStartTime, setRhythmStartTime] = useState<number>(0);
   const [tempoTaps, setTempoTaps] = useState<number[]>([]);
   const [bpmSliderValue, setBpmSliderValue] = useState<number>(100);
   const [isCountingIn, setIsCountingIn] = useState(false);
+  const [playbackStage, setPlaybackStage] = useState<'reference' | 'progression' | null>(null);
   const [audioQuality, setAudioQuality] = useState<AudioQuality>('synth');
   const [solfegeInputMethod, setSolfegeInputMethod] = useState<'choice' | 'piano'>('choice');
-  const [absoluteMode, setAbsoluteMode] = useState(false);
+  const [stackInputMethod, setStackInputMethod] = useState<'choice' | 'piano'>('choice');
 
   const modeKey = mode as ModeKey;
   const modeInfo: ModeInfo = MODE_INFO[modeKey] ?? {
@@ -103,6 +129,11 @@ export function Train() {
   };
   const isWeakSession = focusMode === 'weak';
   const totalQuestions = isWeakSession ? settings.weakSessionLength : settings.questionsPerSession;
+  // The question count is chosen on the setup screen and persisted in the store
+  // so it is remembered across sessions and app restarts.
+  const questionOptions = isWeakSession ? [5, 10, 15, 20] : [5, 10, 15, 20, 25, 30];
+  const setTotalQuestions = (n: number) =>
+    updateSettings(isWeakSession ? { weakSessionLength: n } : { questionsPerSession: n });
 
   // In weak-session mode, restrict the candidate pool to the top weak items
   // (by mode). The factory uses this as a filter — falls back to full pool
@@ -157,7 +188,20 @@ export function Train() {
   }, []);
 
   // ─── Session Management ─────────────────────────────────────────────────────
+  // Snapshot of weak-item accuracy taken at the start of a weak-focus session,
+  // so the Result screen can show before→after improvement on what was drilled.
+  const weakSnapshotRef = useRef<Record<string, { attempts: number; correct: number }>>({});
+
   function beginSession() {
+    if (isWeakSession && weakItemKeys) {
+      const ms = useStore.getState().stats[modeKey] ?? {};
+      const snap: Record<string, { attempts: number; correct: number }> = {};
+      weakItemKeys.forEach((key) => {
+        const it = ms[key];
+        snap[key] = { attempts: it?.attempts ?? 0, correct: it?.correct ?? 0 };
+      });
+      weakSnapshotRef.current = snap;
+    }
     const startTime = Date.now();
     setSession({
       questions: [],
@@ -187,50 +231,64 @@ export function Train() {
     setRhythmStartTime(0);
     setTempoTaps([]);
     setBpmSliderValue(100);
+    setPlaybackStage(null);
     setFeedbackResult(null);
     setTimeout(() => playQuestion(q), 100);
   }
 
   function generateQuestion(idx: number): Question {
-    // Force random keys when in absolute mode so the user can't infer the
-    // tonic from a fixed-key session.
-    const k = absoluteMode ? 'random' : settings.keyMode;
+    const k = settings.keyMode;
     const fk = settings.fixedKey;
     const last = session?.questions[idx - 1]?.itemKey;
     const modeSrs = srs[modeKey];
     const modeStats = stats[modeKey];
+    const sel = { lastItemKey: last, srs: modeSrs, stats: modeStats, candidateFilter };
     let q: Question;
     switch (modeKey) {
       case 'interval': q = makeIntervalQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter); break;
       case 'chord': q = makeChordQuestion(level, k, fk, false, last, modeSrs, modeStats, candidateFilter); break;
-      case 'solfege': q = makeSolfegeQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter, absoluteMode); break;
+      case 'solfege': q = makeSolfegeQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter); break;
       case 'progression': q = makeProgressionQuestion(level, k, fk, progressionSource); break;
       case 'melody': q = makeMelodyQuestion(level, k, fk); break;
       case 'transpose': q = makeTransposeQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter); break;
-      case 'rhythm': return makeRhythmQuestion(level);
+      case 'rhythm': {
+        const prev = session?.questions[idx - 1]?.data;
+        const avoidBeats = prev && prev.type === 'rhythm'
+          ? prev.pattern.map((p) => p.time)
+          : undefined;
+        return makeRhythmQuestion(level, avoidBeats);
+      }
       case 'tempo': return makeTempoQuestion(level);
       case 'bpm': return makeBpmQuestion(level);
-      case 'lab-scale': return makeScaleQuestion(level);
-      case 'lab-cadence': q = makeCadenceQuestion(level, k, fk); break;
-      case 'lab-inversion': return makeInversionQuestion(level);
-      case 'lab-interval-compare': return makeIntervalCompareQuestion(level);
-      case 'lab-odd-note': return makeOddNoteQuestion(level);
-      case 'lab-contour': return makeContourQuestion(level);
-      case 'lab-tuning': return makeTuningQuestion(level);
-      case 'lab-function': return makeFunctionQuestion(level);
-      case 'lab-extended': return makeExtendedQuestion(level);
-      case 'lab-bass': return makeBassQuestion(level);
-      case 'lab-tension': return makeTensionQuestion(level);
+      case 'lab-scale': return makeScaleQuestion(level, sel);
+      case 'lab-cadence': q = makeCadenceQuestion(level, sel); break;
+      case 'lab-inversion': return makeInversionQuestion(level, sel);
+      case 'lab-interval-compare': return makeIntervalCompareQuestion(level, sel);
+      case 'lab-odd-note': return makeOddNoteQuestion(level, sel);
+      case 'lab-contour': return makeContourQuestion(level, sel);
+      case 'lab-tuning': return makeTuningQuestion(level, sel);
+      case 'lab-function': return makeFunctionQuestion(level, sel);
+      case 'lab-extended': return makeExtendedQuestion(level, sel);
+      case 'lab-bass': return makeBassQuestion(level, sel);
+      case 'lab-tension': return makeTensionQuestion(level, sel);
+      case 'lab-wide-interval': return makeWideIntervalQuestion(level, sel);
+      case 'lab-note-stack': return makeNoteStackQuestion(level, sel);
+      case 'lab-microtuning': return makeMicrotuningQuestion(level, sel);
+      case 'lab-harmonics': return makeHarmonicQuestion(level, sel);
+      case 'mix-eq-freq':
+      case 'mix-eq-boostcut':
+      case 'mix-filter':
+      case 'mix-compression':
+      case 'mix-reverb-amount':
+      case 'mix-reverb-type':
+      case 'mix-delay-time':
+      case 'mix-pan':
+      case 'mix-width':
+      case 'mix-level':
+      case 'mix-distortion':
+      case 'mix-modulation':
+        return makeMixQuestion(modeKey, level, sel);
       default: q = makeIntervalQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter);
-    }
-    // Stamp absoluteMode flag on the question so downstream playback/UI
-    // (reference-tone gate, key badge) honours the session-level toggle even
-    // for factories that don't accept the flag explicitly.
-    if (absoluteMode) {
-      q = {
-        ...q,
-        context: { ...q.context, absoluteMode: true, referenceToneNote: undefined },
-      };
     }
     return q;
   }
@@ -258,6 +316,7 @@ export function Train() {
         settings.referenceTone === 'perQuestion' &&
         q.context?.referenceToneNote
       ) {
+        if (q.mode === 'progression') setPlaybackStage('reference');
         await playReferenceTone(q.context.referenceToneNote, '2n');
         if (gen !== getPlaybackGen()) return;
         await delay(700 / speed);
@@ -267,7 +326,10 @@ export function Train() {
     } finally {
       // Only release the loading state if we're still the active playback;
       // otherwise the newer playback owns it.
-      if (gen === getPlaybackGen()) setLoading(false);
+      if (gen === getPlaybackGen()) {
+        setLoading(false);
+        setPlaybackStage(null);
+      }
     }
   }
 
@@ -294,10 +356,9 @@ export function Train() {
       }
       case 'progression': {
         const d = data as ProgressionData;
+        setPlaybackStage('progression');
         if (d.playback === 'arpeggio') {
-          for (const c of d.chords) {
-            await playArpeggio(c.notes, '8n', speed);
-          }
+          await playArpeggioProgression(d.chords.map((c) => c.notes), '8n', speed);
         } else {
           const chordNotes = d.chords.map((c) => c.notes);
           await playProgression(chordNotes, '2n', speed);
@@ -391,6 +452,32 @@ export function Train() {
         await playChord(d.fullNotes, '2n');
         break;
       }
+      case 'note-stack': {
+        const d = data as NoteStackData;
+        await playChord(d.notes, '2n');
+        break;
+      }
+      case 'microtuning': {
+        const d = data as MicrotuningData;
+        // In-tune reference dyad, gap, then the (possibly) detuned test dyad.
+        await playDetunedDyad(d.lowNote, d.highNote, 0, '1n');
+        await delay(750 / speed);
+        await playDetunedDyad(d.lowNote, d.highNote, d.cents, '1n');
+        break;
+      }
+      case 'harmonic': {
+        const d = data as HarmonicData;
+        // Fundamental, gap, then the partial (the fundamental pitch-shifted by
+        // 1200·log2(partial) cents → exactly fundamental × partial).
+        await playNote(d.fundamental, '2n');
+        await delay(700 / speed);
+        await playNote(d.fundamental, '1n', d.cents);
+        break;
+      }
+      case 'mix': {
+        await playMixSample(data as MixData);
+        break;
+      }
     }
   }
 
@@ -445,17 +532,19 @@ export function Train() {
       const q = currentQuestion;
       if (!q) return;
       setPianoInput([note]);
-      if (q.context?.absoluteMode) {
-        // Absolute mode: submit the pressed key's pitch class directly.
-        submitAnswer(Note.pitchClass(note));
-        return;
-      }
       const tonic = q.context.key || 'C';
       const tonicMidi = Note.midi(tonic + '4') ?? 60;
       const pressedMidi = Note.midi(note) ?? 60;
       const semitones = ((pressedMidi - tonicMidi) % 12 + 12) % 12;
       const syllable = semitoneToSolfege(semitones);
       submitAnswer(syllable);
+      return;
+    }
+    if (modeKey === 'lab-note-stack') {
+      const expected = (currentQuestion?.data as NoteStackData)?.notes ?? [];
+      const next = [...pianoInput, note];
+      setPianoInput(next);
+      if (next.length >= expected.length) submitAnswer(next);
       return;
     }
     if (modeKey !== 'melody' && modeKey !== 'transpose') {
@@ -629,6 +718,27 @@ export function Train() {
       results,
     );
 
+    // Weak-focus improvement: compare each drilled weak item's accuracy before
+    // the session vs now. Only report items actually practiced this session.
+    let weakFocus: WeakProgressItem[] | undefined;
+    if (isWeakSession) {
+      const ms = useStore.getState().stats[modeKey] ?? {};
+      const snap = weakSnapshotRef.current;
+      const items = Object.keys(snap)
+        .map((key) => {
+          const before = snap[key];
+          const after = ms[key] ?? before;
+          return {
+            itemKey: key,
+            practiced: after.attempts - before.attempts,
+            beforePct: before.attempts > 0 ? Math.round((before.correct / before.attempts) * 100) : null,
+            afterPct: after.attempts > 0 ? Math.round((after.correct / after.attempts) * 100) : null,
+          };
+        })
+        .filter((x) => x.practiced > 0);
+      weakFocus = items.length > 0 ? items : undefined;
+    }
+
     navigate('/result', {
       state: {
         mode: modeKey,
@@ -640,6 +750,7 @@ export function Train() {
         bestCombo,
         previousTotalXp,
         sessionUnlockedIds: newlyUnlocked,
+        weakFocus,
       },
     });
   }
@@ -648,125 +759,30 @@ export function Train() {
   const currentIdx = session?.currentIdx ?? 0;
   const correctCount = (session?.results ?? []).filter((r) => r.correct).length;
 
+  // Unknown mode key (e.g. a renamed/removed mode lingering in old persisted
+  // stats): there's no input UI for it, so a session would render only the
+  // playback controls. Bounce home rather than show a half-broken screen.
+  if (!MODE_INFO[modeKey]) return <Navigate to="/" replace />;
+
   // ─── Setup Screen ─────────────────────────────────────────────────────────
   if (phase === 'setup' || !audioReady) {
     return (
-      <div className="min-h-screen flex flex-col">
-        <div className="bg-white border-b border-slate-100 px-4 py-4">
-          <div className="max-w-lg mx-auto flex items-center gap-3">
-            <button className="btn-ghost" onClick={() => navigate('/')}>← 뒤로</button>
-            <span className="font-semibold text-slate-700">
-              {modeInfo.emoji} {modeInfo.name}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex-1 flex flex-col items-center justify-center px-4 gap-6">
-          <div className="text-6xl" aria-hidden>{modeInfo.emoji}</div>
-          <h1 className="text-xl font-bold text-slate-800">{modeInfo.name}</h1>
-          {isWeakSession && (
-            <div className="badge-accent text-xs">
-              ⚡ 약점 집중 세션 · {totalQuestions}문항
-            </div>
-          )}
-
-          {/* How-to */}
-          {modeInfo.howTo && (
-            <div className="card w-full max-w-sm">
-              <div className="text-sm font-semibold text-slate-600 mb-2">사용법</div>
-              <p className="text-sm text-slate-600 leading-relaxed">{modeInfo.howTo}</p>
-            </div>
-          )}
-
-          {/* Level selector — 10 levels in a 2×5 grid + label strip */}
-          <div className="card w-full max-w-sm">
-            <div className="text-sm font-semibold text-slate-600 mb-3">레벨 선택</div>
-            <div className="grid grid-cols-5 gap-2">
-              {Array.from({ length: modeInfo.maxLevel ?? MAX_LEVEL }, (_, i) => i + 1).map((lv) => (
-                <button
-                  key={lv}
-                  className={`py-2 rounded-lg font-semibold text-sm transition-colors ${
-                    level === lv
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-slate-100 text-slate-600 active:bg-slate-200'
-                  }`}
-                  onClick={() => setLevel(lv)}
-                  aria-label={`레벨 ${lv}`}
-                >
-                  {lv}
-                </button>
-              ))}
-            </div>
-            <div className="mt-3 text-xs text-slate-500 min-h-[1.25rem] leading-snug">
-              Lv{level} · {getLevelLabel(modeKey, level)}
-            </div>
-          </div>
-
-          {/* Absolute-pitch toggle (pitch-based modes only) */}
-          {ABSOLUTE_TOGGLE_MODES.has(modeKey) && (
-            <div className="card w-full max-w-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-slate-700">
-                    🎯 절대음감 모드
-                  </div>
-                  <div className="text-xs text-slate-500 mt-1 leading-snug">
-                    기준음 없이 음이름만 듣고 맞히기
-                  </div>
-                </div>
-                <button
-                  role="switch"
-                  aria-checked={absoluteMode}
-                  onClick={() => setAbsoluteMode((v) => !v)}
-                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-                    absoluteMode ? 'bg-primary-600' : 'bg-slate-300'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                      absoluteMode ? 'translate-x-5' : 'translate-x-0.5'
-                    }`}
-                  />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Progression source */}
-          {modeKey === 'progression' && (
-            <div className="card w-full max-w-sm">
-              <div className="text-sm font-semibold text-slate-600 mb-3">출제 소스</div>
-              <div className="flex gap-2">
-                {[
-                  { value: 'diatonic', label: '일반 다이어토닉' },
-                  { value: 'praise', label: '🙏 찬양 패턴' },
-                ].map((opt) => (
-                  <button
-                    key={opt.value}
-                    className={`flex-1 py-2 rounded-lg font-semibold text-sm transition-colors ${
-                      progressionSource === opt.value
-                        ? 'bg-primary-600 text-white'
-                        : 'bg-slate-100 text-slate-600'
-                    }`}
-                    onClick={() => setProgressionSource(opt.value as any)}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <button
-            className="btn-primary w-full max-w-sm py-4 text-lg"
-            onClick={handleAudioStart}
-            disabled={loading}
-          >
-            {loading ? '🎵 소리 준비 중...' : '🎵 시작하기'}
-          </button>
-          <p className="text-xs text-slate-400">첫 시작 시 피아노 샘플을 불러옵니다</p>
-        </div>
-      </div>
+      <TrainSetup
+        modeKey={modeKey}
+        modeInfo={modeInfo}
+        isWeakSession={isWeakSession}
+        totalQuestions={totalQuestions}
+        questionOptions={questionOptions}
+        setTotalQuestions={setTotalQuestions}
+        level={level}
+        setLevel={setLevel}
+        isProgression={modeKey === 'progression'}
+        progressionSource={progressionSource}
+        setProgressionSource={setProgressionSource}
+        loading={loading}
+        onStart={handleAudioStart}
+        onBack={() => navigate('/')}
+      />
     );
   }
 
@@ -783,14 +799,24 @@ export function Train() {
   const isTempo = modeKey === 'tempo';
   const isBpm = modeKey === 'bpm';
   const isLabChoice = modeKey.startsWith('lab-');
+  const isMixChoice = modeKey.startsWith('mix-');
+  const isNoteStack = modeKey === 'lab-note-stack';
   const isAbsolute = !!currentQuestion?.context?.absoluteMode;
+  // The note-stack mode toggles between a choice grid and piano reconstruction;
+  // only render the choice grid when it's actually the active input method.
+  const showChoiceGrid =
+    isInterval || isChord || (isSolfege && solfegeInputMethod === 'choice')
+    || (isLabChoice && !(isNoteStack && stackInputMethod === 'piano')) || isMixChoice;
   const choiceColumns: 2 | 3 | 4 =
     isInterval ? 2
     : isChord ? 2
+    : isMixChoice ? mixColumns(modeKey.replace(/^mix-/, '') as MixData['effect'], level)
     : modeKey === 'lab-odd-note' ? 4
     : modeKey === 'lab-bass' ? 4
     : modeKey === 'lab-inversion' ? 2
     : modeKey === 'lab-extended' ? 2
+    : modeKey === 'lab-wide-interval' ? 2
+    : isNoteStack ? 2
     : 3;
 
   return (
@@ -833,6 +859,25 @@ export function Train() {
             <div className="text-center">
               <span className="inline-block bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1 rounded-full">
                 조성: {currentQuestion.context.key}장조
+              </span>
+            </div>
+          )}
+
+          {/* Progression playback-stage indicator — distinguishes the leading
+              key-reference tone (not an input) from the chords to be entered, so
+              "2 chords to input" doesn't get confused with "3 sounds heard". */}
+          {isProgression && phase !== 'feedback' && playbackStage && (
+            <div className="text-center">
+              <span
+                className={`inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-full ${
+                  playbackStage === 'reference'
+                    ? 'bg-amber-100 text-amber-700'
+                    : 'bg-primary-100 text-primary-700'
+                }`}
+              >
+                {playbackStage === 'reference'
+                  ? '🔑 기준음 (조성 잡기) · 입력 대상 아님'
+                  : `🎵 코드 진행 ${(currentQuestion.data as ProgressionData).chords.length}개 재생 중`}
               </span>
             </div>
           )}
@@ -930,10 +975,32 @@ export function Train() {
                 </div>
               )}
 
+              {/* Note-stack input-method toggle (choice vs piano reconstruction) */}
+              {isNoteStack && (
+                <div className="flex justify-center gap-1 bg-slate-100 p-1 rounded-lg w-fit mx-auto">
+                  {[
+                    { value: 'choice', label: '🧱 음정 구성' },
+                    { value: 'piano', label: '🎹 건반' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                        stackInputMethod === opt.value
+                          ? 'bg-white text-primary-700 shadow-sm'
+                          : 'text-slate-500 active:text-slate-700'
+                      }`}
+                      onClick={() => { setStackInputMethod(opt.value as 'choice' | 'piano'); setPianoInput([]); }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {/* Choice-based modes */}
-              {(isInterval || isChord || (isSolfege && solfegeInputMethod === 'choice') || isLabChoice) && (
+              {showChoiceGrid && (
                 <ChoiceGrid
-                  options={getChoiceOptions(modeKey, level, isAbsolute)}
+                  options={getChoiceOptions(modeKey, level)}
                   selected={selectedAnswer ?? undefined}
                   answered={false}
                   onSelect={handleChoiceSelect}
@@ -941,6 +1008,32 @@ export function Train() {
                   disabled={loading}
                 />
               )}
+
+              {/* Note-stack piano reconstruction */}
+              {isNoteStack && stackInputMethod === 'piano' && (() => {
+                const nd = currentQuestion.data as NoteStackData;
+                return (
+                  <>
+                    <div className="text-center text-sm text-slate-500">
+                      들은 음 {nd.notes.length}개를 건반에서 모두 눌러주세요
+                      {pianoInput.length > 0 && ` (${pianoInput.length}/${nd.notes.length})`}
+                    </div>
+                    {pianoInput.length > 0 && (
+                      <div className="flex gap-2 flex-wrap justify-center">
+                        {pianoInput.map((n, i) => (
+                          <span key={i} className="bg-primary-100 text-primary-700 px-2 py-1 rounded text-sm font-mono">{n}</span>
+                        ))}
+                      </div>
+                    )}
+                    <Piano onNotePress={handlePianoNote} highlightNotes={pianoInput} disabled={loading} />
+                    {pianoInput.length > 0 && (
+                      <button className="btn-ghost text-sm text-slate-400" onClick={() => setPianoInput([])}>
+                        ← 다시 입력
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
 
               {/* Transpose: re-enter the melody in the target key on the piano */}
               {isTranspose && (() => {
@@ -1032,7 +1125,7 @@ export function Train() {
                     <div className="flex gap-2 flex-wrap justify-center">
                       {progressionInput.map((p, i) => (
                         <span key={i} className="bg-primary-100 text-primary-700 px-3 py-1.5 rounded-lg font-semibold text-sm">
-                          {settings.notation === 'number' ? `${p.degree}${['m','dim','m7','m7b5'].includes(p.quality) ? 'm' : ''}` : romanize(p.degree, p.quality)}
+                          {formatDegree(p.degree, p.quality, settings.notation)}
                         </span>
                       ))}
                     </div>
@@ -1161,15 +1254,31 @@ export function Train() {
           ) : (
             /* After feedback: show correct answer highlight for choice modes */
             <>
-              {(isInterval || isChord || (isSolfege && solfegeInputMethod === 'choice') || isLabChoice) && (
+              {showChoiceGrid && (
                 <ChoiceGrid
-                  options={getChoiceOptions(modeKey, level, isAbsolute)}
+                  options={getChoiceOptions(modeKey, level)}
                   selected={selectedAnswer ?? undefined}
                   correct={feedbackResult?.correctAnswer as string}
                   answered
                   onSelect={() => {}}
                   columns={choiceColumns}
                 />
+              )}
+              {isNoteStack && stackInputMethod === 'piano' && feedbackResult && (
+                <div className="space-y-2">
+                  <div className="text-xs text-slate-500 text-center">정답 (동시에 울린 음)</div>
+                  <Piano
+                    highlightNotes={[]}
+                    correctNotes={(currentQuestion.data as NoteStackData).notes}
+                    wrongNotes={pianoInput.filter((n) => {
+                      const m = Note.midi(n);
+                      return !(currentQuestion.data as NoteStackData).notes.some(
+                        (cn) => Note.pitchClass(cn) === Note.pitchClass(n) || (m != null && Note.midi(cn) === m),
+                      );
+                    })}
+                    disabled
+                  />
+                </div>
               )}
               {isTranspose && feedbackResult && (
                 <div className="space-y-2">
@@ -1226,9 +1335,7 @@ export function Train() {
                 <div className="flex gap-2 flex-wrap justify-center">
                   {(feedbackResult.correctAnswer as ProgressionAnswer[]).map((p, i) => (
                     <span key={i} className="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg font-semibold text-sm">
-                      {settings.notation === 'number'
-                        ? `${p.degree}${['m','dim','m7','m7b5'].includes(p.quality) ? 'm' : ''}`
-                        : romanize(p.degree, p.quality)}
+                      {formatDegree(p.degree, p.quality, settings.notation)}
                     </span>
                   ))}
                 </div>
@@ -1265,10 +1372,10 @@ export function Train() {
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-function getChoiceOptions(mode: ModeKey, level: number, absolute = false): ChoiceOption[] {
+function getChoiceOptions(mode: ModeKey, level: number): ChoiceOption[] {
   if (mode === 'interval') return getIntervalChoices(level);
   if (mode === 'chord') return getChordChoices(level);
-  if (mode === 'solfege') return absolute ? getNoteNameChoices(level) : getSolfegeChoices(level);
+  if (mode === 'solfege') return getSolfegeChoices(level);
   if (mode === 'lab-scale') return getScaleChoices(level);
   if (mode === 'lab-cadence') return getCadenceChoices(level);
   if (mode === 'lab-inversion') return getInversionChoices(level);
@@ -1280,6 +1387,11 @@ function getChoiceOptions(mode: ModeKey, level: number, absolute = false): Choic
   if (mode === 'lab-extended') return getExtendedChoices(level);
   if (mode === 'lab-bass') return getBassChoices(level);
   if (mode === 'lab-tension') return getTensionChoices(level);
+  if (mode === 'lab-wide-interval') return getWideIntervalChoices(level);
+  if (mode === 'lab-note-stack') return getNoteStackChoices(level);
+  if (mode === 'lab-microtuning') return getMicrotuningChoices(level);
+  if (mode === 'lab-harmonics') return getHarmonicsChoices(level);
+  if (mode.startsWith('mix-')) return getMixChoices(mode.replace(/^mix-/, '') as MixData['effect'], level);
   return [];
 }
 
@@ -1288,25 +1400,19 @@ function formatAnswer(answer: unknown, mode: ModeKey, notation: 'roman' | 'numbe
     if (mode === 'tempo' || mode === 'bpm') return `${answer} BPM`;
     return String(answer);
   }
-  if (typeof answer === 'string') return answer;
+  if (typeof answer === 'string') {
+    if (mode.startsWith('mix-')) return mixLabel(mode.replace(/^mix-/, '') as MixData['effect'], answer);
+    return answer;
+  }
   if (Array.isArray(answer)) {
     if (mode === 'progression') {
       return (answer as ProgressionAnswer[])
-        .map((p) => notation === 'number'
-          ? `${p.degree}${['m','dim','m7','m7b5'].includes(p.quality) ? 'm' : ''}`
-          : romanize(p.degree, p.quality))
+        .map((p) => formatDegree(p.degree, p.quality, notation))
         .join(' → ');
     }
     return (answer as string[]).join(', ');
   }
   return String(answer);
-}
-
-const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
-function romanize(degree: number, quality: string): string {
-  const r = ROMAN[degree] ?? degree.toString();
-  const isMinor = ['m', 'dim', 'm7', 'm7b5'].includes(quality);
-  return isMinor ? r.toLowerCase() : r;
 }
 
 // ─── Progression Input Component ────────────────────────────────────────────

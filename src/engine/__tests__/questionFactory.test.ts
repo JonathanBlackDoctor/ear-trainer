@@ -3,7 +3,14 @@ import {
   makeIntervalQuestion, makeChordQuestion, makeSolfegeQuestion,
   makeProgressionQuestion, makeMelodyQuestion, makeTransposeQuestion,
   makeRhythmQuestion, makeTempoQuestion, makeBpmQuestion,
+  makeScaleQuestion, makeCadenceQuestion, makeInversionQuestion,
+  makeIntervalCompareQuestion, makeOddNoteQuestion, makeContourQuestion,
+  makeTuningQuestion, makeFunctionQuestion, makeExtendedQuestion,
+  makeBassQuestion, makeTensionQuestion,
+  type SelectOpts,
 } from '../questionFactory';
+import { itemKeysForLevel } from '../itemPool';
+import type { ModeKey, Question } from '../../types';
 import { MAX_LEVEL } from '../../modes/levels';
 
 describe('questionFactory — every mode × every level produces a valid question', () => {
@@ -94,6 +101,31 @@ describe('questionFactory — every mode × every level produces a valid questio
   }
 });
 
+describe('questionFactory — rhythm patterns vary within a level', () => {
+  it('produces more than one distinct pattern per level', () => {
+    for (let level = 1; level <= MAX_LEVEL; level++) {
+      const seen = new Set<string>();
+      for (let i = 0; i < 40; i++) {
+        const data = makeRhythmQuestion(level).data as { pattern: { time: number }[] };
+        seen.add(data.pattern.map((p) => p.time).join(','));
+      }
+      expect(seen.size).toBeGreaterThan(1);
+    }
+  });
+
+  it('never repeats the immediately previous pattern when avoidBeats is passed', () => {
+    for (let level = 1; level <= MAX_LEVEL; level++) {
+      let prev: number[] | undefined;
+      for (let i = 0; i < 30; i++) {
+        const data = makeRhythmQuestion(level, prev).data as { pattern: { time: number }[] };
+        const beats = data.pattern.map((p) => p.time);
+        if (prev) expect(beats.join(',')).not.toBe(prev.join(','));
+        prev = beats;
+      }
+    }
+  });
+});
+
 describe('questionFactory — interval Lv2 introduces "down" direction', () => {
   // The whole point of parameter separation is that Lv2 adds *exactly one*
   // new variable over Lv1: the descending direction. Sample enough questions
@@ -134,5 +166,60 @@ describe('questionFactory — bpm Lv7 transitions to slider', () => {
   it('Lv7 is slider mode', () => {
     const q = makeBpmQuestion(7);
     expect((q.data as { inputMode: string }).inputMode).toBe('slider');
+  });
+});
+
+// Every item-focusable mode, called through a uniform builder so the weak-focus
+// machinery (candidate filter + itemKey enumeration) can be exercised generically.
+const BUILD: Partial<Record<ModeKey, (level: number, opts?: SelectOpts) => Question>> = {
+  interval: (l, o) => makeIntervalQuestion(l, 'fixed', 'C', o?.lastItemKey, o?.srs, o?.stats, o?.candidateFilter),
+  chord: (l, o) => makeChordQuestion(l, 'fixed', 'C', false, o?.lastItemKey, o?.srs, o?.stats, o?.candidateFilter),
+  solfege: (l, o) => makeSolfegeQuestion(l, 'fixed', 'C', o?.lastItemKey, o?.srs, o?.stats, o?.candidateFilter),
+  'lab-scale': makeScaleQuestion,
+  'lab-cadence': makeCadenceQuestion,
+  'lab-inversion': makeInversionQuestion,
+  'lab-interval-compare': makeIntervalCompareQuestion,
+  'lab-odd-note': makeOddNoteQuestion,
+  'lab-contour': makeContourQuestion,
+  'lab-tuning': makeTuningQuestion,
+  'lab-function': makeFunctionQuestion,
+  'lab-extended': makeExtendedQuestion,
+  'lab-bass': makeBassQuestion,
+  'lab-tension': makeTensionQuestion,
+};
+
+describe('weak-focus — itemPool enumerators match the keys factories actually produce', () => {
+  for (const mode of Object.keys(BUILD) as ModeKey[]) {
+    for (let level = 1; level <= MAX_LEVEL; level++) {
+      it(`${mode} Lv${level} stays within its enumerated pool`, () => {
+        const pool = new Set(itemKeysForLevel(mode, level));
+        expect(pool.size).toBeGreaterThan(0);
+        for (let i = 0; i < 40; i++) {
+          const q = BUILD[mode]!(level, undefined);
+          expect(pool.has(q.itemKey)).toBe(true);
+        }
+      });
+    }
+  }
+});
+
+describe('weak-focus — candidateFilter restricts questions to the targeted item', () => {
+  for (const mode of Object.keys(BUILD) as ModeKey[]) {
+    it(`${mode} drills only the filtered itemKey`, () => {
+      const pool = itemKeysForLevel(mode, MAX_LEVEL);
+      const target = pool[0];
+      const opts: SelectOpts = { candidateFilter: (k) => k === target };
+      for (let i = 0; i < 30; i++) {
+        const q = BUILD[mode]!(MAX_LEVEL, opts);
+        expect(q.itemKey).toBe(target);
+      }
+    });
+  }
+
+  it('falls back to the full pool when the filter matches nothing', () => {
+    const opts: SelectOpts = { candidateFilter: () => false };
+    const pool = new Set(itemKeysForLevel('lab-function', 5));
+    const q = makeFunctionQuestion(5, opts);
+    expect(pool.has(q.itemKey)).toBe(true);
   });
 });

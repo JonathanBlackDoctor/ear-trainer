@@ -1,8 +1,10 @@
-import type { ModeKey } from '../types';
+import type { ModeKey, MixEffect } from '../types';
 import { INTERVAL_LEVELS } from '../theory/intervals';
 import { CHORD_LEVELS } from '../theory/chords';
 import { SOLFEGE_LEVELS } from '../theory/solfege';
 import { PROGRESSION_LEVELS } from '../theory/progressions';
+import { getLabLevelLabel } from './labModes';
+import { getMixLevelLabel } from './mixModes';
 
 /** Single source of truth for the per-mode level count. */
 export const MAX_LEVEL = 10;
@@ -13,20 +15,20 @@ export interface MelodyLevelConfig {
   noteCount: number;
   maxJump: number;          // max scale-degree distance between consecutive notes
   keyMode: 'fixed' | 'random';
-  scaleOctaves: 1 | 2;      // 1 = one octave (7 notes); 2 = two octaves (14 notes)
+  scaleOctaves: 1 | 2 | 3;  // 1 = one octave (7 notes); 2 = 14 notes; 3 = 21 notes
 }
 
 export const MELODY_LEVELS: Record<number, MelodyLevelConfig> = {
-  1:  { label: '3음 · 인접만',     noteCount: 3, maxJump: 1, keyMode: 'fixed',  scaleOctaves: 1 },
-  2:  { label: '4음 · 인접만',     noteCount: 4, maxJump: 1, keyMode: 'fixed',  scaleOctaves: 1 },
-  3:  { label: '4음 · 도약 2',     noteCount: 4, maxJump: 2, keyMode: 'fixed',  scaleOctaves: 1 },
-  4:  { label: '5음 · 도약 2',     noteCount: 5, maxJump: 2, keyMode: 'fixed',  scaleOctaves: 1 },
-  5:  { label: '6음 · 도약 2',     noteCount: 6, maxJump: 2, keyMode: 'fixed',  scaleOctaves: 1 },
-  6:  { label: '6음 · 도약 3',     noteCount: 6, maxJump: 3, keyMode: 'fixed',  scaleOctaves: 1 },
-  7:  { label: '7음 · 도약 3',     noteCount: 7, maxJump: 3, keyMode: 'fixed',  scaleOctaves: 1 },
-  8:  { label: '8음 · 도약 3',     noteCount: 8, maxJump: 3, keyMode: 'fixed',  scaleOctaves: 1 },
-  9:  { label: '+ 2옥타브 음역',   noteCount: 8, maxJump: 4, keyMode: 'fixed',  scaleOctaves: 2 },
-  10: { label: '+ 랜덤 키',        noteCount: 8, maxJump: 4, keyMode: 'random', scaleOctaves: 2 },
+  1:  { label: '3음 · 인접만',     noteCount: 3,  maxJump: 1, keyMode: 'fixed',  scaleOctaves: 1 },
+  2:  { label: '4음 · 인접만',     noteCount: 4,  maxJump: 1, keyMode: 'fixed',  scaleOctaves: 1 },
+  3:  { label: '4음 · 도약 2',     noteCount: 4,  maxJump: 2, keyMode: 'fixed',  scaleOctaves: 1 },
+  4:  { label: '5음 · 도약 2',     noteCount: 5,  maxJump: 2, keyMode: 'fixed',  scaleOctaves: 1 },
+  5:  { label: '6음 · 도약 2',     noteCount: 6,  maxJump: 2, keyMode: 'fixed',  scaleOctaves: 1 },
+  6:  { label: '6음 · 도약 3',     noteCount: 6,  maxJump: 3, keyMode: 'fixed',  scaleOctaves: 1 },
+  7:  { label: '7음 · 도약 3 · 2옥타브', noteCount: 7,  maxJump: 3, keyMode: 'fixed',  scaleOctaves: 2 },
+  8:  { label: '8음 · 도약 4',     noteCount: 8,  maxJump: 4, keyMode: 'fixed',  scaleOctaves: 2 },
+  9:  { label: '9음 · 도약 5',     noteCount: 9,  maxJump: 5, keyMode: 'fixed',  scaleOctaves: 2 },
+  10: { label: '+ 3옥타브 · 랜덤 키', noteCount: 10, maxJump: 6, keyMode: 'random', scaleOctaves: 3 },
 };
 
 // ─── Transpose ────────────────────────────────────────────────────────────────
@@ -64,8 +66,8 @@ export const TRANSPOSE_LEVELS: Record<number, TransposeLevelConfig> = {
   6:  { label: '3음 · 전 7도 · 키 5개',         noteCount: 3, degreePool: DEG_DIA_7, maxJump: 3, keyPool: KEYS_MID    },
   7:  { label: '4음 · 전 7도 · 키 5개',         noteCount: 4, degreePool: DEG_DIA_7, maxJump: 3, keyPool: KEYS_MID    },
   8:  { label: '4음 · 전 7도 · 키 8개',         noteCount: 4, degreePool: DEG_DIA_7, maxJump: 3, keyPool: KEYS_LARGE  },
-  9:  { label: '5음 · 키 8개',                  noteCount: 5, degreePool: DEG_DIA_7, maxJump: 4, keyPool: KEYS_LARGE  },
-  10: { label: '5음 · 12개 키 전체',            noteCount: 5, degreePool: DEG_DIA_7, maxJump: 4, keyPool: KEYS_FULL12 },
+  9:  { label: '5음 · 도약 4 · 키 8개',         noteCount: 5, degreePool: DEG_DIA_7, maxJump: 4, keyPool: KEYS_LARGE  },
+  10: { label: '6음 · 도약 5 · 12개 키 전체',   noteCount: 6, degreePool: DEG_DIA_7, maxJump: 5, keyPool: KEYS_FULL12 },
 };
 
 // ─── Rhythm ────────────────────────────────────────────────────────────────────
@@ -74,55 +76,39 @@ export interface RhythmPattern {
   duration: number;         // total 16ths
 }
 
+// Rhythm questions are generated procedurally from per-level constraints rather
+// than drawn from a small fixed pool, so the same pattern doesn't keep repeating
+// within a level. `positions` is the set of allowed onset slots (16th-note grid,
+// always includes the downbeat 0); `onsets` is the [min, max] number of taps
+// (including the downbeat).
 export interface RhythmLevelConfig {
   label: string;
-  patterns: RhythmPattern[];
   bpm: number;
+  length: number;           // total length in 16ths (16 = 1 bar, 32 = 2 bars)
+  positions: number[];      // allowed onset positions (must include 0)
+  onsets: [number, number]; // [min, max] number of onsets, downbeat included
 }
 
+const range = (n: number) => Array.from({ length: n }, (_, i) => i);
+const QUARTERS = [0, 4, 8, 12];
+const EIGHTHS = [0, 2, 4, 6, 8, 10, 12, 14];
+const SIXTEENTHS = range(16);
+const SIXTEENTHS_2BAR = range(32);
+// Lopsided grid that avoids landing squarely on every quarter — gives a
+// triplet/swung feel on the 16th-note grid.
+const TRIPLET_FEEL = [0, 2, 3, 5, 6, 8, 10, 11, 13, 14];
+
 export const RHYTHM_LEVELS: Record<number, RhythmLevelConfig> = {
-  1:  { label: '기본 4분음표',       bpm: 70,  patterns: [
-        { beats: [0, 4, 8, 12], duration: 16 },
-        { beats: [0, 8],         duration: 16 },
-      ] },
-  2:  { label: '+ 3분할 패턴',       bpm: 80,  patterns: [
-        { beats: [0, 4, 8],      duration: 12 },
-        { beats: [0, 4, 12],     duration: 16 },
-      ] },
-  3:  { label: '+ 빠른 템포',        bpm: 90,  patterns: [
-        { beats: [0, 4, 8, 12],  duration: 16 },
-        { beats: [0, 4, 8],      duration: 12 },
-        { beats: [0, 4, 12],     duration: 16 },
-      ] },
-  4:  { label: '+ 약한 싱코페이션',  bpm: 90,  patterns: [
-        { beats: [0, 2, 4, 8, 10, 12], duration: 16 },
-        { beats: [0, 4, 6, 8, 12],     duration: 16 },
-        { beats: [0, 2, 8, 10],        duration: 16 },
-      ] },
-  5:  { label: '+ 붙임줄/점음표',     bpm: 95,  patterns: [
-        { beats: [0, 4, 6, 10, 12],    duration: 16 },
-        { beats: [0, 2, 6, 8, 14],     duration: 16 },
-        { beats: [0, 4, 10, 12],       duration: 16 },
-      ] },
-  6:  { label: '+ 16분음표 시작',     bpm: 100, patterns: [
-        { beats: [0, 1, 4, 6, 8, 9, 12, 14], duration: 16 },
-        { beats: [0, 3, 4, 8, 11, 12],       duration: 16 },
-      ] },
-  7:  { label: '+ 셋잇단 느낌',       bpm: 100, patterns: [
-        { beats: [0, 2, 5, 8, 10, 13],       duration: 16 },
-      ] },
-  8:  { label: '+ 강한 싱코페이션',   bpm: 105, patterns: [
-        { beats: [0, 3, 6, 8, 11, 14],          duration: 16 },
-        { beats: [0, 1, 2, 8, 10, 12, 13, 14],  duration: 16 },
-      ] },
-  9:  { label: '+ 16분 묶음',         bpm: 110, patterns: [
-        { beats: [0, 3, 5, 8, 10, 11, 13, 15],      duration: 16 },
-        { beats: [0, 1, 3, 5, 8, 9, 11, 13, 14],    duration: 16 },
-      ] },
-  10: { label: '+ 16분 최대 밀도',    bpm: 115, patterns: [
-        { beats: [0, 2, 3, 6, 8, 11, 13, 14],      duration: 16 },
-        { beats: [0, 1, 4, 5, 7, 8, 11, 12, 15],   duration: 16 },
-      ] },
+  1:  { label: '기본 4분음표',           bpm: 70,  length: 16, positions: QUARTERS,        onsets: [2, 4] },
+  2:  { label: '+ 3분할 패턴',           bpm: 80,  length: 16, positions: QUARTERS,        onsets: [3, 3] },
+  3:  { label: '+ 빠른 템포',            bpm: 90,  length: 16, positions: QUARTERS,        onsets: [3, 4] },
+  4:  { label: '+ 약한 싱코페이션',      bpm: 90,  length: 16, positions: [0, 2, 4, 8, 10, 12], onsets: [4, 6] },
+  5:  { label: '+ 붙임줄/점음표',         bpm: 95,  length: 16, positions: EIGHTHS,         onsets: [4, 6] },
+  6:  { label: '+ 16분음표 시작',         bpm: 105, length: 16, positions: SIXTEENTHS,      onsets: [6, 8] },
+  7:  { label: '+ 셋잇단 느낌',           bpm: 110, length: 16, positions: TRIPLET_FEEL,     onsets: [6, 6] },
+  8:  { label: '+ 강한 싱코페이션',       bpm: 120, length: 16, positions: SIXTEENTHS,      onsets: [7, 9] },
+  9:  { label: '+ 16분 묶음',             bpm: 135, length: 16, positions: SIXTEENTHS,      onsets: [8, 10] },
+  10: { label: '+ 2마디 · 16분 최대 밀도', bpm: 150, length: 32, positions: SIXTEENTHS_2BAR, onsets: [10, 16] },
 };
 
 // ─── Tempo Hold ────────────────────────────────────────────────────────────────
@@ -141,9 +127,9 @@ export const TEMPO_LEVELS: Record<number, TempoLevelConfig> = {
   5:  { label: '60~120 BPM',                   bpmRange: [60, 120],  countInBeats: 4, holdBeats: 4  },
   6:  { label: '+ 6박 유지',                    bpmRange: [60, 120],  countInBeats: 4, holdBeats: 6  },
   7:  { label: '+ 8박 유지',                    bpmRange: [60, 120],  countInBeats: 4, holdBeats: 8  },
-  8:  { label: '60~140 · 카운트인 2박',         bpmRange: [60, 140],  countInBeats: 2, holdBeats: 8  },
-  9:  { label: '50~160 BPM',                   bpmRange: [50, 160],  countInBeats: 2, holdBeats: 8  },
-  10: { label: '40~180 · 12박 유지',           bpmRange: [40, 180],  countInBeats: 2, holdBeats: 12 },
+  8:  { label: '50~150 · 카운트인 2박',         bpmRange: [50, 150],  countInBeats: 2, holdBeats: 8  },
+  9:  { label: '40~170 · 10박 유지',           bpmRange: [40, 170],  countInBeats: 2, holdBeats: 10 },
+  10: { label: '30~200 · 카운트인 1박 · 16박 유지', bpmRange: [30, 200], countInBeats: 1, holdBeats: 16 },
 };
 
 // ─── BPM Guess ─────────────────────────────────────────────────────────────────
@@ -161,11 +147,11 @@ export const BPM_LEVELS: Record<number, BpmLevelConfig> = {
   3:  { label: '4지선다 · 간격 10',         inputMode: 'choice', bpmRange: [60, 120],  bpmStep: 10, choiceSpacing: 10 },
   4:  { label: '50~140 · 간격 10',          inputMode: 'choice', bpmRange: [50, 140],  bpmStep: 5,  choiceSpacing: 10 },
   5:  { label: '50~140 · 간격 5',           inputMode: 'choice', bpmRange: [50, 140],  bpmStep: 5,  choiceSpacing: 5  },
-  6:  { label: '50~160 · 간격 5',           inputMode: 'choice', bpmRange: [50, 160],  bpmStep: 2,  choiceSpacing: 5  },
+  6:  { label: '50~160 · 간격 4',           inputMode: 'choice', bpmRange: [50, 160],  bpmStep: 2,  choiceSpacing: 4  },
   7:  { label: '슬라이더 · 50~170',          inputMode: 'slider', bpmRange: [50, 170],  bpmStep: 1 },
-  8:  { label: '슬라이더 · 40~180',          inputMode: 'slider', bpmRange: [40, 180],  bpmStep: 1 },
-  9:  { label: '슬라이더 · 30~200',          inputMode: 'slider', bpmRange: [30, 200],  bpmStep: 1 },
-  10: { label: '슬라이더 · 30~220',          inputMode: 'slider', bpmRange: [30, 220],  bpmStep: 1 },
+  8:  { label: '슬라이더 · 30~200',          inputMode: 'slider', bpmRange: [30, 200],  bpmStep: 1 },
+  9:  { label: '슬라이더 · 20~220',          inputMode: 'slider', bpmRange: [20, 220],  bpmStep: 1 },
+  10: { label: '슬라이더 · 20~240',          inputMode: 'slider', bpmRange: [20, 240],  bpmStep: 1 },
 };
 
 // ─── Aggregate helpers ─────────────────────────────────────────────────────────
@@ -180,6 +166,10 @@ export function getLevelLabel(modeKey: ModeKey, level: number): string {
     case 'rhythm':      return RHYTHM_LEVELS[level]?.label      ?? '';
     case 'tempo':       return TEMPO_LEVELS[level]?.label       ?? '';
     case 'bpm':         return BPM_LEVELS[level]?.label         ?? '';
-    default:            return '';
+    default:
+      if (modeKey.startsWith('mix-')) {
+        return getMixLevelLabel(modeKey.replace(/^mix-/, '') as MixEffect, level);
+      }
+      return getLabLevelLabel(modeKey, level);
   }
 }

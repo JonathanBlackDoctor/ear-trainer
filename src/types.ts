@@ -19,7 +19,41 @@ export type ModeKey =
   | 'lab-function'
   | 'lab-extended'
   | 'lab-bass'
-  | 'lab-tension';
+  | 'lab-tension'
+  // Interval-training expansion: octave-spanning intervals, simultaneous
+  // multi-note identification, microtonal precision, and harmonic-series ID.
+  | 'lab-wide-interval'
+  | 'lab-note-stack'
+  | 'lab-microtuning'
+  | 'lab-harmonics'
+  // Audio-engineer (mixing) modes: EQ/FX listening on noise or a synthesized loop.
+  | 'mix-eq-freq'
+  | 'mix-eq-boostcut'
+  | 'mix-filter'
+  | 'mix-compression'
+  | 'mix-reverb-amount'
+  | 'mix-reverb-type'
+  | 'mix-delay-time'
+  | 'mix-pan'
+  | 'mix-width'
+  | 'mix-level'
+  | 'mix-distortion'
+  | 'mix-modulation';
+
+// Discriminator for the unified MixData payload — one per audio-engineer mode.
+export type MixEffect =
+  | 'eq-freq'
+  | 'eq-boostcut'
+  | 'filter'
+  | 'compression'
+  | 'reverb-amount'
+  | 'reverb-type'
+  | 'delay-time'
+  | 'pan'
+  | 'width'
+  | 'level'
+  | 'distortion'
+  | 'modulation';
 
 // ─── Question & Answer ────────────────────────────────────────────────────────
 export interface Question {
@@ -32,7 +66,7 @@ export interface Question {
   context: {
     key: string;         // tonic, e.g. "C"
     referenceToneNote?: string; // full note to play as reference, e.g. "C4"
-    absoluteMode?: boolean;     // session-flag: absolute-pitch mode (no reference)
+    absoluteMode?: boolean;     // lab modes that present absolute pitches (no reference tone)
   };
 }
 
@@ -53,7 +87,11 @@ export type QuestionData =
   | ContourData
   | TuningData
   | FunctionData
-  | TensionData;
+  | TensionData
+  | NoteStackData
+  | MicrotuningData
+  | HarmonicData
+  | MixData;
 
 export interface IntervalData {
   type: 'interval';
@@ -183,6 +221,40 @@ export interface TensionData {
   tension: string;       // tension code, e.g. "9", "b9"
 }
 
+export interface NoteStackData {
+  type: 'note-stack';
+  notes: string[];       // simultaneously-sounded notes, ascending
+  stackCode: string;     // interval steps from the bottom, e.g. "M3+m3"
+  stackLabel: string;    // human label, e.g. "장3도+단3도 (장3화음형)"
+}
+
+export interface MicrotuningData {
+  type: 'microtuning';
+  lowNote: string;       // lower note of the dyad (in tune)
+  highNote: string;      // upper note at equal temperament
+  intervalName: string;  // e.g. "P8", "P5"
+  cents: number;         // detune applied to the upper note (+sharp, −flat)
+}
+
+export interface HarmonicData {
+  type: 'harmonic';
+  fundamental: string;   // the played fundamental, e.g. "C2"
+  partial: number;       // harmonic partial number (2 = octave, 3 = 12th, …)
+  cents: number;         // 1200·log2(partial) above the fundamental
+}
+
+// Unified payload for every audio-engineer (mix-*) mode. One shape instead of
+// twelve so the playback dispatch and judge stay small; `effect` selects the
+// Tone.js processing chain and `params` carries its numeric/string settings.
+export interface MixData {
+  type: 'mix';
+  effect: MixEffect;
+  source: 'pink' | 'loop';   // pink noise or the synthesized groove bed
+  compare: 'none' | 'ab';    // 'ab' plays bypassed → gap → processed
+  params: Record<string, number | string>;
+  detail: string;            // human-readable answer detail, e.g. "2 kHz · +6 dB"
+}
+
 export interface BpmData {
   type: 'bpm';
   bpm: number;          // actual BPM played
@@ -239,11 +311,18 @@ export interface AppSettings {
   questionsPerSession: number;
   showStaffFeedback: boolean;
   weakSessionLength: number;
+  // Last-used difficulty level per mode, so the setup screen restores the
+  // level the user practiced at (per-mode because each mode's maxLevel and
+  // difficulty meaning differ). Weak-focus sessions are excluded.
+  levelByMode?: Partial<Record<ModeKey, number>>;
   reducedMotion: 'system' | 'on' | 'off';
   design: DesignTheme;
   // User-defined ordering of training modes on the Home screen. Reconciled
   // against the current mode registry at read time (see resolveModeOrder).
   modeOrder?: ModeKey[];
+  // Modes the user has hidden from the Home screen. They remain in the order
+  // editor (so they can be un-hidden) and stay directly reachable by URL.
+  hiddenModes?: ModeKey[];
 }
 
 // Visual theme. 'default' is the original classic look; g/i/j/m are the four

@@ -1,4 +1,5 @@
 import type { StatsItem, ModeKey, ModeStats } from '../types';
+import { itemKeysForLevel } from './itemPool';
 
 const RECENT_WINDOW = 8;
 const MIN_WEIGHT = 0.05;
@@ -68,6 +69,53 @@ export function topWeakItems(
     .map(([key, item]) => ({ key, score: weaknessScore(item) }))
     .sort((a, b) => b.score - a.score)
     .slice(0, n);
+}
+
+/**
+ * Pick the level a weak-focus session should run at for a mode.
+ *
+ * The factory only builds questions from the current level's item pool, so a
+ * weak session is only meaningful at a level that actually contains the user's
+ * weak items. Defaulting to level 1 makes the candidate filter match nothing
+ * and silently fall back to a normal session.
+ *
+ * Returns the lowest level whose pool covers the most weak items. For modes
+ * that encode the level in the item key (e.g. transpose: `transpose_lv3`) the
+ * level is parsed from the weakest item. Falls back to `fallback` when there's
+ * nothing to focus on.
+ */
+export function weakFocusLevel(
+  modeKey: ModeKey,
+  stats: ModeStats,
+  maxLevel: number,
+  fallback = 1
+): number {
+  const weakKeys = topWeakItems(stats, 8)
+    .filter((w) => (stats[w.key]?.attempts ?? 0) > 0)
+    .map((w) => w.key);
+  if (weakKeys.length === 0) return fallback;
+
+  // Level encoded in the item key (e.g. transpose `transpose_lv3`): drill the
+  // weakest such level directly.
+  const lvMatch = weakKeys[0].match(/_lv(\d+)$/);
+  if (lvMatch) {
+    const lv = Number(lvMatch[1]);
+    return lv >= 1 && lv <= maxLevel ? lv : fallback;
+  }
+
+  const weakSet = new Set(weakKeys);
+  let bestLevel = fallback;
+  let bestCoverage = -1;
+  for (let lv = 1; lv <= maxLevel; lv++) {
+    const pool = itemKeysForLevel(modeKey, lv);
+    if (pool.length === 0) return fallback; // mode isn't item-poolable
+    const coverage = pool.filter((k) => weakSet.has(k)).length;
+    if (coverage > bestCoverage) {
+      bestCoverage = coverage;
+      bestLevel = lv;
+    }
+  }
+  return bestCoverage > 0 ? bestLevel : fallback;
 }
 
 /** Adaptive level suggestion: returns recommended level based on recent accuracy */

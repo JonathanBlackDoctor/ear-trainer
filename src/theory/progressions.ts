@@ -45,7 +45,7 @@ export const COMMON_KEYS = ['C','G','D','A','E','F','Bb','Eb'];
 
 export interface ProgressionLevelConfig {
   label: string;
-  length: 2 | 3 | 4 | 5;
+  length: 2 | 3 | 4 | 5 | 6;
   degreePool: number[];            // allowed degrees (1..7)
   playback: 'arpeggio' | 'block';
   keyMode: 'fixed' | 'random';
@@ -57,6 +57,26 @@ const CORE_PLUS_II = [1, 2, 4, 5, 6];
 const CORE_PLUS_III = [1, 2, 3, 4, 5, 6];
 const ALL_7 = [1, 2, 3, 4, 5, 6, 7];
 
+const choose = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+
+// Functional-harmony transition map for a major key: each degree lists the
+// degrees that idiomatically follow it. Used to generate progressions that
+// actually sound like music instead of a random walk through the scale.
+const DIATONIC_NEXT: Record<number, number[]> = {
+  1: [2, 3, 4, 5, 6],
+  2: [5, 7, 4, 3],
+  3: [6, 4, 2],
+  4: [5, 1, 2, 7],
+  5: [1, 6],
+  6: [2, 4, 5, 1],
+  7: [1, 3],
+};
+
+// Degrees that make a natural opening (tonic-function or pre-dominant).
+const OPENINGS = [1, 6, 4];
+// Degrees that give a sense of resolution when they land last.
+const RESOLUTIONS = [1, 6];
+
 export const PROGRESSION_LEVELS: Record<number, ProgressionLevelConfig> = {
   1:  { label: '2화음 진행 (I·IV·V)',    length: 2, degreePool: CORE_TRIAD,    playback: 'arpeggio', keyMode: 'fixed'  },
   2:  { label: '+ vi 추가',              length: 2, degreePool: CORE_PLUS_VI,  playback: 'arpeggio', keyMode: 'fixed'  },
@@ -66,26 +86,40 @@ export const PROGRESSION_LEVELS: Record<number, ProgressionLevelConfig> = {
   6:  { label: '+ iii 추가',             length: 4, degreePool: CORE_PLUS_III, playback: 'arpeggio', keyMode: 'fixed'  },
   7:  { label: '블록 코드 재생',         length: 4, degreePool: CORE_PLUS_III, playback: 'block',    keyMode: 'fixed'  },
   8:  { label: '+ vii° 추가 (전 7도)',   length: 4, degreePool: ALL_7,         playback: 'block',    keyMode: 'fixed'  },
-  9:  { label: '+ 랜덤 키',              length: 4, degreePool: ALL_7,         playback: 'block',    keyMode: 'random' },
-  10: { label: '5화음 진행',             length: 5, degreePool: ALL_7,         playback: 'block',    keyMode: 'random' },
+  9:  { label: '5화음 · 랜덤 키',        length: 5, degreePool: ALL_7,         playback: 'block',    keyMode: 'random' },
+  10: { label: '6화음 진행 · 랜덤 키',   length: 6, degreePool: ALL_7,         playback: 'block',    keyMode: 'random' },
 };
 
-/** Build a progression respecting the level's degreePool and length. Starts on I. */
+/**
+ * Build a progression respecting the level's degreePool and length, walking
+ * the functional-harmony transition map so the result sounds musical. The
+ * opening chord is chosen from the tonic/pre-dominant degrees (not always I)
+ * and the final chord is biased toward a resolution when one is reachable.
+ */
 export function randomProgressionFromConfig(
   cfg: ProgressionLevelConfig,
   tonic: string,
   octave = 3
 ): ChordStep[] {
   const { length, degreePool } = cfg;
-  const degrees: number[] = [1];
+  const inPool = (d: number) => degreePool.includes(d);
+
+  const openings = OPENINGS.filter(inPool);
+  const degrees: number[] = [choose(openings.length > 0 ? openings : degreePool)];
+
   for (let i = 1; i < length; i++) {
-    const prev = degrees[degrees.length - 1];
-    const avail = degreePool.filter((d) => d !== prev);
-    const next = avail.length > 0
-      ? avail[Math.floor(Math.random() * avail.length)]
-      : degreePool[Math.floor(Math.random() * degreePool.length)];
-    degrees.push(next);
+    const prev = degrees[i - 1];
+    let candidates = (DIATONIC_NEXT[prev] ?? []).filter((d) => inPool(d) && d !== prev);
+    if (candidates.length === 0) candidates = degreePool.filter((d) => d !== prev);
+    if (candidates.length === 0) candidates = [...degreePool];
+    // On the last step, prefer landing on a resolving degree if one is available.
+    if (i === length - 1) {
+      const resolved = candidates.filter((d) => RESOLUTIONS.includes(d));
+      if (resolved.length > 0) candidates = resolved;
+    }
+    degrees.push(choose(candidates));
   }
+
   const pattern: Array<[number, string]> = degrees.map((d) => {
     const info = MAJOR_DIATONIC[(d - 1) % 7];
     return [d, info?.quality ?? 'major'];
@@ -149,10 +183,27 @@ export function randomDiatonicProgression(
   return buildProgressionSteps(base, tonic, octave);
 }
 
-/** Get a random praise pattern */
-export function randomPraiseProgression(tonic: string, octave = 3): ChordStep[] {
-  const pat = PRAISE_PATTERNS[Math.floor(Math.random() * PRAISE_PATTERNS.length)];
-  return buildProgressionSteps(pat.pattern, tonic, octave);
+/**
+ * Get a random praise pattern. When a level config is supplied, the selection
+ * respects the level: only patterns whose degrees all fit the level's pool are
+ * considered, and patterns longer than the level's length are trimmed. Without
+ * a config, any pattern is returned at full length.
+ */
+export function randomPraiseProgression(
+  tonic: string,
+  octave = 3,
+  cfg?: ProgressionLevelConfig
+): ChordStep[] {
+  let pool = PRAISE_PATTERNS;
+  if (cfg) {
+    const fits = pool.filter((p) => p.pattern.every(([d]) => cfg.degreePool.includes(d)));
+    if (fits.length > 0) pool = fits;
+  }
+  const pat = choose(pool);
+  const pattern = cfg && pat.pattern.length > cfg.length
+    ? pat.pattern.slice(0, cfg.length)
+    : pat.pattern;
+  return buildProgressionSteps(pattern, tonic, octave);
 }
 
 /** Degree number to Roman numeral or arabic */

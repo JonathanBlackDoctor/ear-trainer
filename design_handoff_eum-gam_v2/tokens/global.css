@@ -1,0 +1,52 @@
+/* ============================================================================
+   Global base — applies to ALL directions
+   ============================================================================ */
+
+/* Korean sans, only family the project uses. */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* App is portrait-only on mobile, capped at 512px on larger screens. */
+.app-shell {
+  max-width: 512px;
+  margin: 0 auto;
+  min-height: 100vh;
+  /* iOS safe-area */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Tabular numerals — apply to any block of digits (XP, %, time, BPM). */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Reduced motion: disable transitions/animations app-wide. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Focus ring — keyboard only. Override per-direction if needed. */
+*:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+/* Touch target floor — every interactive element should respect this. */
+button, [role="button"], a, [role="radio"] {
+  min-height: 44px;
+  min-width: 44px;
+}

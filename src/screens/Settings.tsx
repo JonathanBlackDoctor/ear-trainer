@@ -96,6 +96,8 @@ export function Settings() {
   }
 
   const modeOrder = resolveModeOrder(settings.modeOrder);
+  const hiddenModes = new Set<ModeKey>(settings.hiddenModes ?? []);
+  const visibleCount = modeOrder.length - hiddenModes.size;
   function moveMode(index: number, dir: -1 | 1) {
     const target = index + dir;
     if (target < 0 || target >= modeOrder.length) return;
@@ -103,8 +105,14 @@ export function Settings() {
     [next[index], next[target]] = [next[target], next[index]];
     updateSettings({ modeOrder: next });
   }
+  function toggleHidden(key: ModeKey) {
+    const next = new Set(hiddenModes);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    updateSettings({ hiddenModes: [...next] });
+  }
   function resetModeOrder() {
-    updateSettings({ modeOrder: undefined });
+    updateSettings({ modeOrder: undefined, hiddenModes: [] });
     toast.success('훈련 순서를 기본값으로 되돌렸어요.');
   }
 
@@ -230,9 +238,9 @@ export function Settings() {
             aria-controls="mode-order-list"
           >
             <div className="text-left">
-              <div className="text-sm font-semibold text-slate-600">훈련 순서</div>
+              <div className="text-sm font-semibold text-slate-600">훈련 순서 · 표시</div>
               <div className="text-xs text-slate-400 mt-0.5">
-                홈 화면 훈련 카드의 순서를 바꿉니다 · {modeOrder.length}개
+                홈 화면 훈련 카드의 순서와 표시 여부를 바꿉니다 · 표시 {visibleCount} · 숨김 {hiddenModes.size}
               </div>
             </div>
             <span
@@ -258,16 +266,33 @@ export function Settings() {
                 {modeOrder.map((key, i) => {
                   const info = MODE_REGISTRY[key as ModeKey];
                   if (!info) return null;
+                  const isHidden = hiddenModes.has(key as ModeKey);
                   return (
                     <li
                       key={key}
-                      className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2"
+                      className={`flex items-center gap-2 rounded-lg px-3 py-2 ${
+                        isHidden ? 'bg-slate-100 opacity-60' : 'bg-slate-50'
+                      }`}
                     >
                       <span className="text-lg" aria-hidden>{info.emoji}</span>
                       <span className="flex-1 text-sm font-medium text-slate-700 leading-tight">
                         {info.name}
+                        {isHidden && (
+                          <span className="ml-1.5 align-middle text-[10px] font-semibold text-slate-400 bg-slate-200 rounded px-1 py-0.5">
+                            숨김
+                          </span>
+                        )}
                       </span>
                       <span className="text-[11px] tabular-nums text-slate-400 w-5 text-right">{i + 1}</span>
+                      <button
+                        type="button"
+                        className="w-8 h-8 rounded-md bg-white border border-slate-200 text-slate-600 focus-ring active:scale-95"
+                        onClick={() => toggleHidden(key as ModeKey)}
+                        aria-pressed={!isHidden}
+                        aria-label={isHidden ? `${info.name} 표시하기` : `${info.name} 숨기기`}
+                      >
+                        {isHidden ? '🙈' : '👁'}
+                      </button>
                       <button
                         type="button"
                         className="w-8 h-8 rounded-md bg-white border border-slate-200 text-slate-600 disabled:opacity-30 focus-ring active:scale-95"
@@ -356,49 +381,6 @@ export function Settings() {
               ))}
             </div>
           )}
-        </div>
-
-        {/* Questions per session */}
-        <div className="card">
-          <div className="text-sm font-semibold text-slate-600 mb-3">
-            세션 문항 수: <span className="text-primary-600 font-bold">{settings.questionsPerSession}</span>
-          </div>
-          <input
-            type="range"
-            min={5}
-            max={30}
-            step={5}
-            value={settings.questionsPerSession}
-            onChange={(e) => updateSettings({ questionsPerSession: Number(e.target.value) })}
-            className="w-full accent-primary-600"
-            aria-label="세션 문항 수"
-          />
-          <div className="flex justify-between text-xs text-slate-400 mt-1">
-            <span>5</span><span>10</span><span>15</span><span>20</span><span>25</span><span>30</span>
-          </div>
-        </div>
-
-        {/* Weak-session length */}
-        <div className="card">
-          <div className="text-sm font-semibold text-slate-600 mb-3">
-            약점 집중 세션 문항 수: <span className="text-accent-600 font-bold">{settings.weakSessionLength}</span>
-          </div>
-          <input
-            type="range"
-            min={5}
-            max={20}
-            step={5}
-            value={settings.weakSessionLength}
-            onChange={(e) => updateSettings({ weakSessionLength: Number(e.target.value) })}
-            className="w-full accent-accent-500"
-            aria-label="약점 집중 세션 문항 수"
-          />
-          <div className="flex justify-between text-xs text-slate-400 mt-1">
-            <span>5</span><span>10</span><span>15</span><span>20</span>
-          </div>
-          <p className="text-xs text-slate-400 mt-2">
-            홈 화면에서 약점 항목을 누르면 이 길이만큼 집중 연습합니다.
-          </p>
         </div>
 
         {/* Difficulty */}

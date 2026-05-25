@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>G · 네오 브루탈리즘 — 음감 훈련</title>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet" />
+<style>
+  html, body { margin: 0; padding: 0; }
+  body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; -webkit-font-smoothing: antialiased; background: #f4f0e8; padding: 40px 0; }
+  .pf, .pf * { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+  .tnum { font-variant-numeric: tabular-nums; }
+  .row { display: flex; gap: 32px; justify-content: center; flex-wrap: wrap; padding: 0 32px 32px; max-width: 2400px; margin: 0 auto; }
+  .frame { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .frame .label { font-size: 12px; font-weight: 700; color: #5a5a5a; letter-spacing: 1px; text-transform: uppercase; }
+  h1 { margin: 0 0 24px; padding: 0 32px; font-size: 24px; font-weight: 900; letter-spacing: -0.02em; }
+</style>
+</head>
+<body>
+<h1>G · 네오 브루탈리즘</h1>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="../source/android-frame.jsx"></script>
+<script type="text/babel" src="../source/shared.jsx"></script>
+<script type="text/babel" src="../source/direction-g.jsx"></script>
+
+<script type="text/babel">
+function App() {
+  const screens = [['홈', G_Home], ['훈련 설정', G_Setup], ['훈련 (선다형)', G_Training], ['결과 / 랭크업', G_Result], ['통계', G_Stats]];
+  return <div className="row">{screens.map(([label, Screen]) => (
+    <div className="frame" key={label}><div className="label">{label}</div><Screen/></div>
+  ))}</div>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
