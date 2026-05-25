@@ -665,6 +665,46 @@ export async function playArpeggio(
   firePlayback(notes, noteDuration, Tone.Time(noteDuration).toSeconds() / speedFactor, '4n');
 }
 
+/**
+ * Play a chord progression as arpeggios, chord after chord.
+ *
+ * Every note of every chord is scheduled up front against a single cumulative
+ * clock, so the chords play sequentially instead of stacking on top of each
+ * other. (Calling playArpeggio per chord in a JS loop fails: playArpeggio
+ * resolves as soon as it has *scheduled* its notes, not when they finish
+ * sounding, so awaiting it returns immediately and every chord starts at once.)
+ * One extra note-gap separates chords so their boundaries stay audible.
+ * Scheduling mirrors firePlayback: first note rides the gain ramp, the rest go
+ * through trackTimeout under the playbackGen guard so stopAllAudio() cuts them.
+ */
+export async function playArpeggioProgression(
+  chords: string[][],
+  noteDuration = '8n',
+  speedFactor = 1.0
+): Promise<void> {
+  if (!audioStarted) await startAudio();
+  await ensureRunning();
+  const gen = playbackGen;
+  const noteSec = Tone.Time(noteDuration).toSeconds() / speedFactor;
+  let step = 0;
+  let first = true;
+  for (const chord of chords) {
+    for (const note of chord) {
+      if (first) {
+        first = false;
+        getInstrument().triggerAttackRelease(note, '4n', scheduleStart());
+      } else {
+        trackTimeout(() => {
+          if (gen !== playbackGen) return; // stop was called — skip
+          getInstrument().triggerAttackRelease(note, '4n', scheduleStart());
+        }, step * noteSec * 1000);
+      }
+      step++;
+    }
+    step++; // one extra note-gap between chords
+  }
+}
+
 // ─── Metronome click (count-in, tempo/bpm modes) ──────────────────────────
 // Clean sine beep — accent one octave above (G5) so the downbeat is obvious
 // without any timbral confusion with the rhythm-pattern woodblock that follows.
