@@ -14,6 +14,8 @@ import {
   makeIntervalCompareQuestion, makeOddNoteQuestion, makeContourQuestion,
   makeTuningQuestion, makeFunctionQuestion, makeExtendedQuestion,
   makeBassQuestion, makeTensionQuestion, makeMixQuestion,
+  makeWideIntervalQuestion, makeNoteStackQuestion,
+  makeMicrotuningQuestion, makeHarmonicQuestion,
 } from '../engine/questionFactory';
 import { MAX_LEVEL } from '../modes/levels';
 import { TrainSetup } from './TrainSetup';
@@ -35,12 +37,14 @@ import {
   getScaleChoices, getCadenceChoices, getInversionChoices,
   getIntervalCompareChoices, getOddNoteChoices, getContourChoices, getTuningChoices,
   getFunctionChoices, getExtendedChoices, getBassChoices, getTensionChoices,
+  getWideIntervalChoices, getNoteStackChoices, getMicrotuningChoices, getHarmonicsChoices,
 } from '../modes/labModes';
 import { getMixChoices, mixColumns, mixLabel } from '../modes/mixModes';
 import { MODE_REGISTRY, type ModeInfo } from '../modes/registry';
 import type {
   ScaleData, CadenceData,
   IntervalCompareData, OddNoteData, ContourData, TuningData, FunctionData, TensionData,
+  NoteStackData, MicrotuningData, HarmonicData,
   MixData,
 } from '../types';
 import {
@@ -48,7 +52,7 @@ import {
   playArpeggioProgression,
   playMetronomeClick, playRhythmClick,
   playMetronome, stopAllAudio, getAudioStatus, getPlaybackGen, type AudioQuality,
-  playReferenceTone, playMixSample,
+  playReferenceTone, playMixSample, playDetunedDyad,
 } from '../audio/piano';
 import type { ChordStep } from '../types';
 import { Note } from 'tonal';
@@ -117,6 +121,7 @@ export function Train() {
   const [playbackStage, setPlaybackStage] = useState<'reference' | 'progression' | null>(null);
   const [audioQuality, setAudioQuality] = useState<AudioQuality>('synth');
   const [solfegeInputMethod, setSolfegeInputMethod] = useState<'choice' | 'piano'>('choice');
+  const [stackInputMethod, setStackInputMethod] = useState<'choice' | 'piano'>('choice');
 
   const modeKey = mode as ModeKey;
   const modeInfo: ModeInfo = MODE_INFO[modeKey] ?? {
@@ -260,6 +265,10 @@ export function Train() {
       case 'lab-extended': return makeExtendedQuestion(level, sel);
       case 'lab-bass': return makeBassQuestion(level, sel);
       case 'lab-tension': return makeTensionQuestion(level, sel);
+      case 'lab-wide-interval': return makeWideIntervalQuestion(level, sel);
+      case 'lab-note-stack': return makeNoteStackQuestion(level, sel);
+      case 'lab-microtuning': return makeMicrotuningQuestion(level, sel);
+      case 'lab-harmonics': return makeHarmonicQuestion(level, sel);
       case 'mix-eq-freq':
       case 'mix-eq-boostcut':
       case 'mix-filter':
@@ -437,6 +446,28 @@ export function Train() {
         await playChord(d.fullNotes, '2n');
         break;
       }
+      case 'note-stack': {
+        const d = data as NoteStackData;
+        await playChord(d.notes, '2n');
+        break;
+      }
+      case 'microtuning': {
+        const d = data as MicrotuningData;
+        // In-tune reference dyad, gap, then the (possibly) detuned test dyad.
+        await playDetunedDyad(d.lowNote, d.highNote, 0, '1n');
+        await delay(750 / speed);
+        await playDetunedDyad(d.lowNote, d.highNote, d.cents, '1n');
+        break;
+      }
+      case 'harmonic': {
+        const d = data as HarmonicData;
+        // Fundamental, gap, then the partial (the fundamental pitch-shifted by
+        // 1200·log2(partial) cents → exactly fundamental × partial).
+        await playNote(d.fundamental, '2n');
+        await delay(700 / speed);
+        await playNote(d.fundamental, '1n', d.cents);
+        break;
+      }
       case 'mix': {
         await playMixSample(data as MixData);
         break;
@@ -501,6 +532,13 @@ export function Train() {
       const semitones = ((pressedMidi - tonicMidi) % 12 + 12) % 12;
       const syllable = semitoneToSolfege(semitones);
       submitAnswer(syllable);
+      return;
+    }
+    if (modeKey === 'lab-note-stack') {
+      const expected = (currentQuestion?.data as NoteStackData)?.notes ?? [];
+      const next = [...pianoInput, note];
+      setPianoInput(next);
+      if (next.length >= expected.length) submitAnswer(next);
       return;
     }
     if (modeKey !== 'melody' && modeKey !== 'transpose') {
@@ -756,7 +794,13 @@ export function Train() {
   const isBpm = modeKey === 'bpm';
   const isLabChoice = modeKey.startsWith('lab-');
   const isMixChoice = modeKey.startsWith('mix-');
+  const isNoteStack = modeKey === 'lab-note-stack';
   const isAbsolute = !!currentQuestion?.context?.absoluteMode;
+  // The note-stack mode toggles between a choice grid and piano reconstruction;
+  // only render the choice grid when it's actually the active input method.
+  const showChoiceGrid =
+    isInterval || isChord || (isSolfege && solfegeInputMethod === 'choice')
+    || (isLabChoice && !(isNoteStack && stackInputMethod === 'piano')) || isMixChoice;
   const choiceColumns: 2 | 3 | 4 =
     isInterval ? 2
     : isChord ? 2
@@ -765,6 +809,8 @@ export function Train() {
     : modeKey === 'lab-bass' ? 4
     : modeKey === 'lab-inversion' ? 2
     : modeKey === 'lab-extended' ? 2
+    : modeKey === 'lab-wide-interval' ? 2
+    : isNoteStack ? 2
     : 3;
 
   return (
@@ -923,8 +969,30 @@ export function Train() {
                 </div>
               )}
 
+              {/* Note-stack input-method toggle (choice vs piano reconstruction) */}
+              {isNoteStack && (
+                <div className="flex justify-center gap-1 bg-slate-100 p-1 rounded-lg w-fit mx-auto">
+                  {[
+                    { value: 'choice', label: '🧱 음정 구성' },
+                    { value: 'piano', label: '🎹 건반' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                        stackInputMethod === opt.value
+                          ? 'bg-white text-primary-700 shadow-sm'
+                          : 'text-slate-500 active:text-slate-700'
+                      }`}
+                      onClick={() => { setStackInputMethod(opt.value as 'choice' | 'piano'); setPianoInput([]); }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {/* Choice-based modes */}
-              {(isInterval || isChord || (isSolfege && solfegeInputMethod === 'choice') || isLabChoice || isMixChoice) && (
+              {showChoiceGrid && (
                 <ChoiceGrid
                   options={getChoiceOptions(modeKey, level)}
                   selected={selectedAnswer ?? undefined}
@@ -934,6 +1002,32 @@ export function Train() {
                   disabled={loading}
                 />
               )}
+
+              {/* Note-stack piano reconstruction */}
+              {isNoteStack && stackInputMethod === 'piano' && (() => {
+                const nd = currentQuestion.data as NoteStackData;
+                return (
+                  <>
+                    <div className="text-center text-sm text-slate-500">
+                      들은 음 {nd.notes.length}개를 건반에서 모두 눌러주세요
+                      {pianoInput.length > 0 && ` (${pianoInput.length}/${nd.notes.length})`}
+                    </div>
+                    {pianoInput.length > 0 && (
+                      <div className="flex gap-2 flex-wrap justify-center">
+                        {pianoInput.map((n, i) => (
+                          <span key={i} className="bg-primary-100 text-primary-700 px-2 py-1 rounded text-sm font-mono">{n}</span>
+                        ))}
+                      </div>
+                    )}
+                    <Piano onNotePress={handlePianoNote} highlightNotes={pianoInput} disabled={loading} />
+                    {pianoInput.length > 0 && (
+                      <button className="btn-ghost text-sm text-slate-400" onClick={() => setPianoInput([])}>
+                        ← 다시 입력
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
 
               {/* Transpose: re-enter the melody in the target key on the piano */}
               {isTranspose && (() => {
@@ -1154,7 +1248,7 @@ export function Train() {
           ) : (
             /* After feedback: show correct answer highlight for choice modes */
             <>
-              {(isInterval || isChord || (isSolfege && solfegeInputMethod === 'choice') || isLabChoice || isMixChoice) && (
+              {showChoiceGrid && (
                 <ChoiceGrid
                   options={getChoiceOptions(modeKey, level)}
                   selected={selectedAnswer ?? undefined}
@@ -1163,6 +1257,22 @@ export function Train() {
                   onSelect={() => {}}
                   columns={choiceColumns}
                 />
+              )}
+              {isNoteStack && stackInputMethod === 'piano' && feedbackResult && (
+                <div className="space-y-2">
+                  <div className="text-xs text-slate-500 text-center">정답 (동시에 울린 음)</div>
+                  <Piano
+                    highlightNotes={[]}
+                    correctNotes={(currentQuestion.data as NoteStackData).notes}
+                    wrongNotes={pianoInput.filter((n) => {
+                      const m = Note.midi(n);
+                      return !(currentQuestion.data as NoteStackData).notes.some(
+                        (cn) => Note.pitchClass(cn) === Note.pitchClass(n) || (m != null && Note.midi(cn) === m),
+                      );
+                    })}
+                    disabled
+                  />
+                </div>
               )}
               {isTranspose && feedbackResult && (
                 <div className="space-y-2">
@@ -1271,6 +1381,10 @@ function getChoiceOptions(mode: ModeKey, level: number): ChoiceOption[] {
   if (mode === 'lab-extended') return getExtendedChoices(level);
   if (mode === 'lab-bass') return getBassChoices(level);
   if (mode === 'lab-tension') return getTensionChoices(level);
+  if (mode === 'lab-wide-interval') return getWideIntervalChoices(level);
+  if (mode === 'lab-note-stack') return getNoteStackChoices(level);
+  if (mode === 'lab-microtuning') return getMicrotuningChoices(level);
+  if (mode === 'lab-harmonics') return getHarmonicsChoices(level);
   if (mode.startsWith('mix-')) return getMixChoices(mode.replace(/^mix-/, '') as MixData['effect'], level);
   return [];
 }

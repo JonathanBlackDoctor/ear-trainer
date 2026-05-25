@@ -606,6 +606,26 @@ export async function playChord(notes: string[], duration = '2n'): Promise<void>
   getInstrument().triggerAttackRelease(notes, duration, scheduleStart());
 }
 
+/**
+ * Play a sustained two-note dyad with the upper note optionally detuned by
+ * `detuneCents` (+sharp, −flat). Used by the microtuning mode so the two notes
+ * beat against each other when the upper one is off — the long default
+ * duration gives the beating time to be heard.
+ */
+export async function playDetunedDyad(
+  lowNote: string,
+  highNote: string,
+  detuneCents = 0,
+  duration = '1n',
+): Promise<void> {
+  if (!audioStarted) await startAudio();
+  await ensureRunning();
+  const highTarget: string | number = detuneCents === 0
+    ? highNote
+    : Tone.Frequency(highNote).toFrequency() * Math.pow(2, detuneCents / 1200);
+  getInstrument().triggerAttackRelease([lowNote, highTarget] as any, duration, scheduleStart());
+}
+
 // Each playSequence/playProgression/playArpeggio fires its first item
 // immediately on the audio thread (so the user gets instant feedback on tap)
 // and dispatches the rest via trackTimeout. Pre-scheduling everything in the

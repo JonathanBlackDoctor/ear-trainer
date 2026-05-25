@@ -39,12 +39,15 @@ import {
   DEGREE_FUNCTION, FUNCTION_LEVELS,
   EXTENDED_LEVELS, BASS_LEVELS,
   TENSION_SEMITONES, TENSION_LABEL, TENSION_LEVELS,
+  WIDE_LEVELS, WIDE_SEMITONES, NOTE_STACK_LEVELS, NOTE_STACK_RANDOM_REGISTER_LEVEL,
+  MICROTUNING_LEVELS, HARMONICS_LEVELS, harmonicAnswer,
 } from '../modes/labModes';
 import {
   scaleItemKeys, scaleKey, cadenceItemKeys, inversionItemKeys,
   compareItemKeys, oddNoteItemKeys, contourItemKeys, tuningItemKeys,
   functionItemKeys, funcCode, extendedItemKeys, bassItemKeys, bassOf,
-  tensionItemKeys,
+  tensionItemKeys, wideIntervalItemKeys, noteStackItemKeys,
+  microtuningItemKeys, harmonicItemKeys,
 } from './itemPool';
 
 /** Per-question selection context shared by every item-focusable factory. */
@@ -768,6 +771,98 @@ export function makeTensionQuestion(level: number, opts?: SelectOpts): Question 
     itemKey,
     data: { type: 'tension', root: rootNote, baseNotes, fullNotes, tension: code },
     answer: TENSION_LABEL[code],
+    context: { key: 'C', absoluteMode: true },
+  };
+}
+
+// ─── Lab: Wide / Compound Intervals ─────────────────────────────────────────
+export function makeWideIntervalQuestion(level: number, opts?: SelectOpts): Question {
+  const cfg = WIDE_LEVELS[level] ?? WIDE_LEVELS[1];
+  const itemKey = selectItemKey(wideIntervalItemKeys(level), opts);
+  const [intervalName, direction] = itemKey.slice('wide_'.length).split('_') as [string, IntervalDirection];
+  const semitones = WIDE_SEMITONES[intervalName] ?? 12;
+
+  const rootNote = randomNote(cfg.low, cfg.high);
+  const secondMidi = (Note.midi(rootNote) ?? 48) + (direction === 'down' ? -semitones : semitones);
+  const secondNote = Note.fromMidi(secondMidi) ?? 'C4';
+
+  return {
+    id: genId(),
+    mode: 'lab-wide-interval',
+    level,
+    itemKey,
+    data: { type: 'interval', notes: [rootNote, secondNote], direction, intervalName },
+    answer: intervalName,
+    context: { key: 'C', absoluteMode: true },
+  };
+}
+
+// ─── Lab: Note Stack (simultaneous multi-note) ──────────────────────────────
+export function makeNoteStackQuestion(level: number, opts?: SelectOpts): Question {
+  const patterns = NOTE_STACK_LEVELS[level] ?? NOTE_STACK_LEVELS[1];
+  const itemKey = selectItemKey(noteStackItemKeys(level), opts);
+  const n = Number(itemKey.slice('stack_n'.length)) || 2;
+  const candidates = patterns.filter((p) => p.steps.length + 1 === n);
+  const pat = pickRandom(candidates.length > 0 ? candidates : patterns);
+
+  // Low, narrow root range keeps even the widest voicing within the C3–C5
+  // keyboard so the piano-reconstruction input stays usable.
+  const rootRange: [string, string] = level >= NOTE_STACK_RANDOM_REGISTER_LEVEL ? ['C3', 'A3'] : ['C3', 'E3'];
+  const root = randomNote(...rootRange);
+  const notes: string[] = [root];
+  let midi = Note.midi(root) ?? 60;
+  for (const step of pat.steps) {
+    midi += step;
+    notes.push(Note.fromMidi(midi) ?? root);
+  }
+
+  return {
+    id: genId(),
+    mode: 'lab-note-stack',
+    level,
+    itemKey,
+    data: { type: 'note-stack', notes, stackCode: pat.code, stackLabel: pat.label },
+    answer: notes,
+    context: { key: 'C', absoluteMode: true },
+  };
+}
+
+// ─── Lab: Microtuning (cents on a sustained dyad) ───────────────────────────
+export function makeMicrotuningQuestion(level: number, opts?: SelectOpts): Question {
+  const cfg = MICROTUNING_LEVELS[level] ?? MICROTUNING_LEVELS[1];
+  const itemKey = selectItemKey(microtuningItemKeys(level), opts);
+  const code = itemKey.slice('microtune_'.length);
+  const cents = Number(code) || 0;
+  const iv = pickRandom(cfg.intervals);
+  const lowNote = randomNote('C3', 'C4');
+  const highNote = Note.fromMidi((Note.midi(lowNote) ?? 60) + iv.semitones) ?? lowNote;
+
+  return {
+    id: genId(),
+    mode: 'lab-microtuning',
+    level,
+    itemKey,
+    data: { type: 'microtuning', lowNote, highNote, intervalName: iv.name, cents },
+    answer: code,
+    context: { key: 'C', absoluteMode: true },
+  };
+}
+
+// ─── Lab: Harmonics (harmonic-series partial ID) ────────────────────────────
+export function makeHarmonicQuestion(level: number, opts?: SelectOpts): Question {
+  const cfg = HARMONICS_LEVELS[level] ?? HARMONICS_LEVELS[1];
+  const itemKey = selectItemKey(harmonicItemKeys(level), opts);
+  const partial = Number(itemKey.slice('harmonic_'.length)) || 2;
+  const fundamental = randomNote(cfg.low, cfg.high);
+  const cents = 1200 * Math.log2(partial);
+
+  return {
+    id: genId(),
+    mode: 'lab-harmonics',
+    level,
+    itemKey,
+    data: { type: 'harmonic', fundamental, partial, cents },
+    answer: harmonicAnswer(partial),
     context: { key: 'C', absoluteMode: true },
   };
 }
