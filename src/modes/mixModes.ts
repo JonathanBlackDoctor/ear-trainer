@@ -368,6 +368,53 @@ export function buildMix(effect: MixEffect, level: number, value: string): MixBu
   }
 }
 
+// Short per-level summary shown on the setup screen ("what changes at this
+// level"). Derived from the level tables above so it never drifts out of sync.
+export function getMixLevelLabel(effect: MixEffect, level: number): string {
+  switch (effect) {
+    case 'eq-freq': {
+      const c = cfgAt(EQ_FREQ_LEVELS, level);
+      return `${c.bands.length}대역 · ±${c.gain}dB${c.cut ? ' · 컷 포함' : ''}`;
+    }
+    case 'eq-boostcut': {
+      const c = cfgAt(EQ_BOOSTCUT_LEVELS, level);
+      return `${c.bands.length}대역 · ±${c.gain}dB`;
+    }
+    case 'filter': {
+      const c = cfgAt(FILTER_LEVELS, level);
+      return c.task === 'cutoff'
+        ? `차단 주파수 맞히기 · ${c.cutoffs.length}택`
+        : `필터 종류 맞히기 · ${c.types.length}종`;
+    }
+    case 'compression': {
+      const c = cfgAt(COMP_LEVELS, level);
+      return `${c.amounts.length}단계${c.makeupScale < 1 ? ` · 음량보정 ${Math.round(c.makeupScale * 100)}%` : ''}`;
+    }
+    case 'reverb-amount': {
+      const c = cfgAt(REVERB_AMT_LEVELS, level);
+      return `${c.amounts.length}단계${c.wetScale < 1 ? ` · 폭 ${Math.round(c.wetScale * 100)}%` : ''}`;
+    }
+    case 'reverb-type':
+      return `${cfgAt(REVERB_TYPE_LEVELS, level).types.length}종 공간`;
+    case 'delay-time':
+      return `${cfgAt(DELAY_LEVELS, level).notes.length}택 음표`;
+    case 'pan':
+      return `${cfgAt(PAN_LEVELS, level).positions.length}개 위치`;
+    case 'width':
+      return `${cfgAt(WIDTH_LEVELS, level).widths.length}단계 폭`;
+    case 'level': {
+      const c = cfgAt(LEVEL_LEVELS, level);
+      return c.task === 'which'
+        ? `어느 쪽이 큰지 · ${c.dbs[0]}dB 차`
+        : `dB 차이 맞히기 · ${c.dbs.length}택`;
+    }
+    case 'distortion':
+      return `${cfgAt(DIST_LEVELS, level).amounts.length}단계`;
+    case 'modulation':
+      return `${cfgAt(MOD_LEVELS, level).types.length}종`;
+  }
+}
+
 // Choice grid column count per mode (frequency/cutoff grids get 3 columns).
 export function mixColumns(effect: MixEffect, level: number): 2 | 3 | 4 {
   return getMixChoices(effect, level).length > 4 ? 3 : 2;

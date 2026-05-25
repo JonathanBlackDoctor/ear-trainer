@@ -1,8 +1,10 @@
-import type { ModeKey } from '../types';
+import type { ModeKey, MixEffect } from '../types';
 import { INTERVAL_LEVELS } from '../theory/intervals';
 import { CHORD_LEVELS } from '../theory/chords';
 import { SOLFEGE_LEVELS } from '../theory/solfege';
 import { PROGRESSION_LEVELS } from '../theory/progressions';
+import { getLabLevelLabel } from './labModes';
+import { getMixLevelLabel } from './mixModes';
 
 /** Single source of truth for the per-mode level count. */
 export const MAX_LEVEL = 10;
@@ -181,6 +183,10 @@ export function getLevelLabel(modeKey: ModeKey, level: number): string {
     case 'rhythm':      return RHYTHM_LEVELS[level]?.label      ?? '';
     case 'tempo':       return TEMPO_LEVELS[level]?.label       ?? '';
     case 'bpm':         return BPM_LEVELS[level]?.label         ?? '';
-    default:            return '';
+    default:
+      if (modeKey.startsWith('mix-')) {
+        return getMixLevelLabel(modeKey.replace(/^mix-/, '') as MixEffect, level);
+      }
+      return getLabLevelLabel(modeKey, level);
   }
 }
