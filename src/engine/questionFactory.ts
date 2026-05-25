@@ -358,13 +358,30 @@ function degreeToSemitones(degree: number): number {
 }
 
 // ─── Rhythm ────────────────────────────────────────────────────────────────────
-export function makeRhythmQuestion(level: number): Question {
+// `avoidBeats` is the previous question's onset positions; we regenerate to avoid
+// serving the exact same rhythm twice in a row within a level.
+export function makeRhythmQuestion(level: number, avoidBeats?: number[]): Question {
   const cfg = RHYTHM_LEVELS[level] ?? RHYTHM_LEVELS[1];
-  const pattern = pickRandom(cfg.patterns);
   const bpm = cfg.bpm;
   const sixteenthMs = (60_000 / bpm) / 4;
 
-  const beatTimes = pattern.beats.map((b) => b * sixteenthMs);
+  const pool = cfg.positions.filter((p) => p !== 0);
+  const [lo, hi] = cfg.onsets;
+  const maxOnsets = Math.min(hi, pool.length + 1);
+  const minOnsets = Math.min(lo, maxOnsets);
+
+  let beats: number[] = [];
+  for (let attempt = 0; attempt < 16; attempt++) {
+    const count = minOnsets + Math.floor(Math.random() * (maxOnsets - minOnsets + 1));
+    const picks = shuffle(pool).slice(0, Math.max(0, count - 1));
+    beats = [0, ...picks].sort((a, b) => a - b);
+    const sameAsPrev = avoidBeats
+      && beats.length === avoidBeats.length
+      && beats.every((b, i) => b === avoidBeats[i]);
+    if (!sameAsPrev) break;
+  }
+
+  const beatTimes = beats.map((b) => b * sixteenthMs);
 
   return {
     id: genId(),
@@ -373,11 +390,9 @@ export function makeRhythmQuestion(level: number): Question {
     itemKey: `rhythm_lv${level}`,
     data: {
       type: 'rhythm',
-      pattern: pattern.beats.map((time, i) => ({
+      pattern: beats.map((time, i) => ({
         time,
-        duration: i < pattern.beats.length - 1
-          ? pattern.beats[i + 1] - time
-          : 4,
+        duration: i < beats.length - 1 ? beats[i + 1] - time : 4,
       })),
       bpm,
     },

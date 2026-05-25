@@ -246,7 +246,13 @@ export function Train() {
       case 'progression': q = makeProgressionQuestion(level, k, fk, progressionSource); break;
       case 'melody': q = makeMelodyQuestion(level, k, fk); break;
       case 'transpose': q = makeTransposeQuestion(level, k, fk, last, modeSrs, modeStats, candidateFilter); break;
-      case 'rhythm': return makeRhythmQuestion(level);
+      case 'rhythm': {
+        const prev = session?.questions[idx - 1]?.data;
+        const avoidBeats = prev && prev.type === 'rhythm'
+          ? prev.pattern.map((p) => p.time)
+          : undefined;
+        return makeRhythmQuestion(level, avoidBeats);
+      }
       case 'tempo': return makeTempoQuestion(level);
       case 'bpm': return makeBpmQuestion(level);
       case 'lab-scale': return makeScaleQuestion(level, sel);
