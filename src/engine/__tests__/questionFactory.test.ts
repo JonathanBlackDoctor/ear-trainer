@@ -101,6 +101,31 @@ describe('questionFactory — every mode × every level produces a valid questio
   }
 });
 
+describe('questionFactory — rhythm patterns vary within a level', () => {
+  it('produces more than one distinct pattern per level', () => {
+    for (let level = 1; level <= MAX_LEVEL; level++) {
+      const seen = new Set<string>();
+      for (let i = 0; i < 40; i++) {
+        const data = makeRhythmQuestion(level).data as { pattern: { time: number }[] };
+        seen.add(data.pattern.map((p) => p.time).join(','));
+      }
+      expect(seen.size).toBeGreaterThan(1);
+    }
+  });
+
+  it('never repeats the immediately previous pattern when avoidBeats is passed', () => {
+    for (let level = 1; level <= MAX_LEVEL; level++) {
+      let prev: number[] | undefined;
+      for (let i = 0; i < 30; i++) {
+        const data = makeRhythmQuestion(level, prev).data as { pattern: { time: number }[] };
+        const beats = data.pattern.map((p) => p.time);
+        if (prev) expect(beats.join(',')).not.toBe(prev.join(','));
+        prev = beats;
+      }
+    }
+  });
+});
+
 describe('questionFactory — interval Lv2 introduces "down" direction', () => {
   // The whole point of parameter separation is that Lv2 adds *exactly one*
   // new variable over Lv1: the descending direction. Sample enough questions

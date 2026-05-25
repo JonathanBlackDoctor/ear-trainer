@@ -17,6 +17,8 @@ vi.mock('../../audio/piano', () => ({
   getAudioStatus: vi.fn(() => 'piano'),
   getPlaybackGen: vi.fn(() => 0),
   playReferenceTone: vi.fn(async () => {}),
+  playDetunedDyad: vi.fn(async () => {}),
+  playMixSample: vi.fn(async () => {}),
 }));
 
 import { Train } from '../Train';
@@ -75,6 +77,7 @@ const CHOICE_MODES = [
   'lab-scale', 'lab-cadence', 'lab-inversion', 'lab-interval-compare',
   'lab-odd-note', 'lab-contour', 'lab-tuning', 'lab-function',
   'lab-extended', 'lab-bass', 'lab-tension',
+  'lab-wide-interval', 'lab-note-stack', 'lab-microtuning', 'lab-harmonics',
 ];
 
 describe('weak session renders an answer input', () => {

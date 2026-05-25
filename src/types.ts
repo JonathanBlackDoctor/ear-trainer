@@ -20,6 +20,12 @@ export type ModeKey =
   | 'lab-extended'
   | 'lab-bass'
   | 'lab-tension'
+  // Interval-training expansion: octave-spanning intervals, simultaneous
+  // multi-note identification, microtonal precision, and harmonic-series ID.
+  | 'lab-wide-interval'
+  | 'lab-note-stack'
+  | 'lab-microtuning'
+  | 'lab-harmonics'
   // Audio-engineer (mixing) modes: EQ/FX listening on noise or a synthesized loop.
   | 'mix-eq-freq'
   | 'mix-eq-boostcut'
@@ -82,6 +88,9 @@ export type QuestionData =
   | TuningData
   | FunctionData
   | TensionData
+  | NoteStackData
+  | MicrotuningData
+  | HarmonicData
   | MixData;
 
 export interface IntervalData {
@@ -210,6 +219,28 @@ export interface TensionData {
   baseNotes: string[];   // base chord (without the tension)
   fullNotes: string[];   // base chord + tension note
   tension: string;       // tension code, e.g. "9", "b9"
+}
+
+export interface NoteStackData {
+  type: 'note-stack';
+  notes: string[];       // simultaneously-sounded notes, ascending
+  stackCode: string;     // interval steps from the bottom, e.g. "M3+m3"
+  stackLabel: string;    // human label, e.g. "장3도+단3도 (장3화음형)"
+}
+
+export interface MicrotuningData {
+  type: 'microtuning';
+  lowNote: string;       // lower note of the dyad (in tune)
+  highNote: string;      // upper note at equal temperament
+  intervalName: string;  // e.g. "P8", "P5"
+  cents: number;         // detune applied to the upper note (+sharp, −flat)
+}
+
+export interface HarmonicData {
+  type: 'harmonic';
+  fundamental: string;   // the played fundamental, e.g. "C2"
+  partial: number;       // harmonic partial number (2 = octave, 3 = 12th, …)
+  cents: number;         // 1200·log2(partial) above the fundamental
 }
 
 // Unified payload for every audio-engineer (mix-*) mode. One shape instead of

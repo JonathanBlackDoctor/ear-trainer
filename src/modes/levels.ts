@@ -76,56 +76,39 @@ export interface RhythmPattern {
   duration: number;         // total 16ths
 }
 
+// Rhythm questions are generated procedurally from per-level constraints rather
+// than drawn from a small fixed pool, so the same pattern doesn't keep repeating
+// within a level. `positions` is the set of allowed onset slots (16th-note grid,
+// always includes the downbeat 0); `onsets` is the [min, max] number of taps
+// (including the downbeat).
 export interface RhythmLevelConfig {
   label: string;
-  patterns: RhythmPattern[];
   bpm: number;
+  length: number;           // total length in 16ths (16 = 1 bar, 32 = 2 bars)
+  positions: number[];      // allowed onset positions (must include 0)
+  onsets: [number, number]; // [min, max] number of onsets, downbeat included
 }
 
+const range = (n: number) => Array.from({ length: n }, (_, i) => i);
+const QUARTERS = [0, 4, 8, 12];
+const EIGHTHS = [0, 2, 4, 6, 8, 10, 12, 14];
+const SIXTEENTHS = range(16);
+const SIXTEENTHS_2BAR = range(32);
+// Lopsided grid that avoids landing squarely on every quarter — gives a
+// triplet/swung feel on the 16th-note grid.
+const TRIPLET_FEEL = [0, 2, 3, 5, 6, 8, 10, 11, 13, 14];
+
 export const RHYTHM_LEVELS: Record<number, RhythmLevelConfig> = {
-  1:  { label: '기본 4분음표',       bpm: 70,  patterns: [
-        { beats: [0, 4, 8, 12], duration: 16 },
-        { beats: [0, 8],         duration: 16 },
-      ] },
-  2:  { label: '+ 3분할 패턴',       bpm: 80,  patterns: [
-        { beats: [0, 4, 8],      duration: 12 },
-        { beats: [0, 4, 12],     duration: 16 },
-      ] },
-  3:  { label: '+ 빠른 템포',        bpm: 90,  patterns: [
-        { beats: [0, 4, 8, 12],  duration: 16 },
-        { beats: [0, 4, 8],      duration: 12 },
-        { beats: [0, 4, 12],     duration: 16 },
-      ] },
-  4:  { label: '+ 약한 싱코페이션',  bpm: 90,  patterns: [
-        { beats: [0, 2, 4, 8, 10, 12], duration: 16 },
-        { beats: [0, 4, 6, 8, 12],     duration: 16 },
-        { beats: [0, 2, 8, 10],        duration: 16 },
-      ] },
-  5:  { label: '+ 붙임줄/점음표',     bpm: 95,  patterns: [
-        { beats: [0, 4, 6, 10, 12],    duration: 16 },
-        { beats: [0, 2, 6, 8, 14],     duration: 16 },
-        { beats: [0, 4, 10, 12],       duration: 16 },
-      ] },
-  6:  { label: '+ 16분음표 시작',     bpm: 105, patterns: [
-        { beats: [0, 1, 4, 6, 8, 9, 12, 14], duration: 16 },
-        { beats: [0, 3, 4, 8, 11, 12],       duration: 16 },
-      ] },
-  7:  { label: '+ 셋잇단 느낌',       bpm: 110, patterns: [
-        { beats: [0, 2, 5, 8, 10, 13],       duration: 16 },
-      ] },
-  8:  { label: '+ 강한 싱코페이션',   bpm: 120, patterns: [
-        { beats: [0, 3, 6, 8, 11, 14],          duration: 16 },
-        { beats: [0, 1, 2, 8, 10, 12, 13, 14],  duration: 16 },
-      ] },
-  9:  { label: '+ 16분 묶음',         bpm: 135, patterns: [
-        { beats: [0, 3, 5, 8, 10, 11, 13, 15],      duration: 16 },
-        { beats: [0, 1, 3, 5, 8, 9, 11, 13, 14],    duration: 16 },
-      ] },
-  10: { label: '+ 2마디 · 16분 최대 밀도', bpm: 150, patterns: [
-        { beats: [0, 2, 3, 6, 8, 11, 13, 14],      duration: 16 },
-        { beats: [0, 1, 4, 5, 7, 8, 11, 12, 15],   duration: 16 },
-        { beats: [0, 2, 3, 6, 8, 11, 13, 14, 16, 19, 21, 24, 26, 27, 29, 31], duration: 32 },
-      ] },
+  1:  { label: '기본 4분음표',           bpm: 70,  length: 16, positions: QUARTERS,        onsets: [2, 4] },
+  2:  { label: '+ 3분할 패턴',           bpm: 80,  length: 16, positions: QUARTERS,        onsets: [3, 3] },
+  3:  { label: '+ 빠른 템포',            bpm: 90,  length: 16, positions: QUARTERS,        onsets: [3, 4] },
+  4:  { label: '+ 약한 싱코페이션',      bpm: 90,  length: 16, positions: [0, 2, 4, 8, 10, 12], onsets: [4, 6] },
+  5:  { label: '+ 붙임줄/점음표',         bpm: 95,  length: 16, positions: EIGHTHS,         onsets: [4, 6] },
+  6:  { label: '+ 16분음표 시작',         bpm: 105, length: 16, positions: SIXTEENTHS,      onsets: [6, 8] },
+  7:  { label: '+ 셋잇단 느낌',           bpm: 110, length: 16, positions: TRIPLET_FEEL,     onsets: [6, 6] },
+  8:  { label: '+ 강한 싱코페이션',       bpm: 120, length: 16, positions: SIXTEENTHS,      onsets: [7, 9] },
+  9:  { label: '+ 16분 묶음',             bpm: 135, length: 16, positions: SIXTEENTHS,      onsets: [8, 10] },
+  10: { label: '+ 2마디 · 16분 최대 밀도', bpm: 150, length: 32, positions: SIXTEENTHS_2BAR, onsets: [10, 16] },
 };
 
 // ─── Tempo Hold ────────────────────────────────────────────────────────────────

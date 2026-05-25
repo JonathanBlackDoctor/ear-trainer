@@ -1,6 +1,7 @@
 import type { ChoiceOption } from '../components/ChoiceGrid';
 import type { ModeKey } from '../types';
 import { chordLabel } from '../theory/chords';
+import type { IntervalDirection } from '../theory/intervals';
 
 export const LAB_SCALE_MODE_INFO = {
   key: 'lab-scale' as ModeKey,
@@ -474,6 +475,224 @@ export function getTensionChoices(level: number): ChoiceOption[] {
   }));
 }
 
+// ─── Wide / Compound Intervals (octave → 3 octaves) ─────────────────────────
+export const LAB_WIDE_INTERVAL_MODE_INFO = {
+  key: 'lab-wide-interval' as ModeKey,
+  name: '광역 음정',
+  emoji: '📏',
+  description: '옥타브를 넘는 넓은 음정을 맞혀보세요',
+  howTo: '두 음이 차례로(또는 동시에) 들립니다. 두 음 사이의 음정이 옥타브를 넘어 몇 도인지(완전8도·장10도·완전12도·2옥타브 등) 아래 보기에서 고르세요.',
+  theory: '한 옥타브를 넘는 음정을 컴파운드(복합) 음정이라 부르며, 옥타브에 단순 음정을 더한 것과 같습니다. 예를 들어 10도는 옥타브+3도, 12도는 옥타브+5도입니다. 음이 멀리 떨어질수록 두 음을 하나의 "간격"으로 묶어 듣기가 어려워지므로, 넓은 도약을 정확히 가늠하는 감각은 큰 폭의 멜로디나 넓게 벌린 화음을 채보할 때 핵심이 됩니다.',
+  maxLevel: 10,
+  defaultLevel: 1,
+};
+
+export const WIDE_INTERVAL_NAMES = [
+  { name: 'P8',  label: '완전8도 (옥타브)',        semitones: 12 },
+  { name: 'm9',  label: '단9도',                   semitones: 13 },
+  { name: 'M9',  label: '장9도',                   semitones: 14 },
+  { name: 'm10', label: '단10도',                  semitones: 15 },
+  { name: 'M10', label: '장10도',                  semitones: 16 },
+  { name: 'P11', label: '완전11도',                semitones: 17 },
+  { name: 'A11', label: '증11도',                  semitones: 18 },
+  { name: 'P12', label: '완전12도',                semitones: 19 },
+  { name: 'm13', label: '단13도',                  semitones: 20 },
+  { name: 'M13', label: '장13도',                  semitones: 21 },
+  { name: 'm14', label: '단14도',                  semitones: 22 },
+  { name: 'M14', label: '장14도',                  semitones: 23 },
+  { name: 'P15', label: '완전15도 (2옥타브)',      semitones: 24 },
+  { name: 'M17', label: '장17도 (2옥타브+장3도)',  semitones: 28 },
+  { name: 'P19', label: '완전19도 (2옥타브+5도)',  semitones: 31 },
+  { name: 'P22', label: '완전22도 (3옥타브)',      semitones: 36 },
+];
+
+export const WIDE_SEMITONES: Record<string, number> = Object.fromEntries(
+  WIDE_INTERVAL_NAMES.map((i) => [i.name, i.semitones]),
+);
+const WIDE_LABEL: Record<string, string> = Object.fromEntries(
+  WIDE_INTERVAL_NAMES.map((i) => [i.name, i.label]),
+);
+
+const WIDE_SPREAD = ['P8', 'M10', 'P12', 'P15'];
+const WIDE_TENTHS = ['P8', 'm9', 'M9', 'm10', 'M10', 'P11', 'P12', 'P15'];
+const WIDE_TO_15 = ['P8', 'm9', 'M9', 'm10', 'M10', 'P11', 'A11', 'P12', 'm13', 'M13', 'm14', 'M14', 'P15'];
+const WIDE_ULTRA = [...WIDE_TO_15, 'M17', 'P19', 'P22'];
+
+export const WIDE_LEVELS: Record<number, { names: string[]; directions: IntervalDirection[]; low: string; high: string }> = {
+  1:  { names: WIDE_SPREAD, directions: ['up'],                       low: 'C3', high: 'C4' },
+  2:  { names: WIDE_TENTHS, directions: ['up'],                       low: 'C3', high: 'C4' },
+  3:  { names: WIDE_TENTHS, directions: ['up', 'down'],               low: 'C2', high: 'C4' },
+  4:  { names: WIDE_TO_15,  directions: ['up', 'down'],               low: 'C2', high: 'C4' },
+  5:  { names: WIDE_TO_15,  directions: ['up', 'down', 'harmonic'],   low: 'C2', high: 'C4' },
+  6:  { names: WIDE_TO_15,  directions: ['up', 'down', 'harmonic'],   low: 'A1', high: 'C4' },
+  7:  { names: WIDE_ULTRA,  directions: ['up', 'down'],               low: 'A1', high: 'G3' },
+  8:  { names: WIDE_ULTRA,  directions: ['up', 'down', 'harmonic'],   low: 'A1', high: 'G3' },
+  9:  { names: WIDE_ULTRA,  directions: ['up', 'down', 'harmonic'],   low: 'A1', high: 'F3' },
+  10: { names: WIDE_ULTRA,  directions: ['up', 'down', 'harmonic'],   low: 'A1', high: 'F3' },
+};
+
+export function getWideIntervalChoices(level: number): ChoiceOption[] {
+  const cfg = WIDE_LEVELS[level] ?? WIDE_LEVELS[1];
+  return cfg.names.map((n) => ({ value: n, label: n, sublabel: WIDE_LABEL[n] ?? n }));
+}
+
+// ─── Note Stack (identify simultaneous notes / interval stack) ──────────────
+export const LAB_NOTE_STACK_MODE_INFO = {
+  key: 'lab-note-stack' as ModeKey,
+  name: '다성 음 쌓기',
+  emoji: '🗼',
+  description: '동시에 울린 2~4개 음을 찾으세요',
+  howTo: '여러 음이 동시에 울립니다. "건반" 입력에서는 들은 음을 모두 눌러 재구성하고, "보기" 입력에서는 베이스부터 쌓인 음정 구성을 고르세요.',
+  theory: '두 개 이상의 음이 동시에 울리면 각 음을 따로 가려내기가 어려운데, 이를 베이스(맨 아래 음)부터 위로 쌓인 음정의 연속으로 분석하면 구조가 보입니다. 예컨대 "장3도 위에 단3도"는 장3화음, "단3도 위에 장3도"는 단3화음입니다. 동시에 울리는 음을 분해해 듣는 능력은 화음 채보와 편곡의 토대입니다.',
+  maxLevel: 10,
+  defaultLevel: 1,
+};
+
+export interface StackPattern { code: string; label: string; steps: number[] }
+
+const STACK_DYADS: StackPattern[] = [
+  { code: 'M3', label: '장3도', steps: [4] },
+  { code: 'm3', label: '단3도', steps: [3] },
+  { code: 'P5', label: '완전5도', steps: [7] },
+  { code: 'P4', label: '완전4도', steps: [5] },
+];
+const STACK_DYADS_PLUS: StackPattern[] = [
+  ...STACK_DYADS,
+  { code: 'A4', label: '증4도 (트라이톤)', steps: [6] },
+  { code: 'M6', label: '장6도', steps: [9] },
+  { code: 'm7', label: '단7도', steps: [10] },
+];
+const STACK_TRIADS: StackPattern[] = [
+  { code: 'M3+m3', label: '장3+단3 (장3화음형)', steps: [4, 3] },
+  { code: 'm3+M3', label: '단3+장3 (단3화음형)', steps: [3, 4] },
+  { code: 'm3+m3', label: '단3+단3 (감3화음형)', steps: [3, 3] },
+  { code: 'M3+M3', label: '장3+장3 (증3화음형)', steps: [4, 4] },
+  { code: 'P4+P4', label: '완4+완4 (4도 쌓기)', steps: [5, 5] },
+  { code: 'M2+M2', label: '장2+장2 (온음 클러스터)', steps: [2, 2] },
+];
+const STACK_SEVENTHS: StackPattern[] = [
+  { code: 'M3+m3+M3', label: '장3+단3+장3 (장7화음형)', steps: [4, 3, 4] },
+  { code: 'M3+m3+m3', label: '장3+단3+단3 (속7화음형)', steps: [4, 3, 3] },
+  { code: 'm3+M3+m3', label: '단3+장3+단3 (단7화음형)', steps: [3, 4, 3] },
+  { code: 'm3+m3+M3', label: '단3+단3+장3 (반감7형)', steps: [3, 3, 4] },
+  { code: 'm3+m3+m3', label: '단3+단3+단3 (감7화음형)', steps: [3, 3, 3] },
+];
+const STACK_WIDE: StackPattern[] = [
+  { code: 'P8+M3', label: '옥타브+장3도 (넓은 보이싱)', steps: [12, 4] },
+  { code: 'P5+P8', label: '완전5도+옥타브 (넓은 보이싱)', steps: [7, 12] },
+  { code: 'P4+P8', label: '완전4도+옥타브 (넓은 보이싱)', steps: [5, 12] },
+];
+
+export const NOTE_STACK_LEVELS: Record<number, StackPattern[]> = {
+  1:  STACK_DYADS,
+  2:  STACK_DYADS_PLUS,
+  3:  STACK_TRIADS,
+  4:  [...STACK_TRIADS],
+  5:  [...STACK_DYADS_PLUS, ...STACK_TRIADS],
+  6:  STACK_SEVENTHS,
+  7:  [...STACK_TRIADS, ...STACK_SEVENTHS],
+  8:  [...STACK_TRIADS, ...STACK_SEVENTHS, ...STACK_WIDE],
+  9:  [...STACK_DYADS_PLUS, ...STACK_TRIADS, ...STACK_SEVENTHS, ...STACK_WIDE],
+  10: [...STACK_DYADS_PLUS, ...STACK_TRIADS, ...STACK_SEVENTHS, ...STACK_WIDE],
+};
+
+// Levels at or above this randomize the register (essence-independent listening).
+export const NOTE_STACK_RANDOM_REGISTER_LEVEL = 5;
+
+export function getNoteStackChoices(level: number): ChoiceOption[] {
+  return (NOTE_STACK_LEVELS[level] ?? NOTE_STACK_LEVELS[1]).map((p) => ({
+    value: p.code,
+    label: p.label,
+  }));
+}
+
+export function noteStackLabel(code: string): string {
+  for (const lvl of Object.values(NOTE_STACK_LEVELS)) {
+    const found = lvl.find((p) => p.code === code);
+    if (found) return found.label;
+  }
+  return code;
+}
+
+// ─── Microtuning (cents-level intonation on a sustained dyad) ────────────────
+export const LAB_MICROTUNING_MODE_INFO = {
+  key: 'lab-microtuning' as ModeKey,
+  name: '정밀 조율',
+  emoji: '🔬',
+  description: '센트 단위 음정 어긋남을 판별하세요',
+  howTo: '정확히 맞는 두 음(기준)이 먼저 울리고, 같은 음정이 다시 울립니다. 두 번째에서 위 음이 몇 센트 어긋났는지(맥놀이로 판별) 아래 보기에서 고르세요.',
+  theory: '두 음을 함께 울리면 주파수 차이에 따라 음량이 주기적으로 흔들리는 맥놀이(beating)가 생깁니다. 음정이 정확할수록 맥놀이가 사라지고, 어긋날수록 빨라집니다. 한 반음의 1/100인 센트(cent) 단위의 미세한 차이를 맥놀이로 가려내는 것은 합주·조율의 가장 전문적인 청각 기술입니다.',
+  maxLevel: 10,
+  defaultLevel: 1,
+};
+
+export function centsCode(cents: number): string {
+  return cents > 0 ? `+${cents}` : String(cents);
+}
+export function centsLabel(cents: number): string {
+  if (cents === 0) return '정확 (0¢)';
+  return cents > 0 ? `+${cents}¢ (높음)` : `${cents}¢ (낮음)`;
+}
+
+interface MicroInterval { name: string; semitones: number }
+const MICRO_OCTAVE: MicroInterval[] = [{ name: 'P8', semitones: 12 }];
+const MICRO_OCT_5: MicroInterval[] = [{ name: 'P8', semitones: 12 }, { name: 'P5', semitones: 7 }];
+const MICRO_OCT_5_3: MicroInterval[] = [...MICRO_OCT_5, { name: 'M3', semitones: 4 }, { name: 'M6', semitones: 9 }];
+
+export const MICROTUNING_LEVELS: Record<number, { cents: number[]; intervals: MicroInterval[] }> = {
+  1:  { cents: [0, 20, -20],            intervals: MICRO_OCTAVE },
+  2:  { cents: [0, 20, -20, 10, -10],   intervals: MICRO_OCTAVE },
+  3:  { cents: [0, 15, -15, 8, -8],     intervals: MICRO_OCT_5 },
+  4:  { cents: [0, 12, -12, 6, -6],     intervals: MICRO_OCT_5 },
+  5:  { cents: [0, 10, -10, 5, -5],     intervals: MICRO_OCT_5 },
+  6:  { cents: [0, 8, -8, 4, -4],       intervals: MICRO_OCT_5_3 },
+  7:  { cents: [0, 7, -7, 4, -4],       intervals: MICRO_OCT_5_3 },
+  8:  { cents: [0, 6, -6, 3, -3],       intervals: MICRO_OCT_5_3 },
+  9:  { cents: [0, 5, -5, 3, -3],       intervals: MICRO_OCT_5_3 },
+  10: { cents: [0, 4, -4, 2, -2],       intervals: MICRO_OCT_5_3 },
+};
+
+export function getMicrotuningChoices(level: number): ChoiceOption[] {
+  const cfg = MICROTUNING_LEVELS[level] ?? MICROTUNING_LEVELS[1];
+  return cfg.cents.map((c) => ({ value: centsCode(c), label: centsLabel(c) }));
+}
+
+// ─── Harmonics (harmonic-series partial identification) ─────────────────────
+export const LAB_HARMONICS_MODE_INFO = {
+  key: 'lab-harmonics' as ModeKey,
+  name: '배음렬 청음',
+  emoji: '🌈',
+  description: '근음 위의 배음이 몇 배음인지 맞혀보세요',
+  howTo: '근음이 먼저 울리고, 이어서 그 배음(정수배 주파수의 음)이 들립니다. 몇 배음인지(2·3·5배음 등) 아래 보기에서 고르세요.',
+  theory: '한 음(근음)은 그 주파수의 정수배인 배음들을 품고 있습니다. 2배음은 한 옥타브 위, 3배음은 옥타브+완전5도, 4배음은 2옥타브 위로 멀리 퍼져 나갑니다. 흥미롭게도 5배음(장3도)은 평균율보다 14센트, 7배음(단7도)은 31센트 낮아 자연 배음 특유의 색을 냅니다. 배음을 가려 듣는 귀는 음색·화성·조율의 근본을 이해하는 전문 감각입니다.',
+  maxLevel: 10,
+  defaultLevel: 1,
+};
+
+export const HARMONICS_LEVELS: Record<number, { partials: number[]; low: string; high: string }> = {
+  1:  { partials: [2, 4, 8],                       low: 'C2', high: 'C3' },
+  2:  { partials: [2, 3, 4, 6, 8],                 low: 'C2', high: 'C3' },
+  3:  { partials: [2, 3, 4, 5, 6, 8],              low: 'C2', high: 'C3' },
+  4:  { partials: [2, 3, 4, 5, 6, 7, 8],           low: 'C2', high: 'G2' },
+  5:  { partials: [2, 3, 4, 5, 6, 7, 8, 9],        low: 'C2', high: 'G2' },
+  6:  { partials: [2, 3, 4, 5, 6, 7, 8, 9, 10],    low: 'C2', high: 'G2' },
+  7:  { partials: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11], low: 'C2', high: 'G2' },
+  8:  { partials: [3, 4, 5, 6, 7, 8, 9, 10, 11],   low: 'C2', high: 'A2' },
+  9:  { partials: [5, 6, 7, 8, 9, 10, 11],         low: 'C2', high: 'A2' },
+  10: { partials: [5, 6, 7, 8, 9, 10, 11],         low: 'A1', high: 'A2' },
+};
+
+export function harmonicAnswer(partial: number): string {
+  return `${partial}배음`;
+}
+
+export function getHarmonicsChoices(level: number): ChoiceOption[] {
+  return (HARMONICS_LEVELS[level] ?? HARMONICS_LEVELS[1]).partials.map((p) => ({
+    value: harmonicAnswer(p),
+    label: harmonicAnswer(p),
+  }));
+}
+
 // ─── Per-level setup labels ───────────────────────────────────────────────--
 // Short summary of "what changes at this level", shown on the setup screen.
 // Derived from each mode's *_LEVELS table so it stays in sync automatically.
@@ -526,6 +745,26 @@ export function getLabLevelLabel(modeKey: ModeKey, level: number): string {
     case 'lab-tension': {
       const c = TENSION_LEVELS[level] ?? TENSION_LEVELS[1];
       return `텐션 ${c.tensions.length}종 · 기반화음 ${c.bases.length}종`;
+    }
+    case 'lab-wide-interval': {
+      const c = WIDE_LEVELS[level] ?? WIDE_LEVELS[1];
+      const dirTxt = c.directions.includes('harmonic')
+        ? '상하행+동시'
+        : c.directions.length > 1 ? '상하행' : '상행';
+      return `음정 ${c.names.length}종 · ${dirTxt}`;
+    }
+    case 'lab-note-stack': {
+      const patterns = NOTE_STACK_LEVELS[level] ?? NOTE_STACK_LEVELS[1];
+      return `${patterns.length}종${level >= NOTE_STACK_RANDOM_REGISTER_LEVEL ? ' · 음역 랜덤' : ''}`;
+    }
+    case 'lab-microtuning': {
+      const c = MICROTUNING_LEVELS[level] ?? MICROTUNING_LEVELS[1];
+      const minMag = Math.min(...c.cents.filter((n) => n !== 0).map(Math.abs));
+      return `최소 ±${minMag}센트 · 음정 ${c.intervals.length}종`;
+    }
+    case 'lab-harmonics': {
+      const c = HARMONICS_LEVELS[level] ?? HARMONICS_LEVELS[1];
+      return `${c.partials.length}택 · 최대 ${Math.max(...c.partials)}배음`;
     }
     default:
       return '';

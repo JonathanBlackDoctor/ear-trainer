@@ -606,6 +606,26 @@ export async function playChord(notes: string[], duration = '2n'): Promise<void>
   getInstrument().triggerAttackRelease(notes, duration, scheduleStart());
 }
 
+/**
+ * Play a sustained two-note dyad with the upper note optionally detuned by
+ * `detuneCents` (+sharp, −flat). Used by the microtuning mode so the two notes
+ * beat against each other when the upper one is off — the long default
+ * duration gives the beating time to be heard.
+ */
+export async function playDetunedDyad(
+  lowNote: string,
+  highNote: string,
+  detuneCents = 0,
+  duration = '1n',
+): Promise<void> {
+  if (!audioStarted) await startAudio();
+  await ensureRunning();
+  const highTarget: string | number = detuneCents === 0
+    ? highNote
+    : Tone.Frequency(highNote).toFrequency() * Math.pow(2, detuneCents / 1200);
+  getInstrument().triggerAttackRelease([lowNote, highTarget] as any, duration, scheduleStart());
+}
+
 // Each playSequence/playProgression/playArpeggio fires its first item
 // immediately on the audio thread (so the user gets instant feedback on tap)
 // and dispatches the rest via trackTimeout. Pre-scheduling everything in the
@@ -663,6 +683,46 @@ export async function playArpeggio(
   // Note value sent to triggerAttackRelease is '4n' (longer than the gap
   // between notes) so consecutive arpeggio notes can ring through each other.
   firePlayback(notes, noteDuration, Tone.Time(noteDuration).toSeconds() / speedFactor, '4n');
+}
+
+/**
+ * Play a chord progression as arpeggios, chord after chord.
+ *
+ * Every note of every chord is scheduled up front against a single cumulative
+ * clock, so the chords play sequentially instead of stacking on top of each
+ * other. (Calling playArpeggio per chord in a JS loop fails: playArpeggio
+ * resolves as soon as it has *scheduled* its notes, not when they finish
+ * sounding, so awaiting it returns immediately and every chord starts at once.)
+ * One extra note-gap separates chords so their boundaries stay audible.
+ * Scheduling mirrors firePlayback: first note rides the gain ramp, the rest go
+ * through trackTimeout under the playbackGen guard so stopAllAudio() cuts them.
+ */
+export async function playArpeggioProgression(
+  chords: string[][],
+  noteDuration = '8n',
+  speedFactor = 1.0
+): Promise<void> {
+  if (!audioStarted) await startAudio();
+  await ensureRunning();
+  const gen = playbackGen;
+  const noteSec = Tone.Time(noteDuration).toSeconds() / speedFactor;
+  let step = 0;
+  let first = true;
+  for (const chord of chords) {
+    for (const note of chord) {
+      if (first) {
+        first = false;
+        getInstrument().triggerAttackRelease(note, '4n', scheduleStart());
+      } else {
+        trackTimeout(() => {
+          if (gen !== playbackGen) return; // stop was called — skip
+          getInstrument().triggerAttackRelease(note, '4n', scheduleStart());
+        }, step * noteSec * 1000);
+      }
+      step++;
+    }
+    step++; // one extra note-gap between chords
+  }
 }
 
 // ─── Metronome click (count-in, tempo/bpm modes) ──────────────────────────
