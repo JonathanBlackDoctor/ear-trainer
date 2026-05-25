@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { toast } from '../store/useToast';
 import { usePwaInstall } from '../hooks/usePwaInstall';
-import { refreshToLatest } from '../sw-update';
 import { MODE_REGISTRY, resolveModeOrder } from '../modes/registry';
 import type { DesignTheme, ModeKey } from '../types';
 
@@ -20,20 +19,8 @@ export function Settings() {
   const { settings, updateSettings, resetData, exportData, importData } = useStore();
   const fileRef = useRef<HTMLInputElement>(null);
   const [confirmReset, setConfirmReset] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [orderOpen, setOrderOpen] = useState(false);
-  const { canInstall, isStandalone, isIOS, promptInstall } = usePwaInstall();
-
-  async function handleRefresh() {
-    setRefreshing(true);
-    toast.info('최신 버전을 확인하고 있어요…');
-    try {
-      await refreshToLatest();
-    } catch {
-      setRefreshing(false);
-      toast.error('새로고침에 실패했어요. 잠시 후 다시 시도해 주세요.');
-    }
-  }
+  const { isStandalone, isIOS, promptInstall } = usePwaInstall();
 
   async function handleInstall() {
     if (isIOS) {
@@ -126,26 +113,6 @@ export function Settings() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 mt-5 space-y-4">
-        {/* App update — force-fetch the latest deployed build. */}
-        <div className="card">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-sm font-semibold text-slate-600">최신 버전으로 새로고침</div>
-              <div className="text-xs text-slate-400 mt-0.5">
-                업데이트가 배포되었다면 즉시 받아옵니다.
-              </div>
-            </div>
-            <button
-              type="button"
-              className="btn-secondary text-sm whitespace-nowrap focus-ring disabled:opacity-60"
-              onClick={handleRefresh}
-              disabled={refreshing}
-            >
-              {refreshing ? '확인 중…' : '🔄 새로고침'}
-            </button>
-          </div>
-        </div>
-
         {/* PWA install — standalone 모드에서는 숨김. 그 외엔 항상 노출하고
             네이티브 프롬프트가 아직 준비되지 않았으면 click 시 안내한다. */}
         {!isStandalone && (
