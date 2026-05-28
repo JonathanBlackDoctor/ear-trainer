@@ -585,7 +585,13 @@ function getReferenceSynth(): Tone.PolySynth {
   if (!referenceSynth) {
     referenceSynth = new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: 'sine' },
-      envelope: { attack: 0.02, decay: 0.1, sustain: 0.7, release: 0.4 },
+      // release was 0.4s — longer than the ~50ms stop-mute window on the
+      // fast paths (기준음 / 다시 듣기 retrigger), so a releaseAll() during
+      // stopAllAudio() could not finish fading before scheduleStart() lifted
+      // the gain back to 1, leaking the reference tone's sine tail into the
+      // next playback. 0.05s matches the piano synth/sampler: long enough to
+      // avoid a click, short enough to be silent before the gain restores.
+      envelope: { attack: 0.02, decay: 0.1, sustain: 0.7, release: 0.05 },
     }).connect(getOutputGain());
     referenceSynth.volume.value = -10;
   }
