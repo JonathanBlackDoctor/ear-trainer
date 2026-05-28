@@ -322,7 +322,7 @@ export function Train() {
         await delay(700 / speed);
         if (gen !== getPlaybackGen()) return;
       }
-      await playQuestionAudio(q, speed);
+      await playQuestionAudio(q, speed, gen);
     } finally {
       // Only release the loading state if we're still the active playback;
       // otherwise the newer playback owns it.
@@ -333,7 +333,7 @@ export function Train() {
     }
   }
 
-  async function playQuestionAudio(q: Question, speed = 1.0) {
+  async function playQuestionAudio(q: Question, speed = 1.0, gen = getPlaybackGen()) {
     const data = q.data;
     switch (data.type) {
       case 'interval': {
@@ -375,9 +375,11 @@ export function Train() {
         // Original key: tonic, then the melody in fromKey.
         await playReferenceTone(d.fromKey + '4', '4n');
         await delay(400 / speed);
+        if (gen !== getPlaybackGen()) return;
         await playSequence(d.fromNotes, '4n', speed);
         // Pause, then sound the target key's tonic to prime the transposed input.
         await delay(700 / speed);
+        if (gen !== getPlaybackGen()) return;
         await playReferenceTone(d.toKey + '4', '2n');
         break;
       }
@@ -417,6 +419,7 @@ export function Train() {
         const d = data as IntervalCompareData;
         await playSequence(d.pairA, '2n', speed);
         await delay(900 / speed);
+        if (gen !== getPlaybackGen()) return;
         await playSequence(d.pairB, '2n', speed);
         break;
       }
@@ -434,6 +437,7 @@ export function Train() {
         const d = data as TuningData;
         await playReferenceTone(d.note, '2n');
         await delay(650 / speed);
+        if (gen !== getPlaybackGen()) return;
         await playNote(d.note, '2n', d.cents);
         break;
       }
@@ -442,6 +446,7 @@ export function Train() {
         // Establish the key with the tonic chord, then sound the target chord.
         await playChord(d.tonicNotes, '2n');
         await delay(800 / speed);
+        if (gen !== getPlaybackGen()) return;
         await playChord(d.chordNotes, '2n');
         break;
       }
@@ -449,6 +454,7 @@ export function Train() {
         const d = data as TensionData;
         await playChord(d.baseNotes, '2n');
         await delay(800 / speed);
+        if (gen !== getPlaybackGen()) return;
         await playChord(d.fullNotes, '2n');
         break;
       }
@@ -462,6 +468,7 @@ export function Train() {
         // In-tune reference dyad, gap, then the (possibly) detuned test dyad.
         await playDetunedDyad(d.lowNote, d.highNote, 0, '1n');
         await delay(750 / speed);
+        if (gen !== getPlaybackGen()) return;
         await playDetunedDyad(d.lowNote, d.highNote, d.cents, '1n');
         break;
       }
@@ -471,6 +478,7 @@ export function Train() {
         // 1200·log2(partial) cents → exactly fundamental × partial).
         await playNote(d.fundamental, '2n');
         await delay(700 / speed);
+        if (gen !== getPlaybackGen()) return;
         await playNote(d.fundamental, '1n', d.cents);
         break;
       }
