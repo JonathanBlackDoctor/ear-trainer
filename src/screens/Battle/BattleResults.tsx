@@ -1,5 +1,5 @@
 import { useBattleStore } from '../../store/useBattleStore';
-import { useBattle } from '../../battle/BattleProvider';
+import { useBattle } from '../../battle/useBattle';
 
 export function BattleResults() {
   const { voteRematch, leaveBattle } = useBattle();

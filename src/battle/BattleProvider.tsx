@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useParams, useNavigate, Outlet } from 'react-router-dom';
 import { judge } from '../engine/judge';
 import { startAudio, stopAllAudio } from '../audio/piano';
@@ -10,20 +10,7 @@ import { getNick, getPlayerId, defaultNick } from '../net/identity';
 import { generateBattleQuestions } from './generateQuestion';
 import { scoreAnswer } from './battleMachine';
 import { COUNTDOWN_MS, type BattleConfig } from './types';
-
-interface BattleApi {
-  startBattle: (config: BattleConfig) => void;
-  submitAnswer: (value: string) => void;
-  leaveBattle: () => void;
-  voteRematch: () => void;
-}
-
-const Ctx = createContext<BattleApi | null>(null);
-export function useBattle(): BattleApi {
-  const api = useContext(Ctx);
-  if (!api) throw new Error('useBattle must be used within BattleProvider');
-  return api;
-}
+import { BattleContext, type BattleApi } from './useBattle';
 
 const FEEDBACK_MS = 1400;
 
@@ -212,8 +199,8 @@ export function BattleProvider() {
 
   const api: BattleApi = { startBattle, submitAnswer, leaveBattle, voteRematch };
   return (
-    <Ctx.Provider value={api}>
+    <BattleContext.Provider value={api}>
       <Outlet />
-    </Ctx.Provider>
+    </BattleContext.Provider>
   );
 }

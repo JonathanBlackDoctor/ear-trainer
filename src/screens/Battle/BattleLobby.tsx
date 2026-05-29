@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useBattleStore } from '../../store/useBattleStore';
-import { useBattle } from '../../battle/BattleProvider';
+import { useBattle } from '../../battle/useBattle';
 import { BATTLE_MODES, maxLevelFor } from '../../battle/modes';
 import { QUESTION_COUNT_OPTIONS, DEFAULT_BATTLE_CONFIG } from '../../battle/types';
 import { MODE_REGISTRY } from '../../modes/registry';

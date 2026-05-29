@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useBattleStore } from '../../store/useBattleStore';
-import { useBattle } from '../../battle/BattleProvider';
+import { useBattle } from '../../battle/useBattle';
 import { getBattleChoices } from '../../battle/choices';
 import { ChoiceGrid } from '../../components/ChoiceGrid';
 import { Scoreboard } from '../../components/battle/Scoreboard';
