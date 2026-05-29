@@ -9,7 +9,7 @@ const WEAK_COLORS = [M.pink, M.violet, M.amber];
 export function HomeM({ data }: { data: HomeData }) {
   const {
     rank, totalXp, overallPct, totalSessions, totalQuestions,
-    modes, weakItems, startMode, startWeakSession, goStats, goSettings, goBadges,
+    modes, weakItems, startMode, startWeakSession, goStats, goSettings, goBadges, goBattle,
   } = data;
   const tnum: React.CSSProperties = { fontVariantNumeric: 'tabular-nums' };
 
@@ -27,6 +27,20 @@ export function HomeM({ data }: { data: HomeData }) {
         <div style={{ marginTop: 14, fontSize: 30, fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.05 }}>
           오늘도 <MText size={30}>다섯 분</MText>
         </div>
+      </div>
+
+      {/* 1대1 대결 */}
+      <div style={{ padding: '0 20px 14px', position: 'relative' }}>
+        <MCard gloss style={{ padding: 0, cursor: 'pointer' }} onClick={goBattle} role="button" aria-label="온라인 1대1 대결 시작">
+          <div style={{ background: M.iridescent, padding: 14, color: '#fff', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }} aria-hidden>⚔️</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.01em' }}>친구와 1대1 대결</div>
+              <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.92, marginTop: 2 }}>같은 문제로 실시간 청음 대결</div>
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 800 }} aria-hidden>→</div>
+          </div>
+        </MCard>
       </div>
 
       {/* iridescent rank card */}
