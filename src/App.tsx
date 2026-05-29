@@ -14,6 +14,14 @@ const Result = lazy(() => import('./screens/Result').then((m) => ({ default: m.R
 const Stats = lazy(() => import('./screens/Stats').then((m) => ({ default: m.Stats })));
 const Settings = lazy(() => import('./screens/Settings').then((m) => ({ default: m.Settings })));
 const Badges = lazy(() => import('./screens/Badges').then((m) => ({ default: m.Badges })));
+// Online 1v1 battle. The provider is a layout route that owns the realtime
+// transport + battle store and stays mounted across the lobby/play/results
+// sub-routes (so the connection survives phase navigation).
+const BattleHome = lazy(() => import('./screens/Battle/BattleHome').then((m) => ({ default: m.BattleHome })));
+const BattleProvider = lazy(() => import('./battle/BattleProvider').then((m) => ({ default: m.BattleProvider })));
+const BattleLobby = lazy(() => import('./screens/Battle/BattleLobby').then((m) => ({ default: m.BattleLobby })));
+const BattleTrain = lazy(() => import('./screens/Battle/BattleTrain').then((m) => ({ default: m.BattleTrain })));
+const BattleResults = lazy(() => import('./screens/Battle/BattleResults').then((m) => ({ default: m.BattleResults })));
 
 export default function App() {
   useThemeSync();
@@ -29,6 +37,12 @@ export default function App() {
             <Route path="/stats" element={<Stats />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/badges" element={<Badges />} />
+            <Route path="/battle" element={<BattleHome />} />
+            <Route path="/battle/room/:roomId" element={<BattleProvider />}>
+              <Route path="lobby" element={<BattleLobby />} />
+              <Route path="play" element={<BattleTrain />} />
+              <Route path="results" element={<BattleResults />} />
+            </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

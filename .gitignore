@@ -5,3 +5,5 @@ dev-dist/
 *.tsbuildinfo
 .DS_Store
 coverage/
+.env
+.env.local
