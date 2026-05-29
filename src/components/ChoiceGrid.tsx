@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 
 export interface ChoiceOption {
   value: string;
@@ -16,6 +16,12 @@ interface ChoiceGridProps {
   disabled?: boolean;
   /** Optional ARIA label for the radiogroup (e.g. "인터벌 보기"). */
   ariaLabel?: string;
+  /**
+   * When true, the first tap arms an option (highlight) and a second tap on it
+   * submits — guards against fat-finger mis-taps. The parent should give the
+   * grid a per-question `key` so the armed state resets between questions.
+   */
+  requireConfirm?: boolean;
 }
 
 /**
@@ -33,8 +39,21 @@ export function ChoiceGrid({
   columns = 2,
   disabled = false,
   ariaLabel,
+  requireConfirm = false,
 }: ChoiceGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  // The armed-but-not-submitted option when requireConfirm is on.
+  const [pending, setPending] = useState<string | null>(null);
+
+  // Single selection entry point: instant submit, or arm→confirm when
+  // requireConfirm is on (a second press on the armed option submits).
+  const choose = useCallback((value: string) => {
+    if (!requireConfirm) { onSelect(value); return; }
+    setPending((cur) => {
+      if (cur === value) { onSelect(value); return null; }
+      return value;
+    });
+  }, [requireConfirm, onSelect]);
 
   // Global number-key shortcuts (1..9). Skip while disabled/answered.
   useEffect(() => {
@@ -47,12 +66,12 @@ export function ChoiceGrid({
       const n = parseInt(e.key, 10);
       if (Number.isFinite(n) && n >= 1 && n <= options.length) {
         e.preventDefault();
-        onSelect(options[n - 1].value);
+        choose(options[n - 1].value);
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [disabled, answered, options, onSelect]);
+  }, [disabled, answered, options, choose]);
 
   function btnClass(value: string): string {
     const base = 'relative choice-btn py-4 px-2 text-lg min-h-[64px] touch-manipulation focus-ring';
@@ -61,7 +80,7 @@ export function ChoiceGrid({
       if (value === selected && value !== correct) return `${base} choice-btn-wrong`;
       return `${base} opacity-50`;
     }
-    if (value === selected) return `${base} choice-btn-selected`;
+    if (value === selected || value === pending) return `${base} choice-btn-selected`;
     return base;
   }
 
@@ -98,12 +117,18 @@ export function ChoiceGrid({
   }
 
   return (
-    <div
-      ref={containerRef}
-      role="radiogroup"
-      aria-label={ariaLabel ?? '답안 선택'}
-      className={`grid ${gridCols} gap-3`}
-    >
+    <div>
+      {requireConfirm && pending && !answered && (
+        <div className="text-center text-xs font-semibold text-primary-600 mb-2" aria-live="polite">
+          한 번 더 눌러 제출하세요
+        </div>
+      )}
+      <div
+        ref={containerRef}
+        role="radiogroup"
+        aria-label={ariaLabel ?? '답안 선택'}
+        className={`grid ${gridCols} gap-3`}
+      >
       {options.map((opt, idx) => {
         const isSelected = opt.value === selected;
         const isCorrect = answered && opt.value === correct;
@@ -112,10 +137,10 @@ export function ChoiceGrid({
             key={opt.value}
             type="button"
             role="radio"
-            aria-checked={isSelected}
+            aria-checked={isSelected || opt.value === pending}
             aria-label={`${idx + 1}. ${opt.label}${opt.sublabel ? `, ${opt.sublabel}` : ''}`}
             className={btnClass(opt.value)}
-            onClick={() => !disabled && !answered && onSelect(opt.value)}
+            onClick={() => !disabled && !answered && choose(opt.value)}
             onKeyDown={(e) => handleKeyNav(e, idx)}
             disabled={disabled || (answered && opt.value !== correct && opt.value !== selected)}
             tabIndex={answered ? -1 : isSelected || (selected === undefined && idx === 0) ? 0 : -1}
@@ -138,6 +163,7 @@ export function ChoiceGrid({
           </button>
         );
       })}
+      </div>
     </div>
   );
 }

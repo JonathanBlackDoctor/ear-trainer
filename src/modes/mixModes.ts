@@ -88,19 +88,18 @@ const COMP_SETTINGS: Record<CompAmount, { ratio: number; threshold: number; make
   medium: { ratio: 4,  threshold: -24, makeupDb: 4 },
   strong: { ratio: 8,  threshold: -30, makeupDb: 6 },
 };
-// makeupScale shrinks the make-up gain so loudness stops being a giveaway — at
-// the top levels you must judge by the dynamics (pumping/density), not volume.
+// Make-up gain stays loudness-matched (scale 1) at every level so volume is
+// NOT a cue — you must judge by the dynamics (pumping/density). Difficulty
+// instead comes from subtler amount pools (dropping the obvious 'none'/'strong'
+// anchors and pitting adjacent amounts against each other). Only 4 amounts
+// exist, so the ladder honestly caps at level 6 rather than padding to 10.
 const COMP_LEVELS: Record<number, { amounts: CompAmount[]; makeupScale: number }> = {
   1:  { amounts: ['none', 'strong'], makeupScale: 1 },
-  2:  { amounts: ['none', 'light', 'strong'], makeupScale: 1 },
+  2:  { amounts: ['none', 'medium', 'strong'], makeupScale: 1 },
   3:  { amounts: ['none', 'light', 'medium', 'strong'], makeupScale: 1 },
-  4:  { amounts: ['none', 'light', 'medium', 'strong'], makeupScale: 1 },
-  5:  { amounts: ['none', 'light', 'medium', 'strong'], makeupScale: 0.8 },
-  6:  { amounts: ['none', 'light', 'medium', 'strong'], makeupScale: 0.65 },
-  7:  { amounts: ['none', 'light', 'medium', 'strong'], makeupScale: 0.5 },
-  8:  { amounts: ['none', 'light', 'medium', 'strong'], makeupScale: 0.35 },
-  9:  { amounts: ['none', 'light', 'medium', 'strong'], makeupScale: 0.2 },
-  10: { amounts: ['none', 'light', 'medium', 'strong'], makeupScale: 0 },
+  4:  { amounts: ['light', 'medium', 'strong'], makeupScale: 1 },
+  5:  { amounts: ['none', 'light', 'medium'], makeupScale: 1 },
+  6:  { amounts: ['light', 'medium'], makeupScale: 1 },
 };
 
 // ─── Reverb amount ──────────────────────────────────────────────────────────
@@ -125,95 +124,138 @@ const REVERB_AMT_LEVELS: Record<number, { amounts: RevAmount[]; wetScale: number
 };
 
 // ─── Reverb type ──────────────────────────────────────────────────────────--
-type RevType = 'room' | 'hall' | 'plate';
+type RevType = 'room' | 'hall' | 'plate' | 'spring' | 'chamber';
 const REV_TYPE_LABEL: Record<RevType, string> = {
   room: '룸 (Room)', hall: '홀 (Hall)', plate: '플레이트 (Plate)',
+  spring: '스프링 (Spring)', chamber: '체임버 (Chamber)',
 };
+// Rendered generically from decay/preDelay/wet, so new spaces need no audio
+// changes. Spring = short/bright/boingy, chamber = medium between room & hall.
 const REV_TYPE_SETTINGS: Record<RevType, { decay: number; preDelay: number; wet: number }> = {
-  room:  { decay: 0.8, preDelay: 0.005, wet: 0.32 },
-  hall:  { decay: 2.6, preDelay: 0.03,  wet: 0.32 },
-  plate: { decay: 1.4, preDelay: 0.0,   wet: 0.34 },
+  room:    { decay: 0.8, preDelay: 0.005, wet: 0.32 },
+  hall:    { decay: 2.6, preDelay: 0.03,  wet: 0.32 },
+  plate:   { decay: 1.4, preDelay: 0.0,   wet: 0.34 },
+  spring:  { decay: 0.5, preDelay: 0.0,   wet: 0.30 },
+  chamber: { decay: 1.8, preDelay: 0.02,  wet: 0.32 },
 };
-const REVERB_TYPE_LEVELS: Record<number, { types: RevType[] }> = {
-  1: { types: ['room', 'hall'] },
-  2: { types: ['room', 'hall', 'plate'] },
+// Spaces grow 2→5, then wet shrinks so the tails are subtler to classify. Five
+// distinct spaces cap the genuine ladder at level 5.
+const REVERB_TYPE_LEVELS: Record<number, { types: RevType[]; wetScale: number }> = {
+  1: { types: ['room', 'hall'], wetScale: 1 },
+  2: { types: ['room', 'hall', 'plate'], wetScale: 1 },
+  3: { types: ['room', 'hall', 'plate', 'spring'], wetScale: 1 },
+  4: { types: ['room', 'hall', 'plate', 'spring', 'chamber'], wetScale: 1 },
+  5: { types: ['room', 'hall', 'plate', 'spring', 'chamber'], wetScale: 0.7 },
 };
 
 // ─── Delay time ──────────────────────────────────────────────────────────---
-type DelayNote = '16' | '16d' | '8t' | '8' | '8d' | '4' | '2';
+type DelayNote = '16' | '16t' | '16d' | '8t' | '8' | '8d' | '4t' | '4' | '4d' | '2' | '2d';
 const DELAY_LABEL: Record<DelayNote, string> = {
-  '16': '1/16', '16d': '점16분 (1/16.)', '8t': '셋잇단8분 (1/8T)',
-  '8': '1/8', '8d': '점8분 (1/8.)', '4': '1/4', '2': '1/2',
+  '16': '1/16', '16t': '셋잇단16분 (1/16T)', '16d': '점16분 (1/16.)', '8t': '셋잇단8분 (1/8T)',
+  '8': '1/8', '8d': '점8분 (1/8.)', '4t': '셋잇단4분 (1/4T)', '4': '1/4', '4d': '점4분 (1/4.)',
+  '2': '1/2', '2d': '점2분 (1/2.)',
 };
 const DELAY_MS: Record<DelayNote, number> = {
-  '16': 125, '16d': 187, '8t': 167, '8': 250, '8d': 375, '4': 500, '2': 1000,
+  '16': 125, '16t': 83, '16d': 187, '8t': 167, '8': 250, '8d': 375,
+  '4t': 333, '4': 500, '4d': 750, '2': 1000, '2d': 1500,
 };
+// Note-value discrimination has many genuinely distinct values, so this is a
+// real 10-level ladder: the pool grows and gains closer-spaced clusters
+// (straight vs dotted vs triplet) that are harder to tell apart.
 const DELAY_LEVELS: Record<number, { notes: DelayNote[] }> = {
-  1: { notes: ['16', '4'] },
-  2: { notes: ['16', '8', '4'] },
-  3: { notes: ['16', '8', '8d', '4'] },
-  4: { notes: ['16', '8', '8d', '4', '2'] },
-  5: { notes: ['16', '16d', '8', '8d', '4'] },
-  6: { notes: ['16', '16d', '8t', '8', '8d', '4'] },
-  7: { notes: ['16', '16d', '8t', '8', '8d', '4', '2'] },
+  1:  { notes: ['16', '4'] },
+  2:  { notes: ['16', '8', '4'] },
+  3:  { notes: ['16', '8', '8d', '4'] },
+  4:  { notes: ['16', '8', '8d', '4', '2'] },
+  5:  { notes: ['16', '16d', '8', '8d', '4'] },
+  6:  { notes: ['16', '16d', '8t', '8', '8d', '4'] },
+  7:  { notes: ['16', '16d', '8t', '8', '8d', '4', '2'] },
+  8:  { notes: ['16', '16d', '8t', '8', '8d', '4', '4d', '2'] },
+  9:  { notes: ['16', '16t', '16d', '8t', '8', '8d', '4', '4d', '2'] },
+  10: { notes: ['16', '16t', '16d', '8t', '8', '8d', '4t', '4', '4d', '2', '2d'] },
 };
 
 // ─── Pan ─────────────────────────────────────────────────────────────────---
 const PAN_VALUE: Record<string, number> = {
-  L: -1, C: 0, R: 1, L70: -0.7, L30: -0.35, R30: 0.35, R70: 0.7, L15: -0.15, R15: 0.15,
+  L: -1, C: 0, R: 1, L85: -0.85, L70: -0.7, L50: -0.5, L30: -0.35, L15: -0.15, L08: -0.08,
+  R85: 0.85, R70: 0.7, R50: 0.5, R30: 0.35, R15: 0.15, R08: 0.08,
 };
 const PAN_LABEL: Record<string, string> = {
   L: '왼쪽', C: '가운데', R: '오른쪽',
-  L70: '왼쪽 (강)', L30: '왼쪽 (약)', R30: '오른쪽 (약)', R70: '오른쪽 (강)',
-  L15: '왼쪽 (살짝)', R15: '오른쪽 (살짝)',
+  L85: '왼쪽 (아주 강)', L70: '왼쪽 (강)', L50: '왼쪽 (중)', L30: '왼쪽 (약)', L15: '왼쪽 (살짝)', L08: '왼쪽 (아주 살짝)',
+  R85: '오른쪽 (아주 강)', R70: '오른쪽 (강)', R50: '오른쪽 (중)', R30: '오른쪽 (약)', R15: '오른쪽 (살짝)', R08: '오른쪽 (아주 살짝)',
 };
+// More positions, packed progressively closer (down to ±8%) — a genuine ladder
+// up to 11 positions, which is about the limit of useful pan discrimination, so
+// the mode honestly caps at level 5 rather than padding to 10.
 const PAN_LEVELS: Record<number, { positions: string[] }> = {
   1: { positions: ['L', 'C', 'R'] },
   2: { positions: ['L70', 'L30', 'C', 'R30', 'R70'] },
-  3: { positions: ['L70', 'L30', 'L15', 'C', 'R15', 'R30', 'R70'] },
+  3: { positions: ['L85', 'L50', 'L15', 'C', 'R15', 'R50', 'R85'] },
+  4: { positions: ['L85', 'L50', 'L30', 'L15', 'C', 'R15', 'R30', 'R50', 'R85'] },
+  5: { positions: ['L85', 'L50', 'L30', 'L15', 'L08', 'C', 'R08', 'R15', 'R30', 'R50', 'R85'] },
 };
 
 // ─── Stereo width ─────────────────────────────────────────────────────────--
 type Width = 'mono' | 'narrow' | 'mid' | 'wide';
 const WIDTH_LABEL: Record<Width, string> = { mono: '모노', narrow: '좁게', mid: '중간', wide: '넓게' };
 const WIDTH_VALUE: Record<Width, number> = { mono: 0, narrow: 0.3, mid: 0.6, wide: 1 };
-const WIDTH_LEVELS: Record<number, { widths: Width[] }> = {
-  1: { widths: ['mono', 'wide'] },
-  2: { widths: ['mono', 'narrow', 'wide'] },
-  3: { widths: ['mono', 'narrow', 'mid', 'wide'] },
+// `spread` compresses the non-mono widths toward each other at higher levels so
+// the four categories sound progressively closer (subtler to tell apart). Four
+// categories cap the genuine ladder at level 6.
+const WIDTH_LEVELS: Record<number, { widths: Width[]; spread: number }> = {
+  1: { widths: ['mono', 'wide'], spread: 1 },
+  2: { widths: ['mono', 'narrow', 'wide'], spread: 1 },
+  3: { widths: ['mono', 'narrow', 'mid', 'wide'], spread: 1 },
+  4: { widths: ['mono', 'narrow', 'mid', 'wide'], spread: 0.8 },
+  5: { widths: ['mono', 'narrow', 'mid', 'wide'], spread: 0.6 },
+  6: { widths: ['mono', 'narrow', 'mid', 'wide'], spread: 0.45 },
 };
 
 // ─── Level (gain) ─────────────────────────────────────────────────────────--
+// dB options are floored at 1 dB and kept ≥1 dB apart: ~1 dB is the human JND,
+// so 0.5 dB answers (or 0.5-dB-spaced options) would be below threshold and
+// reduce to guessing. Difficulty grows via smaller single diffs, then more
+// options that stay ≥1 dB apart.
 const LEVEL_LEVELS: Record<number, { task: 'which' | 'amount'; dbs: number[] }> = {
   1:  { task: 'which', dbs: [6] },
   2:  { task: 'which', dbs: [3] },
   3:  { task: 'which', dbs: [2] },
   4:  { task: 'which', dbs: [1] },
   5:  { task: 'amount', dbs: [3, 6] },
-  6:  { task: 'amount', dbs: [1, 3, 6] },
+  6:  { task: 'amount', dbs: [2, 4, 6] },
   7:  { task: 'amount', dbs: [1, 3, 6] },
-  8:  { task: 'amount', dbs: [1, 2, 3, 6] },
-  9:  { task: 'amount', dbs: [0.5, 1, 2, 3] },
-  10: { task: 'amount', dbs: [0.5, 1, 1.5, 2, 3] },
+  8:  { task: 'amount', dbs: [1, 2, 4, 6] },
+  9:  { task: 'amount', dbs: [1, 3, 5] },
+  10: { task: 'amount', dbs: [1, 2, 3, 5] },
 };
 
 // ─── Distortion ──────────────────────────────────────────────────────────---
 type DistAmount = 'clean' | 'subtle' | 'light' | 'medium' | 'heavy';
 const DIST_LABEL: Record<DistAmount, string> = { clean: '클린', subtle: '아주 약간', light: '약간', medium: '중간', heavy: '강하게' };
 const DIST_VALUE: Record<DistAmount, number> = { clean: 0, subtle: 0.08, light: 0.18, medium: 0.4, heavy: 0.8 };
-const DIST_LEVELS: Record<number, { amounts: DistAmount[] }> = {
-  1: { amounts: ['clean', 'heavy'] },
-  2: { amounts: ['clean', 'light', 'heavy'] },
-  3: { amounts: ['clean', 'light', 'medium', 'heavy'] },
-  4: { amounts: ['clean', 'subtle', 'light', 'medium', 'heavy'] },
+// `scale` compresses the drive amounts toward clean at higher levels so the
+// categories get subtler. Five categories cap the genuine ladder at level 6.
+const DIST_LEVELS: Record<number, { amounts: DistAmount[]; scale: number }> = {
+  1: { amounts: ['clean', 'heavy'], scale: 1 },
+  2: { amounts: ['clean', 'light', 'heavy'], scale: 1 },
+  3: { amounts: ['clean', 'light', 'medium', 'heavy'], scale: 1 },
+  4: { amounts: ['clean', 'subtle', 'light', 'medium', 'heavy'], scale: 1 },
+  5: { amounts: ['clean', 'subtle', 'light', 'medium', 'heavy'], scale: 0.7 },
+  6: { amounts: ['clean', 'subtle', 'light', 'medium', 'heavy'], scale: 0.5 },
 };
 
 // ─── Modulation ──────────────────────────────────────────────────────────---
 type ModType = 'chorus' | 'phaser' | 'tremolo';
 const MOD_LABEL: Record<ModType, string> = { chorus: '코러스 (Chorus)', phaser: '페이저 (Phaser)', tremolo: '트레몰로 (Tremolo)' };
-const MOD_LEVELS: Record<number, { types: ModType[] }> = {
-  1: { types: ['chorus', 'tremolo'] },
-  2: { types: ['chorus', 'phaser', 'tremolo'] },
+// `strength` scales depth/wet in the audio chain so the movement gets subtler
+// (harder to classify) at higher levels. Three types cap the ladder at level 5.
+const MOD_LEVELS: Record<number, { types: ModType[]; strength: number }> = {
+  1: { types: ['chorus', 'tremolo'], strength: 1 },
+  2: { types: ['chorus', 'phaser', 'tremolo'], strength: 1 },
+  3: { types: ['chorus', 'phaser', 'tremolo'], strength: 0.75 },
+  4: { types: ['chorus', 'phaser', 'tremolo'], strength: 0.6 },
+  5: { types: ['chorus', 'phaser', 'tremolo'], strength: 0.45 },
 };
 
 // ─── Per-effect choices + build ───────────────────────────────────────────--
@@ -263,7 +305,9 @@ export function buildMix(effect: MixEffect, level: number, value: string): MixBu
       const sign = c.cut && Math.random() < 0.5 ? -1 : 1;
       const gainDb = sign * c.gain;
       return {
-        source: 'pink', compare: 'none',
+        // A cut on pink noise is hard to localise with no reference, so cut
+        // questions play dry→processed (A/B); boosts are recognisable solo.
+        source: 'pink', compare: gainDb < 0 ? 'ab' : 'none',
         params: { freq, gainDb, q: c.q },
         detail: `${formatHz(freq)} · ${gainDb > 0 ? '+' : ''}${gainDb} dB`,
       };
@@ -316,9 +360,10 @@ export function buildMix(effect: MixEffect, level: number, value: string): MixBu
     }
     case 'reverb-type': {
       const s = REV_TYPE_SETTINGS[value as RevType];
+      const wet = s.wet * cfgAt(REVERB_TYPE_LEVELS, level).wetScale;
       return {
         source: 'loop', compare: 'none',
-        params: { decay: s.decay, preDelay: s.preDelay, wet: s.wet },
+        params: { decay: s.decay, preDelay: s.preDelay, wet },
         detail: `${REV_TYPE_LABEL[value as RevType]} · ${s.decay}s`,
       };
     }
@@ -336,7 +381,7 @@ export function buildMix(effect: MixEffect, level: number, value: string): MixBu
       return { source: 'loop', compare: 'none', params: { pan }, detail: PAN_LABEL[value] };
     }
     case 'width': {
-      const width = WIDTH_VALUE[value as Width];
+      const width = WIDTH_VALUE[value as Width] * cfgAt(WIDTH_LEVELS, level).spread;
       return {
         source: 'loop', compare: 'none',
         params: { width },
@@ -360,11 +405,15 @@ export function buildMix(effect: MixEffect, level: number, value: string): MixBu
       return { source: 'loop', compare: 'ab', params: { db }, detail: `레벨 차이 ${mag} dB` };
     }
     case 'distortion': {
-      const amount = DIST_VALUE[value as DistAmount];
+      const amount = DIST_VALUE[value as DistAmount] * cfgAt(DIST_LEVELS, level).scale;
       return { source: 'loop', compare: 'none', params: { amount }, detail: DIST_LABEL[value as DistAmount] };
     }
     case 'modulation':
-      return { source: 'loop', compare: 'none', params: { modType: value }, detail: MOD_LABEL[value as ModType] };
+      return {
+        source: 'loop', compare: 'none',
+        params: { modType: value, strength: cfgAt(MOD_LEVELS, level).strength },
+        detail: MOD_LABEL[value as ModType],
+      };
   }
 }
 
@@ -431,7 +480,19 @@ export function mixLabel(effect: MixEffect, value: string): string {
 }
 
 // ─── Mode metadata (display order on Home, appended after lab modes) ─────────
-export const MIX_MODE_INFOS = [
+// Effects whose genuine difficulty ladder is shorter than 10 (limited answer
+// sets / perceptual resolution). maxLevel is set to the real ceiling so the
+// setup screen never offers identical "padded" levels above it.
+const MIX_MAX_LEVEL: Partial<Record<ModeKey, number>> = {
+  'mix-compression': 6,
+  'mix-reverb-type': 5,
+  'mix-pan': 5,
+  'mix-width': 6,
+  'mix-distortion': 6,
+  'mix-modulation': 5,
+};
+
+const MIX_MODE_INFOS_BASE = [
   {
     key: 'mix-eq-freq' as ModeKey, name: '주파수 대역 식별', emoji: '🎚️',
     description: '부스트된 주파수 대역을 맞혀보세요',
@@ -517,3 +578,8 @@ export const MIX_MODE_INFOS = [
     maxLevel: 10, defaultLevel: 1,
   },
 ];
+
+export const MIX_MODE_INFOS = MIX_MODE_INFOS_BASE.map((m) => ({
+  ...m,
+  maxLevel: MIX_MAX_LEVEL[m.key] ?? m.maxLevel,
+}));
