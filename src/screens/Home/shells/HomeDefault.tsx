@@ -43,6 +43,18 @@ export function HomeDefault({ data }: { data: HomeData }) {
       </header>
 
       <div className="max-w-lg mx-auto px-5 -mt-6 space-y-5">
+                <a
+          href="#/battle"
+          className="card-hero animate-slide-up flex items-center gap-4 active:scale-[0.99] transition-transform"
+          aria-label="온라인 1대1 대결 시작"
+        >
+          <div className="text-4xl" aria-hidden>⚔️</div>
+          <div className="flex-1">
+            <div className="font-display text-lg font-bold text-primary-900">친구와 1대1 대결</div>
+            <div className="text-sm text-slate-500 mt-0.5">같은 문제로 실시간 청음 대결 · 코드/링크로 초대</div>
+          </div>
+          <span className="text-primary-400 text-xl" aria-hidden>→</span>
+        </a>
         {totalXp > 0 && (
           <button
             type="button"
