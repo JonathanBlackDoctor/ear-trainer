@@ -58,7 +58,7 @@ export const SCALE_DESCENDING_PROB: Record<number, number> = {
   8: 0.4, 9: 0.7, 10: 1,
 };
 
-const SCALE_LABEL: Record<string, string> = {
+export const SCALE_LABEL: Record<string, string> = {
   'major': '장조 (Major)',
   'natural minor': '자연단조',
   'harmonic minor': '화성단조',
@@ -102,7 +102,7 @@ export const CADENCE_LEVELS: Record<number, { types: string[]; keys: string[] }>
   10: { types: CADENCE_ALL, keys: ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'] },
 };
 
-const CADENCE_LABEL: Record<string, string> = {
+export const CADENCE_LABEL: Record<string, string> = {
   authentic: '정격 종지 (V→I)',
   plagal:    '변격 종지 (IV→I)',
   half:      '반종지 (→V)',
@@ -135,7 +135,7 @@ export const INVERSION_LEVELS: Record<number, { inversions: number[]; qualities:
 // 7th-chord qualities — the only ones that have a meaningful 3rd inversion.
 export const INVERSION_SEVENTHS = ['dominant7', 'major7', 'minor7', 'm7b5'];
 
-const INVERSION_LABEL: Record<number, string> = {
+export const INVERSION_LABEL: Record<number, string> = {
   0: '기본 위치',
   1: '1전위',
   2: '2전위',
@@ -393,43 +393,67 @@ export function getExtendedChoices(level: number): ChoiceOption[] {
   }));
 }
 
-// ─── Bass (lowest note) ─────────────────────────────────────────────────────
+// ─── Bass (scale degree of the lowest note, relative to a sounded tonic) ─────
+// Reframed from "name the absolute bass pitch" (which required perfect pitch
+// with no reference) to "which scale degree is the bass" after the tonic is
+// sounded — a relative, trainable bass-line listening skill, distinct from the
+// inversion mode (which asks the chord's position, not the key-relative degree).
 export const LAB_BASS_MODE_INFO = {
   key: 'lab-bass' as ModeKey,
   name: '베이스 식별',
   emoji: '🔊',
-  description: '화음의 최저음을 찾으세요',
-  howTo: '한 화음이 들립니다. 화음에서 가장 낮은 음(베이스)의 음이름을 아래 보기에서 고르세요.',
-  theory: '베이스는 화음에서 가장 낮은 음으로, 화음의 토대이자 무게중심을 잡아 줍니다. 같은 화음이라도 베이스가 근음이 아닌 다른 음이면 자리바꿈(전위)이나 슬래시 코드(예: C/E)가 되어 흐름의 느낌이 달라집니다. 베이스 라인을 따로 들어 내는 능력은 화음의 자리바꿈을 파악하고 곡을 채보하는 데 핵심입니다.',
+  description: '베이스가 조성에서 몇 번째 음인지 맞혀보세요',
+  howTo: '으뜸음(기준음)이 먼저 들리고 이어서 한 화음이 들립니다. 가장 낮은 음(베이스)이 그 조성에서 몇 번째 음(음계 도수)인지 아래 보기에서 고르세요.',
+  theory: '베이스는 화음에서 가장 낮은 음으로, 화음의 토대이자 진행의 무게중심을 잡아 줍니다. 같은 화음이라도 베이스가 근음이 아니면 자리바꿈(전위)이나 슬래시 코드(예: C/E)가 되어 흐름의 느낌이 달라집니다. 으뜸음을 기준으로 베이스가 조성의 몇 번째 음(도수)인지 짚어 내는 것은 베이스 라인을 따라 듣고 곡을 채보하는 데 핵심이 되는 능력입니다.',
   maxLevel: 10,
   defaultLevel: 1,
 };
 
-const NATURAL_NOTES = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
-// Flat spelling matches tonal's Note.fromMidi output (e.g. midi 70 → "Bb4").
-const CHROMATIC_NOTES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+// Diatonic triad / 7th-chord qualities per scale degree (indexed by (deg-1)%7).
+export const BASS_TRIAD_QUALITIES = ['major', 'minor', 'minor', 'major', 'major', 'minor', 'dim'];
+export const BASS_SEVENTH_QUALITIES = ['major7', 'minor7', 'minor7', 'major7', 'dominant7', 'minor7', 'm7b5'];
 
-// Once inversions appear (L2+), the bass can be any chromatic pitch class.
-export function getBassChoices(level: number): ChoiceOption[] {
-  const names = level >= 2 ? CHROMATIC_NOTES : NATURAL_NOTES;
-  return names.map((n) => ({ value: n, label: n }));
+const DEGREE_SOLFEGE = ['', '도', '레', '미', '파', '솔', '라', '시'];
+
+// Bass scale degree (1-7) produced by a diatonic chord rooted on `rootDegree`
+// at the given inversion: inv0→root, inv1→3rd (+2 steps), inv2→5th (+4),
+// inv3→7th (+6), wrapped within the 7-degree scale.
+export function bassDegreeOf(rootDegree: number, inversion: number): number {
+  return ((rootDegree - 1 + 2 * inversion) % 7) + 1;
 }
 
-const BASS_7THS = ['major', 'minor', 'dominant7', 'major7', 'minor7'];
-const BASS_ALL = [...BASS_7THS, 'dim', 'aug'];
-
-export const BASS_LEVELS: Record<number, { roots: string[]; qualities: string[]; inversions: number[] }> = {
-  1:  { roots: NATURAL_NOTES, qualities: ['major', 'minor'], inversions: [0] },
-  2:  { roots: NATURAL_NOTES, qualities: ['major', 'minor'], inversions: [0, 1] },
-  3:  { roots: NATURAL_NOTES, qualities: ['major', 'minor'], inversions: [0, 1, 2] },
-  4:  { roots: NATURAL_NOTES, qualities: ['major', 'minor', 'dominant7'], inversions: [0, 1, 2] },
-  5:  { roots: CHROMATIC_NOTES, qualities: ['major', 'minor', 'dominant7'], inversions: [0, 1, 2] },
-  6:  { roots: CHROMATIC_NOTES, qualities: BASS_7THS, inversions: [0, 1, 2] },
-  7:  { roots: CHROMATIC_NOTES, qualities: BASS_7THS, inversions: [0, 1, 2, 3] },
-  8:  { roots: CHROMATIC_NOTES, qualities: BASS_ALL, inversions: [0, 1, 2, 3] },
-  9:  { roots: CHROMATIC_NOTES, qualities: BASS_ALL, inversions: [0, 1, 2, 3] },
-  10: { roots: CHROMATIC_NOTES, qualities: BASS_ALL, inversions: [0, 1, 2, 3] },
+// Difficulty grows by: number of chord degrees, inversions allowed (more bass
+// positions), then key randomisation, then 7th chords (which add the 7th in the
+// bass at inv3). `sevenths:true` levels are the only ones that include inv 3.
+export const BASS_LEVELS: Record<number, { rootDegrees: number[]; inversions: number[]; sevenths: boolean; randomKey: boolean }> = {
+  1:  { rootDegrees: [1, 4, 5],             inversions: [0],          sevenths: false, randomKey: false },
+  2:  { rootDegrees: [1, 4, 5, 6],          inversions: [0],          sevenths: false, randomKey: false },
+  3:  { rootDegrees: [1, 2, 4, 5, 6],       inversions: [0, 1],       sevenths: false, randomKey: false },
+  4:  { rootDegrees: [1, 2, 3, 4, 5, 6, 7], inversions: [0, 1],       sevenths: false, randomKey: false },
+  5:  { rootDegrees: [1, 2, 3, 4, 5, 6, 7], inversions: [0, 1, 2],    sevenths: false, randomKey: false },
+  6:  { rootDegrees: [1, 2, 3, 4, 5, 6, 7], inversions: [0, 1, 2],    sevenths: false, randomKey: true  },
+  7:  { rootDegrees: [1, 4, 5],             inversions: [0, 1, 2, 3], sevenths: true,  randomKey: true  },
+  8:  { rootDegrees: [1, 2, 4, 5, 6],       inversions: [0, 1, 2, 3], sevenths: true,  randomKey: true  },
+  9:  { rootDegrees: [1, 2, 3, 4, 5, 6, 7], inversions: [0, 1, 2, 3], sevenths: true,  randomKey: true  },
+  10: { rootDegrees: [1, 2, 3, 4, 5, 6, 7], inversions: [0, 1, 2, 3], sevenths: true,  randomKey: true  },
 };
+
+/** Unique bass scale degrees reachable at a level (sorted) — the answer pool. */
+export function bassDegreesForLevel(level: number): number[] {
+  const cfg = BASS_LEVELS[level] ?? BASS_LEVELS[1];
+  const set = new Set<number>();
+  for (const d of cfg.rootDegrees)
+    for (const inv of cfg.inversions)
+      set.add(bassDegreeOf(d, inv));
+  return [...set].sort((a, b) => a - b);
+}
+
+export function getBassChoices(level: number): ChoiceOption[] {
+  return bassDegreesForLevel(level).map((d) => ({
+    value: `${d}도`,
+    label: `${d}도 (${DEGREE_SOLFEGE[d]})`,
+  }));
+}
 
 // ─── Tension Notes ──────────────────────────────────────────────────────────
 export const LAB_TENSION_MODE_INFO = {
@@ -620,18 +644,20 @@ export const LAB_MICROTUNING_MODE_INFO = {
   name: '정밀 조율',
   emoji: '🔬',
   description: '센트 단위 음정 어긋남을 판별하세요',
-  howTo: '정확히 맞는 두 음(기준)이 먼저 울리고, 같은 음정이 다시 울립니다. 두 번째에서 위 음이 몇 센트 어긋났는지(맥놀이로 판별) 아래 보기에서 고르세요.',
-  theory: '두 음을 함께 울리면 주파수 차이에 따라 음량이 주기적으로 흔들리는 맥놀이(beating)가 생깁니다. 음정이 정확할수록 맥놀이가 사라지고, 어긋날수록 빨라집니다. 한 반음의 1/100인 센트(cent) 단위의 미세한 차이를 맥놀이로 가려내는 것은 합주·조율의 가장 전문적인 청각 기술입니다.',
+  howTo: '정확히 맞는 두 음(기준)이 먼저 울리고, 같은 음정이 다시 울립니다. 두 번째에서 위 음이 얼마나 어긋났는지(맥놀이 속도로 판별) 그 정도를 아래 보기에서 고르세요. 방향(높낮이)이 아니라 어긋난 "양"을 맞히는 훈련입니다.',
+  theory: '두 음을 함께 울리면 주파수 차이에 따라 음량이 주기적으로 흔들리는 맥놀이(beating)가 생깁니다. 음정이 정확할수록 맥놀이가 사라지고, 어긋날수록 빨라집니다. 맥놀이 속도는 어긋난 "정도"를 알려 줄 뿐 높았는지 낮았는지 방향은 구분해 주지 않으므로, 이 훈련은 어긋난 양(센트)을 가려내는 데 집중합니다. 한 반음의 1/100인 센트(cent) 단위를 맥놀이로 분별하는 것은 합주·조율의 가장 전문적인 청각 기술입니다.',
   maxLevel: 10,
   defaultLevel: 1,
 };
 
+// Answers are detune *magnitudes* (cents), not signed values: the beat-rate cue
+// is symmetric in sign, so only "how far off" is answerable.
 export function centsCode(cents: number): string {
-  return cents > 0 ? `+${cents}` : String(cents);
+  return String(Math.abs(cents));
 }
 export function centsLabel(cents: number): string {
-  if (cents === 0) return '정확 (0¢)';
-  return cents > 0 ? `+${cents}¢ (높음)` : `${cents}¢ (낮음)`;
+  const c = Math.abs(cents);
+  return c === 0 ? '정확 (0¢)' : `±${c}¢ 어긋남`;
 }
 
 interface MicroInterval { name: string; semitones: number }
@@ -639,17 +665,19 @@ const MICRO_OCTAVE: MicroInterval[] = [{ name: 'P8', semitones: 12 }];
 const MICRO_OCT_5: MicroInterval[] = [{ name: 'P8', semitones: 12 }, { name: 'P5', semitones: 7 }];
 const MICRO_OCT_5_3: MicroInterval[] = [...MICRO_OCT_5, { name: 'M3', semitones: 4 }, { name: 'M6', semitones: 9 }];
 
+// Magnitude-only pools (no sign). Adjacent magnitudes get closer at higher
+// levels so "how far off" gets subtler to judge.
 export const MICROTUNING_LEVELS: Record<number, { cents: number[]; intervals: MicroInterval[] }> = {
-  1:  { cents: [0, 20, -20],            intervals: MICRO_OCTAVE },
-  2:  { cents: [0, 20, -20, 10, -10],   intervals: MICRO_OCTAVE },
-  3:  { cents: [0, 15, -15, 8, -8],     intervals: MICRO_OCT_5 },
-  4:  { cents: [0, 12, -12, 6, -6],     intervals: MICRO_OCT_5 },
-  5:  { cents: [0, 10, -10, 5, -5],     intervals: MICRO_OCT_5 },
-  6:  { cents: [0, 8, -8, 4, -4],       intervals: MICRO_OCT_5_3 },
-  7:  { cents: [0, 7, -7, 4, -4],       intervals: MICRO_OCT_5_3 },
-  8:  { cents: [0, 6, -6, 3, -3],       intervals: MICRO_OCT_5_3 },
-  9:  { cents: [0, 5, -5, 3, -3],       intervals: MICRO_OCT_5_3 },
-  10: { cents: [0, 4, -4, 2, -2],       intervals: MICRO_OCT_5_3 },
+  1:  { cents: [0, 20],          intervals: MICRO_OCTAVE },
+  2:  { cents: [0, 10, 20],      intervals: MICRO_OCTAVE },
+  3:  { cents: [0, 8, 15],       intervals: MICRO_OCT_5 },
+  4:  { cents: [0, 6, 12],       intervals: MICRO_OCT_5 },
+  5:  { cents: [0, 5, 10],       intervals: MICRO_OCT_5 },
+  6:  { cents: [0, 4, 8],        intervals: MICRO_OCT_5_3 },
+  7:  { cents: [0, 4, 7, 10],    intervals: MICRO_OCT_5_3 },
+  8:  { cents: [0, 3, 6, 9],     intervals: MICRO_OCT_5_3 },
+  9:  { cents: [0, 3, 5, 8],     intervals: MICRO_OCT_5_3 },
+  10: { cents: [0, 2, 4, 6],     intervals: MICRO_OCT_5_3 },
 };
 
 export function getMicrotuningChoices(level: number): ChoiceOption[] {
@@ -740,7 +768,7 @@ export function getLabLevelLabel(modeKey: ModeKey, level: number): string {
     }
     case 'lab-bass': {
       const c = BASS_LEVELS[level] ?? BASS_LEVELS[1];
-      return `${c.roots.length === 7 ? '자연음' : '반음계'} · 화음 ${c.qualities.length}종 · ${invLabel(Math.max(...c.inversions))}`;
+      return `베이스 ${bassDegreesForLevel(level).length}택 · ${invLabel(Math.max(...c.inversions))}${c.sevenths ? ' · 7화음' : ''}${c.randomKey ? ' · 랜덤 키' : ''}`;
     }
     case 'lab-tension': {
       const c = TENSION_LEVELS[level] ?? TENSION_LEVELS[1];

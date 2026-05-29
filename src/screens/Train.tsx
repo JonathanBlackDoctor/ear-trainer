@@ -57,7 +57,8 @@ import {
 import type { ChordStep } from '../types';
 import { Note } from 'tonal';
 import { semitoneToSolfege } from '../theory/solfege';
-import { topWeakItems, weakFocusLevel } from '../engine/weakness';
+import { topWeakItems, weakFocusLevel, suggestLevel } from '../engine/weakness';
+import { toast } from '../store/useToast';
 
 const MODE_INFO = MODE_REGISTRY;
 
@@ -122,6 +123,9 @@ export function Train() {
   const [audioQuality, setAudioQuality] = useState<AudioQuality>('synth');
   const [solfegeInputMethod, setSolfegeInputMethod] = useState<'choice' | 'piano'>('choice');
   const [stackInputMethod, setStackInputMethod] = useState<'choice' | 'piano'>('choice');
+  // Playback speed is owned here (not inside PlaybackControls) so the choice
+  // persists across questions and applies to the next question's auto-play too.
+  const [playbackSpeed, setPlaybackSpeed] = useState<1 | 0.5>(1);
 
   const modeKey = mode as ModeKey;
   const modeInfo: ModeInfo = MODE_INFO[modeKey] ?? {
@@ -191,8 +195,12 @@ export function Train() {
   // Snapshot of weak-item accuracy taken at the start of a weak-focus session,
   // so the Result screen can show before→after improvement on what was drilled.
   const weakSnapshotRef = useRef<Record<string, { attempts: number; correct: number }>>({});
+  // 'perSession' reference tone fires once at the start of a session; this
+  // tracks whether it has already played.
+  const sessionRefPlayedRef = useRef(false);
 
   function beginSession() {
+    sessionRefPlayedRef.current = false;
     if (isWeakSession && weakItemKeys) {
       const ms = useStore.getState().stats[modeKey] ?? {};
       const snap: Record<string, { attempts: number; correct: number }> = {};
@@ -233,7 +241,7 @@ export function Train() {
     setBpmSliderValue(100);
     setPlaybackStage(null);
     setFeedbackResult(null);
-    setTimeout(() => playQuestion(q), 100);
+    setTimeout(() => playQuestion(q, playbackSpeed), 100);
   }
 
   function generateQuestion(idx: number): Question {
@@ -309,13 +317,15 @@ export function Train() {
       // Transpose mode handles its own reference tones inline (it sounds both
       // the source and target key tonics around the melody), so the generic
       // pre-roll is skipped for it.
-      if (
+      const wantReference =
         includeReference &&
         q.mode !== 'transpose' &&
         !q.context?.absoluteMode &&
-        settings.referenceTone === 'perQuestion' &&
-        q.context?.referenceToneNote
-      ) {
+        !!q.context?.referenceToneNote &&
+        (settings.referenceTone === 'perQuestion' ||
+          (settings.referenceTone === 'perSession' && !sessionRefPlayedRef.current));
+      if (wantReference && q.context?.referenceToneNote) {
+        sessionRefPlayedRef.current = true;
         if (q.mode === 'progression') setPlaybackStage('reference');
         await playReferenceTone(q.context.referenceToneNote, '2n');
         if (gen !== getPlaybackGen()) return;
@@ -435,7 +445,9 @@ export function Train() {
       }
       case 'tuning': {
         const d = data as TuningData;
-        await playReferenceTone(d.note, '2n');
+        // Reference and test note share the same instrument so the comparison
+        // isn't confounded by timbre — only pitch differs.
+        await playNote(d.note, '2n', 0);
         await delay(650 / speed);
         if (gen !== getPlaybackGen()) return;
         await playNote(d.note, '2n', d.cents);
@@ -460,6 +472,12 @@ export function Train() {
       }
       case 'note-stack': {
         const d = data as NoteStackData;
+        // Sound the lowest note alone first as a pitch anchor, then the full
+        // stack — so analysis/reconstruction is relative to the bass rather
+        // than requiring absolute pitch.
+        await playNote(d.notes[0], '4n');
+        await delay(450 / speed);
+        if (gen !== getPlaybackGen()) return;
         await playChord(d.notes, '2n');
         break;
       }
@@ -530,12 +548,23 @@ export function Train() {
   }
 
   // ─── Answer Submission ───────────────────────────────────────────────────
+  // Let the user respond the instant they recognise the answer — cut any
+  // in-flight question audio instead of forcing them to wait playback out.
+  function interruptPlayback() {
+    stopAllAudio();
+    setLoading(false);
+  }
+
   function handleChoiceSelect(value: string) {
+    interruptPlayback();
     setSelectedAnswer(value);
     submitAnswer(value);
   }
 
   function handlePianoNote(note: string) {
+    // NB: do NOT stop audio here — the Piano has already sounded the pressed
+    // note by the time this fires, and stopAllAudio() would cut it off. Any
+    // overlap with the (now-redundant) question audio is brief and harmless.
     if (modeKey === 'solfege') {
       const q = currentQuestion;
       if (!q) return;
@@ -570,12 +599,22 @@ export function Train() {
   }
 
   function handleProgressionSelect(degree: number, quality: string) {
+    interruptPlayback();
     const expected = (currentQuestion?.data as ProgressionData)?.chords ?? [];
     const next = [...progressionInput, { degree, quality }];
     setProgressionInput(next);
     if (next.length >= expected.length) {
       submitAnswer(next);
     }
+  }
+
+  // Undo just the last entered note/chord (vs. the full reset) so a single
+  // slip near the end of a long sequence doesn't force re-entering everything.
+  function undoLastPiano() {
+    setPianoInput((prev) => prev.slice(0, -1));
+  }
+  function undoLastProgression() {
+    setProgressionInput((prev) => prev.slice(0, -1));
   }
 
   function handleRhythmTap() {
@@ -611,6 +650,7 @@ export function Train() {
   }
 
   function handleBpmSubmit(value: number) {
+    interruptPlayback();
     submitAnswer(value);
   }
 
@@ -747,6 +787,19 @@ export function Train() {
       weakFocus = items.length > 0 ? items : undefined;
     }
 
+    // Adaptive difficulty: nudge the next session's level from recent accuracy
+    // (only in adaptive mode, and never during weak-focus drills). The level is
+    // persisted to settings so the next session opens there; a toast explains.
+    if (settings.difficultyMode === 'adaptive' && !isWeakSession) {
+      const ms = useStore.getState().stats[modeKey] ?? {};
+      const suggested = suggestLevel(ms, level, modeInfo.maxLevel ?? MAX_LEVEL);
+      if (suggested !== level) {
+        updateSettings({ levelByMode: { ...settings.levelByMode, [modeKey]: suggested } });
+        if (suggested > level) toast.success(`📈 정확도가 높아요 — 다음엔 Lv${suggested}에 도전!`, 3500);
+        else toast.info(`📉 Lv${suggested}에서 한 번 더 다져볼게요`, 3500);
+      }
+    }
+
     navigate('/result', {
       state: {
         mode: modeKey,
@@ -860,7 +913,19 @@ export function Train() {
             onPlayReference={handlePlayReference}
             showReference={!isAbsolute && settings.referenceTone !== 'off' && !!currentQuestion?.context?.referenceToneNote}
             loading={loading}
+            speed={playbackSpeed}
+            onToggleSpeed={() => setPlaybackSpeed((s) => (s === 1 ? 0.5 : 1))}
+            onStop={interruptPlayback}
           />
+
+          {/* While the stimulus is playing, recognition modes can be answered
+              immediately — make that discoverable. Timing modes (rhythm/tempo)
+              must wait for playback, so no hint there. */}
+          {loading && phase !== 'feedback' && !isRhythm && !isTempo && (
+            <div className="text-center text-xs text-slate-400">
+              🔊 재생 중 · 답을 알면 기다리지 않고 바로 선택해도 됩니다
+            </div>
+          )}
 
           {/* Key badge (transpose shows its own from→to badge in the input area) */}
           {currentQuestion.context.key && !isInterval && !isTranspose && !isAbsolute && (
@@ -1008,12 +1073,14 @@ export function Train() {
               {/* Choice-based modes */}
               {showChoiceGrid && (
                 <ChoiceGrid
+                  key={currentQuestion.id}
                   options={getChoiceOptions(modeKey, level)}
                   selected={selectedAnswer ?? undefined}
                   answered={false}
                   onSelect={handleChoiceSelect}
                   columns={choiceColumns}
-                  disabled={loading}
+                  disabled={false}
+                  requireConfirm={!!settings.tapToConfirm}
                 />
               )}
 
@@ -1033,11 +1100,12 @@ export function Train() {
                         ))}
                       </div>
                     )}
-                    <Piano onNotePress={handlePianoNote} highlightNotes={pianoInput} disabled={loading} />
+                    <Piano {...octaveRangeOf(nd.notes)} onNotePress={handlePianoNote} highlightNotes={pianoInput} disabled={false} />
                     {pianoInput.length > 0 && (
-                      <button className="btn-ghost text-sm text-slate-400" onClick={() => setPianoInput([])}>
-                        ← 다시 입력
-                      </button>
+                      <div className="flex justify-center gap-2">
+                        <button className="btn-ghost text-sm text-slate-500" onClick={undoLastPiano}>← 한 개 지우기</button>
+                        <button className="btn-ghost text-sm text-slate-400" onClick={() => setPianoInput([])}>전체 지우기</button>
+                      </div>
                     )}
                   </>
                 );
@@ -1065,14 +1133,16 @@ export function Train() {
                       </div>
                     )}
                     <Piano
+                      {...octaveRangeOf(td.toNotes)}
                       onNotePress={handlePianoNote}
                       highlightNotes={pianoInput}
-                      disabled={loading}
+                      disabled={false}
                     />
                     {pianoInput.length > 0 && (
-                      <button className="btn-ghost text-sm text-slate-400" onClick={() => setPianoInput([])}>
-                        ← 다시 입력
-                      </button>
+                      <div className="flex justify-center gap-2">
+                        <button className="btn-ghost text-sm text-slate-500" onClick={undoLastPiano}>← 한 개 지우기</button>
+                        <button className="btn-ghost text-sm text-slate-400" onClick={() => setPianoInput([])}>전체 지우기</button>
+                      </div>
                     )}
                   </>
                 );
@@ -1087,7 +1157,7 @@ export function Train() {
                   <Piano
                     onNotePress={handlePianoNote}
                     highlightNotes={pianoInput}
-                    disabled={loading}
+                    disabled={false}
                   />
                 </>
               )}
@@ -1107,17 +1177,16 @@ export function Train() {
                     </div>
                   )}
                   <Piano
+                    {...octaveRangeOf((currentQuestion.data as MelodyData).notes)}
                     onNotePress={handlePianoNote}
                     highlightNotes={pianoInput}
-                    disabled={loading}
+                    disabled={false}
                   />
                   {pianoInput.length > 0 && (
-                    <button
-                      className="btn-ghost text-sm text-slate-400"
-                      onClick={() => setPianoInput([])}
-                    >
-                      ← 다시 입력
-                    </button>
+                    <div className="flex justify-center gap-2">
+                      <button className="btn-ghost text-sm text-slate-500" onClick={undoLastPiano}>← 한 개 지우기</button>
+                      <button className="btn-ghost text-sm text-slate-400" onClick={() => setPianoInput([])}>전체 지우기</button>
+                    </div>
                   )}
                 </>
               )}
@@ -1141,12 +1210,13 @@ export function Train() {
                   <ProgressionInput
                     notation={settings.notation}
                     onSelect={handleProgressionSelect}
-                    disabled={loading}
+                    disabled={false}
                   />
                   {progressionInput.length > 0 && (
-                    <button className="btn-ghost text-sm text-slate-400" onClick={() => setProgressionInput([])}>
-                      ← 다시 입력
-                    </button>
+                    <div className="flex justify-center gap-2">
+                      <button className="btn-ghost text-sm text-slate-500" onClick={undoLastProgression}>← 한 개 지우기</button>
+                      <button className="btn-ghost text-sm text-slate-400" onClick={() => setProgressionInput([])}>전체 지우기</button>
+                    </div>
                   )}
                 </>
               )}
@@ -1276,6 +1346,7 @@ export function Train() {
                 <div className="space-y-2">
                   <div className="text-xs text-slate-500 text-center">정답 (동시에 울린 음)</div>
                   <Piano
+                    {...octaveRangeOf((currentQuestion.data as NoteStackData).notes)}
                     highlightNotes={[]}
                     correctNotes={(currentQuestion.data as NoteStackData).notes}
                     wrongNotes={pianoInput.filter((n) => {
@@ -1294,6 +1365,7 @@ export function Train() {
                     정답 ({(currentQuestion.data as TransposeData).toKey}장조)
                   </div>
                   <Piano
+                    {...octaveRangeOf(feedbackResult.correctAnswer as string[])}
                     highlightNotes={feedbackResult.correctAnswer as string[]}
                     correctNotes={feedbackResult.correctAnswer as string[]}
                     wrongNotes={pianoInput.filter((n) =>
@@ -1327,6 +1399,7 @@ export function Train() {
                 <div className="space-y-2">
                   <div className="text-xs text-slate-500 text-center">정답</div>
                   <Piano
+                    {...octaveRangeOf(feedbackResult.correctAnswer as string[])}
                     highlightNotes={feedbackResult.correctAnswer as string[]}
                     correctNotes={feedbackResult.correctAnswer as string[]}
                     wrongNotes={pianoInput.filter((n) => {
@@ -1380,6 +1453,16 @@ export function Train() {
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
+// Octave span (floored to 3–5) that covers every given note, so the input and
+// feedback keyboards always show the notes a question can use — a high-register
+// melody (e.g. Lv10 in G) reaches octave 6/7 and must remain reachable.
+function octaveRangeOf(notes: string[]): { startOctave: number; endOctave: number } {
+  const octs = notes
+    .map((n) => Note.octave(n))
+    .filter((o): o is number => typeof o === 'number');
+  return { startOctave: Math.min(3, ...octs), endOctave: Math.max(5, ...octs) };
+}
+
 function getChoiceOptions(mode: ModeKey, level: number): ChoiceOption[] {
   if (mode === 'interval') return getIntervalChoices(level);
   if (mode === 'chord') return getChordChoices(level);

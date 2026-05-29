@@ -892,12 +892,14 @@ function buildMixChain(d: MixData): MixChain {
     }
     case 'modulation': {
       const t = p.modType;
+      // `strength` (1 by default) scales depth/wet so higher levels are subtler.
+      const s = Number(p.strength ?? 1);
       if (t === 'chorus') {
-        head = registerMix(new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0.7, wet: 0.7 }).start());
+        head = registerMix(new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0.7 * s, wet: 0.7 * s }).start());
       } else if (t === 'phaser') {
-        head = registerMix(new Tone.Phaser({ frequency: 0.6, octaves: 3, baseFrequency: 400, wet: 0.9 }));
+        head = registerMix(new Tone.Phaser({ frequency: 0.6, octaves: 3, baseFrequency: 400, wet: 0.9 * s }));
       } else {
-        head = registerMix(new Tone.Tremolo({ frequency: 5, depth: 0.85, wet: 0.9 }).start());
+        head = registerMix(new Tone.Tremolo({ frequency: 5, depth: 0.85 * s, wet: 0.9 * s }).start());
       }
       break;
     }

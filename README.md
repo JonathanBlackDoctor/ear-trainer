@@ -53,7 +53,8 @@ npm run build
 ## 온라인 1대1 대결 (Supabase 설정)
 
 두 사람이 **같은 문제 시퀀스**를 받아 실시간으로 정확도·속도를 겨루는 기능입니다.
-호스트가 "방 만들기"로 6자리 코드를 만들어 공유하면, 상대가 "코드로 입장"해 대결합니다.
+홈 화면의 **"친구와 1대1 대결"** 카드 또는 `#/battle` 경로로 진입하며,
+호스트가 "방 만들기"로 6자리 코드를 만들어 공유하면 상대가 "코드로 입장"해 대결합니다.
 
 ### 동작 방식 (백엔드 없이도 동작)
 
@@ -67,9 +68,9 @@ npm run build
 
 1. [supabase.com](https://supabase.com)에서 무료 프로젝트를 생성합니다.
 2. 프로젝트 대시보드 → **Settings → API**에서 다음 두 값을 복사합니다.
-   - **Project URL** → `VITE_SUPABASE_URL`
+   - **Project URL** → `VITE_SUPABASE_URL` (`https://<project-ref>.supabase.co`)
    - **Project API keys**의 **anon / public** 키 → `VITE_SUPABASE_ANON_KEY`
-   - ⚠️ `service_role` 키는 사용하지 마세요(서버 전용·비공개). `anon` 키는 브라우저 노출이 설계상 안전합니다.
+   - ⚠️ `service_role` 키는 사용하지 마세요(서버 전용·비공개). `anon`(public) 키는 원래 브라우저에 노출되도록 설계된 공개 키라 클라이언트 번들에 포함되어도 안전합니다.
 3. **로컬 개발:** `.env.example`을 복사해 `.env`(또는 `.env.local`)를 만들고 두 값을 채웁니다.
    ```bash
    cp .env.example .env
@@ -78,7 +79,7 @@ npm run build
    ```
    (`.env`, `.env.local`은 `.gitignore`에 있어 커밋되지 않습니다.)
 4. **Vercel 배포:** 프로젝트 → **Settings → Environment Variables**에 같은 두 변수를 추가하고 재배포합니다.
-5. **GitHub Pages 빌드를 쓰는 경우:** 저장소 → **Settings → Secrets and variables → Actions**에 두 값을 추가하고, 빌드 워크플로의 `env`로 전달합니다.
+5. **GitHub Pages 배포:** 저장소 → **Settings → Secrets and variables → Actions**에 두 값을 시크릿으로 추가하면 배포 워크플로(`.github/workflows/deploy.yml`)가 빌드 시 주입합니다.
 
 ### 추가 Supabase 설정이 필요한가요?
 
@@ -104,11 +105,11 @@ npm run build
 | 오디오 | Tone.js + Salamander Grand Piano 샘플 |
 | 음악 이론 | tonal |
 | 악보 | VexFlow |
+| 실시간 대결 | Supabase Realtime (Broadcast/Presence), BroadcastChannel 폴백 |
 | 상태 관리 | Zustand (localStorage persist) |
 | 라우팅 | React Router v6 |
 | 차트 | Recharts |
-| 실시간 대결 | Supabase Realtime (Broadcast/Presence), BroadcastChannel 폴백 |
 
 ## 데이터 저장
 
-모든 학습 기록은 브라우저의 **localStorage**에 JSON으로 저장됩니다. 서버 없이 작동하며, 설정 > 기록 관리에서 JSON으로 내보내기/가져오기가 가능합니다.
+모든 학습 기록은 브라우저의 **localStorage**에 JSON으로 저장됩니다. 서버 없이 작동하며, 설정 > 기록 관리에서 JSON으로 내보내기/가져오기가 가능합니다. 온라인 대결의 실시간 통신에만 Supabase를 사용하고, 학습 기록은 여전히 로컬에만 저장됩니다.

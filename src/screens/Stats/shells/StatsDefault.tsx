@@ -1,6 +1,7 @@
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import type { StatsData } from '../useStatsData';
+import { formatItemKey } from '../../../modes/itemLabels';
 
 export function StatsDefault({ data }: { data: StatsData }) {
   const { overallPct, totalSessions, totalQ, trend, modeAccuracy, weakItems, goHome, startWeakFocus } = data;
@@ -77,7 +78,7 @@ export function StatsDefault({ data }: { data: StatsData }) {
                   <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-700 text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-700 truncate">{w.key}</span>
+                      <span className="text-sm text-slate-700 truncate">{formatItemKey(w.modeKey, w.key)}</span>
                       <span className="text-xs text-slate-400 ml-2">{w.modeLabel}</span>
                     </div>
                     <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1">

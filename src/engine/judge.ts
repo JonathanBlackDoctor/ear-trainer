@@ -1,10 +1,10 @@
-import { Note, Interval } from 'tonal';
+import { Note } from 'tonal';
 import type {
   Question, AnswerValue, ProgressionAnswer,
   IntervalData, ChordData, SolfegeData, MelodyData, MixData, MixEffect,
   NoteStackData,
 } from '../types';
-import { intervalLabel } from '../theory/intervals';
+import { intervalLabel, intervalSemitones } from '../theory/intervals';
 
 export interface TempoJudgeDetails {
   kind: 'tempo';
@@ -177,9 +177,10 @@ export function judge(question: Question, userAnswer: AnswerValue): JudgeResult 
       const ca = correct as string;
       const isCorrect = ua === ca;
       const data = question.data as IntervalData;
-      // Semitone counts via tonal; fall back to 0 if unrecognized.
-      const ucSem = Interval.semitones(ua) ?? 0;
-      const ccSem = Interval.semitones(ca) ?? 0;
+      // Semitone counts from the local interval table (robust for compound
+      // names like "A4"/"M13"/"P15" that tonal's parser can mishandle).
+      const ucSem = intervalSemitones(ua);
+      const ccSem = intervalSemitones(ca);
       const details: IntervalJudgeDetails = {
         kind: 'interval',
         userName: ua,

@@ -48,6 +48,7 @@ const defaultSettings: AppSettings = {
   difficultyMode: 'adaptive',
   questionsPerSession: 10,
   showStaffFeedback: true,
+  tapToConfirm: false,
   weakSessionLength: 10,
   levelByMode: {},
   reducedMotion: 'system',
@@ -101,6 +102,10 @@ export const useStore = create<Store>()(
       },
 
       recordResult: (result, comboAtAnswer) => {
+        // A skip is a non-event for progress: it must not dent per-item
+        // accuracy, SRS scheduling, weakness scores, or lifetime answer counts.
+        // (The session result list still records it for the result screen.)
+        if (result.skipped) return [];
         let unlockedIds: string[] = [];
         set((s) => {
           // ── Stats update (rolling 8-window) ────────────────────────────────

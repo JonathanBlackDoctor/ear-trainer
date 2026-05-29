@@ -89,6 +89,15 @@ export function intervalLabel(name: string): string {
   return INTERVAL_NAMES.find((i) => i.name === name)?.label ?? name;
 }
 
+/**
+ * Semitone count for an interval short-name, read from the local table. Used by
+ * the judge for the feedback delta — more robust than tonal's parser for the
+ * compound names we use (e.g. "A4", "M13", "P15").
+ */
+export function intervalSemitones(name: string): number {
+  return INTERVAL_NAMES.find((i) => i.name === name)?.semitones ?? 0;
+}
+
 /** Safe note frequency range check */
 export function noteInRange(note: string, low = 'A2', high = 'C6'): boolean {
   const midi = Note.midi(note);
