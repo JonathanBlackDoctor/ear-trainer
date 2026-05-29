@@ -90,7 +90,7 @@ export function BattleProvider() {
     } else if (phase === 'lobby' || phase === 'connecting') {
       navigate(`/battle/room/${roomId}/lobby`, { replace: true });
     }
-  }, [phase, roomId]);
+  }, [phase, roomId, navigate]);
 
   // ─── Countdown → first question ──────────────────────────────────────────────
   const startAt = useBattleStore((s) => s.startAt);
@@ -113,7 +113,6 @@ export function BattleProvider() {
     playBattleQuestion(q, true).catch(() => {});
     addTimer(() => timeoutAnswer(), cfg.perQuestionMs);
     return () => clearTimers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, index]);
 
   // ─── Feedback → advance / finish ─────────────────────────────────────────────
@@ -121,7 +120,6 @@ export function BattleProvider() {
     if (phase !== 'feedback') return;
     addTimer(() => advanceOrFinish(), FEEDBACK_MS);
     return () => clearTimers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, index]);
 
   // ─── Rematch: host restarts once everyone has voted ──────────────────────────
