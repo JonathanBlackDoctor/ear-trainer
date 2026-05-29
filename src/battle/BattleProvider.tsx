@@ -77,7 +77,6 @@ export function BattleProvider() {
       connectedRef.current = false;
       useBattleStore.getState().reset();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);
 
   // ─── Phase-driven navigation ─────────────────────────────────────────────────
@@ -91,7 +90,6 @@ export function BattleProvider() {
     } else if (phase === 'lobby' || phase === 'connecting') {
       navigate(`/battle/room/${roomId}/lobby`, { replace: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, roomId]);
 
   // ─── Countdown → first question ──────────────────────────────────────────────
@@ -133,7 +131,6 @@ export function BattleProvider() {
     if (s.phase !== 'results' || !s.isHost() || !s.config) return;
     const everyone = s.roster.length >= 2 && s.roster.every((p) => rematchVotes[p.id]);
     if (everyone) startBattle(s.config);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rematchVotes, phase]);
 
   // ─── Actions ─────────────────────────────────────────────────────────────────
