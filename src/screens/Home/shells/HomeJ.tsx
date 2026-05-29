@@ -9,7 +9,7 @@ const TRACK_COLORS = [J.pink, J.teal, J.yellow];
 export function HomeJ({ data }: { data: HomeData }) {
   const {
     rank, totalXp, overallPct, totalSessions, totalQuestions,
-    modes, startMode, goStats, goSettings, goBadges,
+    modes, startMode, goStats, goSettings, goBadges, goBattle,
   } = data;
   const tnum: React.CSSProperties = { fontVariantNumeric: 'tabular-nums' };
 
@@ -27,6 +27,22 @@ export function HomeJ({ data }: { data: HomeData }) {
           음감 훈련<span style={{ color: J.pink }}>♪</span>
         </div>
         <div style={{ marginTop: 6, fontSize: 12, color: J.inkSoft, fontWeight: 700 }}>듣고 · 맞히고 · 다시 감기</div>
+      </div>
+
+      {/* 1대1 대결 */}
+      <div style={{ padding: '0 20px 16px' }}>
+        <button
+          onClick={goBattle}
+          aria-label="온라인 1대1 대결 시작"
+          style={{ ...tnum, width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: J.pink, border: `2.5px solid ${J.ink}`, boxShadow: `4px 4px 0 ${J.ink}`, color: '#fff', textAlign: 'left' }}
+        >
+          <div style={{ width: 40, height: 40, background: J.yellow, border: `2px solid ${J.ink}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }} aria-hidden>⚔️</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 16, fontWeight: 900, letterSpacing: '-0.01em' }}>친구와 1대1 대결</div>
+            <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.85, marginTop: 2 }}>같은 문제로 실시간 청음 대결</div>
+          </div>
+          <div style={{ fontSize: 18, fontWeight: 900 }} aria-hidden>►►</div>
+        </button>
       </div>
 
       {/* cassette body rank card */}

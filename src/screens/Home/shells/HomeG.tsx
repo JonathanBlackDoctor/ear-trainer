@@ -9,7 +9,7 @@ const CANDY = [G.mint, G.sky, G.lavender, G.pink, G.mustard, G.orange];
 export function HomeG({ data }: { data: HomeData }) {
   const {
     rank, totalXp, overallPct, totalSessions, totalQuestions,
-    modes, weakItems, startMode, startWeakSession, goStats, goSettings, goBadges,
+    modes, weakItems, startMode, startWeakSession, goStats, goSettings, goBadges, goBattle,
   } = data;
   const hasData = totalSessions > 0;
 
@@ -34,6 +34,20 @@ export function HomeG({ data }: { data: HomeData }) {
           </span>
         </div>
         <div style={{ marginTop: 8, fontSize: 12, color: G.inkSoft, fontWeight: 700 }}>매일 5분, 듣고 맞히고 약점 깨부수기.</div>
+      </div>
+
+      {/* 1대1 대결 */}
+      <div style={{ padding: '0 20px 4px' }}>
+        <GBlock bg={G.sky} sh={G.shadow} style={{ padding: 14, cursor: 'pointer' }} onClick={goBattle} role="button" aria-label="온라인 1대1 대결 시작">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 48, height: 48, background: G.mustard, border: G.border, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }} aria-hidden>⚔️</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1 }}>친구와 1대1 대결</div>
+              <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.7, marginTop: 3 }}>같은 문제로 실시간 청음 대결</div>
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 900 }} aria-hidden>→</div>
+          </div>
+        </GBlock>
       </div>
 
       {/* rank */}

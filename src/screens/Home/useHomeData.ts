@@ -39,6 +39,7 @@ export interface HomeData {
   goStats: () => void;
   goSettings: () => void;
   goBadges: () => void;
+  goBattle: () => void;
 }
 
 // All data + navigation handlers the Home screen needs, independent of which
@@ -98,5 +99,6 @@ export function useHomeData(): HomeData {
     goStats: () => navigate('/stats'),
     goSettings: () => navigate('/settings'),
     goBadges: () => navigate('/badges'),
+    goBattle: () => navigate('/battle'),
   };
 }

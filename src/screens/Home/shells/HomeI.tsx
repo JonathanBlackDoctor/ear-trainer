@@ -7,7 +7,7 @@ import type { HomeData } from '../useHomeData';
 export function HomeI({ data }: { data: HomeData }) {
   const {
     rank, totalXp, overallPct, totalSessions, totalQuestions,
-    modes, weakItems, startMode, startWeakSession, goStats, goSettings,
+    modes, weakItems, startMode, startWeakSession, goStats, goSettings, goBattle,
   } = data;
   const mono: React.CSSProperties = { fontVariantNumeric: 'tabular-nums slashed-zero' };
 
@@ -27,6 +27,22 @@ export function HomeI({ data }: { data: HomeData }) {
         <div style={{ marginTop: 10, fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1 }}>
           음감 훈련 <span style={{ ...mono, fontSize: 18, color: I.inkMute, fontWeight: 600 }}>/ v4.2</span>
         </div>
+      </div>
+
+      {/* 1대1 대결 */}
+      <div style={{ padding: '14px 20px 0' }}>
+        <button
+          onClick={goBattle}
+          aria-label="온라인 1대1 대결 시작"
+          style={{ ...mono, width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: I.ink, border: `1px solid ${I.ink}`, color: I.card, textAlign: 'left' }}
+        >
+          <div style={{ fontSize: 20 }} aria-hidden>⚔</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: 1 }}>VERSUS · 1대1 대결</div>
+            <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.7, marginTop: 2, letterSpacing: 0.5 }}>같은 문제로 실시간 청음 대결</div>
+          </div>
+          <div style={{ fontSize: 16, color: I.lime, fontWeight: 800 }} aria-hidden>→</div>
+        </button>
       </div>
 
       {/* 2x2 KPI dashboard */}
