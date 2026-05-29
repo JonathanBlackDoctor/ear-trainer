@@ -428,6 +428,30 @@ export function Settings() {
           </div>
         </div>
 
+        {/* Tap-to-confirm */}
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold text-slate-600">탭 확정 입력</div>
+              <div className="text-xs text-slate-400 mt-0.5">보기를 한 번 누르면 선택, 한 번 더 눌러 제출 (오터치 방지)</div>
+            </div>
+            <button
+              className={`w-12 h-6 rounded-full transition-colors ${
+                settings.tapToConfirm ? 'bg-primary-500' : 'bg-slate-200'
+              }`}
+              onClick={() => updateSettings({ tapToConfirm: !settings.tapToConfirm })}
+              aria-label="탭 확정 입력 켜고 끄기"
+              aria-pressed={!!settings.tapToConfirm}
+            >
+              <div
+                className={`w-5 h-5 rounded-full bg-white shadow transition-transform mx-0.5 ${
+                  settings.tapToConfirm ? 'translate-x-6' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+
         {/* Data management */}
         <div className="card">
           <div className="text-sm font-semibold text-slate-600 mb-3">기록 관리</div>

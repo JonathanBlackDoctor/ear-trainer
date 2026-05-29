@@ -16,6 +16,7 @@ import {
   randomPraiseProgression,
   getScaleNotes,
   buildProgressionSteps,
+  degreeToNote,
 } from '../theory/progressions';
 import {
   SOLFEGE_LEVELS,
@@ -37,7 +38,7 @@ import {
   ODD_LEVELS, CONTOUR_LEVELS, CONTOUR_LABEL,
   TUNING_IN_TUNE, TUNING_SHARP, TUNING_FLAT, TUNING_CENTS,
   DEGREE_FUNCTION, FUNCTION_LEVELS,
-  EXTENDED_LEVELS, BASS_LEVELS,
+  EXTENDED_LEVELS, BASS_LEVELS, bassDegreeOf, BASS_TRIAD_QUALITIES, BASS_SEVENTH_QUALITIES,
   TENSION_SEMITONES, TENSION_LABEL, TENSION_LEVELS,
   WIDE_LEVELS, WIDE_SEMITONES, NOTE_STACK_LEVELS, NOTE_STACK_RANDOM_REGISTER_LEVEL,
   MICROTUNING_LEVELS, HARMONICS_LEVELS, harmonicAnswer,
@@ -45,7 +46,7 @@ import {
 import {
   scaleItemKeys, scaleKey, cadenceItemKeys, inversionItemKeys,
   compareItemKeys, oddNoteItemKeys, contourItemKeys, tuningItemKeys,
-  functionItemKeys, funcCode, extendedItemKeys, bassItemKeys, bassOf,
+  functionItemKeys, funcCode, extendedItemKeys, bassItemKeys,
   tensionItemKeys, wideIntervalItemKeys, noteStackItemKeys,
   microtuningItemKeys, harmonicItemKeys,
 } from './itemPool';
@@ -136,7 +137,10 @@ function getIntervalSemitones(name: string): number {
 // function must be identified regardless of where the chord sits — an
 // essence-preserving difficulty lever for the chord-ID family of modes.
 function registerRange(level: number): [string, string] {
-  if (level >= 9) return ['A1', 'C5'];
+  // Keep the low bound at C2+ even at the widest tiers: below that, dense 7th/9th
+  // chords turn muddy and quality becomes hard to hear for reasons unrelated to
+  // the skill being trained.
+  if (level >= 9) return ['C2', 'C5'];
   if (level >= 7) return ['G2', 'A4'];
   return ['C3', 'G4'];
 }
@@ -232,7 +236,11 @@ export function makeMelodyQuestion(
     const hi = Math.min(lastIdx, prevIdx + cfg.maxJump);
     const candidates: number[] = [];
     for (let j = lo; j <= hi; j++) if (j !== prevIdx) candidates.push(j);
-    const idx = candidates.length > 0 ? pickRandom(candidates) : prevIdx;
+    // Never repeat the previous note: if the jump window leaves no candidate
+    // (degenerate maxJump=0), step to an adjacent degree instead.
+    const idx = candidates.length > 0
+      ? pickRandom(candidates)
+      : (prevIdx < lastIdx ? prevIdx + 1 : Math.max(0, prevIdx - 1));
     notes.push(scale[idx]);
     prevIdx = idx;
   }
@@ -331,7 +339,13 @@ export function makeTransposeQuestion(
   for (let i = 1; i < cfg.noteCount; i++) {
     const prev = degrees[i - 1];
     const candidates = pool.filter((d) => d !== prev && Math.abs(d - prev) <= cfg.maxJump);
-    degrees.push(candidates.length > 0 ? pickRandom(candidates) : pickRandom(pool));
+    if (candidates.length > 0) {
+      degrees.push(pickRandom(candidates));
+    } else {
+      // Never repeat the previous degree even when the jump window is empty.
+      const alt = pool.filter((d) => d !== prev);
+      degrees.push(alt.length > 0 ? pickRandom(alt) : prev);
+    }
   }
 
   const notesInKey = (tonic: string): string[] => {
@@ -373,15 +387,22 @@ export function makeRhythmQuestion(level: number, avoidBeats?: number[]): Questi
   const maxOnsets = Math.min(hi, pool.length + 1);
   const minOnsets = Math.min(lo, maxOnsets);
 
+  const sameAsPrev = (a: number[]) =>
+    !!avoidBeats && a.length === avoidBeats.length && a.every((b, i) => b === avoidBeats[i]);
+
   let beats: number[] = [];
   for (let attempt = 0; attempt < 16; attempt++) {
     const count = minOnsets + Math.floor(Math.random() * (maxOnsets - minOnsets + 1));
     const picks = shuffle(pool).slice(0, Math.max(0, count - 1));
     beats = [0, ...picks].sort((a, b) => a - b);
-    const sameAsPrev = avoidBeats
-      && beats.length === avoidBeats.length
-      && beats.every((b, i) => b === avoidBeats[i]);
-    if (!sameAsPrev) break;
+    if (!sameAsPrev(beats)) break;
+  }
+  // If every attempt still matched the previous pattern, force a difference by
+  // swapping the last onset for an unused grid position.
+  if (sameAsPrev(beats) && beats.length > 1) {
+    const used = new Set(beats);
+    const free = pool.find((p) => !used.has(p));
+    if (free != null) beats = [...beats.slice(0, -1), free].sort((a, b) => a - b);
   }
 
   const beatTimes = beats.map((b) => b * sixteenthMs);
@@ -486,9 +507,13 @@ export function makeScaleQuestion(level: number, opts?: SelectOpts): Question {
   // Add upper tonic (octave above) so it sounds like a complete scale
   const upper = Note.transpose(tonic + '4', '8P');
   const fullNotes = [...scaleNotes, upper];
-  // Descending playback at the top tiers, increasingly often, adds difficulty.
+  // Descending playback at the top tiers, increasingly often, adds difficulty —
+  // but melodic minor is kept ascending only: its conventional descending form
+  // is the natural minor, which would be indistinguishable from the separate
+  // "natural minor" answer option.
+  const canDescend = scaleName !== 'melodic minor';
   const direction: 'up' | 'down' =
-    Math.random() < (SCALE_DESCENDING_PROB[level] ?? 0) ? 'down' : 'up';
+    canDescend && Math.random() < (SCALE_DESCENDING_PROB[level] ?? 0) ? 'down' : 'up';
   const notes = direction === 'up' ? fullNotes : [...fullNotes].reverse();
 
   return {
@@ -585,21 +610,31 @@ export function makeOddNoteQuestion(level: number, opts?: SelectOpts): Question 
   const cfg = ODD_LEVELS[level] ?? ODD_LEVELS[1];
   const tonic = pickRandom(COMMON_KEYS);
   const scaleType = pickRandom(cfg.scales);
-  const base = Scale.get(`${tonic}4 ${scaleType}`).notes;
+  // Decide the descending flip up front so a descending melodic minor can use
+  // its conventional natural-minor form (lowered 6 & 7) as the reference scale.
+  const descending = cfg.descending && Math.random() < 0.5;
+  const effectiveType = descending && scaleType === 'melodic minor' ? 'minor' : scaleType;
+  const base = Scale.get(`${tonic}4 ${effectiveType}`).notes;
   const upper = Note.transpose(tonic + '4', '8P');
   let correctNotes = [...base, upper]; // 8 notes incl. upper tonic
   const n = correctNotes.length;
 
-  // itemKey encodes the *displayed* (post-flip) altered position. Decide the
-  // descending flip first, then alter the pre-flip slot that lands there.
+  // itemKey encodes the *displayed* (post-flip) altered position. Alter the
+  // pre-flip slot that lands at the displayed index after the optional reverse.
   const itemKey = selectItemKey(oddNoteItemKeys(level), opts);
   const targetAlt = Number(itemKey.slice('odd_'.length));
-  const descending = cfg.descending && Math.random() < 0.5;
   const preIndex = descending ? n - 1 - targetAlt : targetAlt;
 
-  const dir = Math.random() < 0.5 ? 1 : -1;
+  // Alter by ±1 semitone, choosing a direction whose result is NOT another scale
+  // tone — otherwise it would duplicate a neighbour (e.g. E→F in C major) and
+  // make the "odd" position ambiguous. When both ±1 are chromatic (whole-step
+  // neighbours) pick at random.
+  const scaleMidis = new Set(correctNotes.map((nt) => Note.midi(nt)));
+  const origMidi = Note.midi(correctNotes[preIndex]) ?? 60;
+  const safeDirs = [1, -1].filter((d) => !scaleMidis.has(origMidi + d));
+  const dir = safeDirs.length > 0 ? pickRandom(safeDirs) : 1;
   let notes = [...correctNotes];
-  notes[preIndex] = Note.fromMidi((Note.midi(correctNotes[preIndex]) ?? 60) + dir) ?? correctNotes[preIndex];
+  notes[preIndex] = Note.fromMidi(origMidi + dir) ?? correctNotes[preIndex];
   let altIndex = preIndex;
 
   if (descending) {
@@ -738,32 +773,39 @@ export function makeExtendedQuestion(level: number, opts?: SelectOpts): Question
   };
 }
 
-// ─── Lab: Bass (lowest note) ────────────────────────────────────────────────
+// ─── Lab: Bass (scale degree of the lowest note, relative to a sounded tonic) ─
 export function makeBassQuestion(level: number, opts?: SelectOpts): Question {
   const cfg = BASS_LEVELS[level] ?? BASS_LEVELS[1];
+  const key = cfg.randomKey ? pickRandom(COMMON_KEYS) : 'C';
   const itemKey = selectItemKey(bassItemKeys(level), opts);
-  const targetBass = itemKey.slice('bass_'.length);
-  // Gather every (root, quality, inversion) whose lowest note is the target.
-  const combos: Array<{ root: string; quality: string; inversion: number }> = [];
-  for (const root of cfg.roots)
-    for (const q of cfg.qualities)
-      for (const inv of cfg.inversions)
-        if (bassOf(root, q, inv) === targetBass) combos.push({ root, quality: q, inversion: inv });
-  const chosen = combos.length > 0
-    ? pickRandom(combos)
-    : { root: pickRandom(cfg.roots), quality: pickRandom(cfg.qualities), inversion: pickRandom(cfg.inversions) };
-  const rootNote = chosen.root + registerOctave(level);
-  const notes = buildChord(rootNote, chosen.quality, chosen.inversion);
-  const bass = Note.pitchClass(notes[0]);
+  const targetDeg = Number(itemKey.slice('bass_deg'.length)) || 1;
+  // Pick a (rootDegree, inversion) in the level's pool whose bass lands on the
+  // targeted scale degree.
+  const combos: Array<{ deg: number; inv: number }> = [];
+  for (const d of cfg.rootDegrees)
+    for (const inv of cfg.inversions)
+      if (bassDegreeOf(d, inv) === targetDeg) combos.push({ deg: d, inv });
+  const chosen = combos.length > 0 ? pickRandom(combos) : { deg: targetDeg, inv: 0 };
+  const qualities = cfg.sevenths ? BASS_SEVENTH_QUALITIES : BASS_TRIAD_QUALITIES;
+  const quality = qualities[(chosen.deg - 1) % 7];
+  // Fixed octave 3 keeps the bass clearly below the octave-4 tonic reference.
+  const rootNote = degreeToNote(chosen.deg, key, 3);
+  const notes = buildChord(rootNote, quality, chosen.inv);
+  // Recompute the bass degree from the actual lowest note so the answer always
+  // matches what is sounded.
+  const keyScale = getScaleNotes(key, 4);
+  const bassPc = Note.pitchClass(notes[0]);
+  const degIdx = keyScale.findIndex((nt) => Note.pitchClass(nt) === bassPc);
+  const bassDegree = degIdx >= 0 ? degIdx + 1 : targetDeg;
 
   return {
     id: genId(),
     mode: 'lab-bass',
     level,
-    itemKey: `bass_${bass}`,
-    data: { type: 'chord', notes, root: rootNote, quality: chosen.quality, inversion: chosen.inversion, arpeggio: false },
-    answer: bass,
-    context: { key: 'C', absoluteMode: true },
+    itemKey: `bass_deg${bassDegree}`,
+    data: { type: 'chord', notes, root: rootNote, quality, inversion: chosen.inv, arpeggio: false },
+    answer: `${bassDegree}도`,
+    context: { key, referenceToneNote: key + '4' },
   };
 }
 
@@ -846,19 +888,23 @@ export function makeNoteStackQuestion(level: number, opts?: SelectOpts): Questio
 export function makeMicrotuningQuestion(level: number, opts?: SelectOpts): Question {
   const cfg = MICROTUNING_LEVELS[level] ?? MICROTUNING_LEVELS[1];
   const itemKey = selectItemKey(microtuningItemKeys(level), opts);
-  const code = itemKey.slice('microtune_'.length);
-  const cents = Number(code) || 0;
+  const magnitude = Number(itemKey.slice('microtune_'.length)) || 0;
   const iv = pickRandom(cfg.intervals);
-  const lowNote = randomNote('C3', 'C4');
-  const highNote = Note.fromMidi((Note.midi(lowNote) ?? 60) + iv.semitones) ?? lowNote;
+  // Fixed low note → the beat-rate cue for a given detuning stays consistent and
+  // learnable across questions (it varied wildly with the old random pitch).
+  const lowNote = 'C3';
+  const highNote = Note.fromMidi((Note.midi(lowNote) ?? 48) + iv.semitones) ?? lowNote;
+  // Sign is randomised for sonic variety; beat rate (hence the answer) is the
+  // same for ± the same magnitude, so only the magnitude is asked.
+  const signed = magnitude === 0 ? 0 : (Math.random() < 0.5 ? 1 : -1) * magnitude;
 
   return {
     id: genId(),
     mode: 'lab-microtuning',
     level,
     itemKey,
-    data: { type: 'microtuning', lowNote, highNote, intervalName: iv.name, cents },
-    answer: code,
+    data: { type: 'microtuning', lowNote, highNote, intervalName: iv.name, cents: signed },
+    answer: String(magnitude),
     context: { key: 'C', absoluteMode: true },
   };
 }

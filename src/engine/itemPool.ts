@@ -1,12 +1,11 @@
-import { Note } from 'tonal';
 import type { ModeKey } from '../types';
 import { intervalItemKeys } from '../theory/intervals';
-import { chordItemKeys, buildChord } from '../theory/chords';
+import { chordItemKeys } from '../theory/chords';
 import { solfegeItemKeys } from '../theory/solfege';
 import {
   SCALE_LEVELS, CADENCE_LEVELS, INVERSION_LEVELS, COMPARE_LEVELS,
   ODD_LEVELS, CONTOUR_LEVELS, FUNCTION_LEVELS, EXTENDED_LEVELS,
-  BASS_LEVELS, TENSION_LEVELS, DEGREE_FUNCTION,
+  bassDegreesForLevel, TENSION_LEVELS, DEGREE_FUNCTION,
   FUNCTION_TONIC, FUNCTION_SUBDOMINANT,
   WIDE_LEVELS, NOTE_STACK_LEVELS, MICROTUNING_LEVELS, HARMONICS_LEVELS,
   centsCode,
@@ -24,11 +23,6 @@ export const scaleKey = (name: string) => `scale_${name.replace(/\s+/g, '-')}`;
 export function funcCode(degree: number): 'T' | 'S' | 'D' {
   const f = DEGREE_FUNCTION[degree];
   return f === FUNCTION_TONIC ? 'T' : f === FUNCTION_SUBDOMINANT ? 'S' : 'D';
-}
-
-/** Bass pitch-class produced by a (root, quality, inversion) chord. */
-export function bassOf(root: string, quality: string, inversion: number): string {
-  return Note.pitchClass(buildChord(root + '3', quality, inversion)[0]);
 }
 
 // ─── Lab-mode level pools ───────────────────────────────────────────────────
@@ -81,13 +75,7 @@ export function extendedItemKeys(level: number): string[] {
 }
 
 export function bassItemKeys(level: number): string[] {
-  const cfg = BASS_LEVELS[level] ?? BASS_LEVELS[1];
-  const set = new Set<string>();
-  for (const root of cfg.roots)
-    for (const q of cfg.qualities)
-      for (const inv of cfg.inversions)
-        set.add(`bass_${bassOf(root, q, inv)}`);
-  return [...set];
+  return bassDegreesForLevel(level).map((d) => `bass_deg${d}`);
 }
 
 export function tensionItemKeys(level: number): string[] {

@@ -1,10 +1,11 @@
 import React from 'react';
 import type { ResultData } from '../useResultData';
+import { formatItemKey } from '../../../modes/itemLabels';
 
 // Classic (default) Result layout — unchanged from the original screen.
 export function ResultDefault({ data }: { data: ResultData }) {
   const {
-    pct, emoji, comment, correct, wrong, mins, secs, bestCombo,
+    mode, pct, emoji, comment, correct, wrong, mins, secs, bestCombo,
     xpEarned, xpDisplayed, totalXp, currRank, prevRank, rankedUp,
     unlocked, wrongItems, weakProgress, again, goBadges, goStats, goHome,
   } = data;
@@ -100,7 +101,7 @@ export function ResultDefault({ data }: { data: ResultData }) {
                 const deltaColor = delta == null ? 'text-slate-400' : delta > 0 ? 'text-emerald-600' : delta < 0 ? 'text-red-500' : 'text-slate-400';
                 return (
                   <div key={w.itemKey} className="flex items-center justify-between text-sm py-1">
-                    <span className="text-slate-600">{w.itemKey}</span>
+                    <span className="text-slate-600">{formatItemKey(mode, w.itemKey)}</span>
                     <span className="flex items-center gap-2 tabular-nums">
                       <span className="text-slate-400 text-xs">{w.beforePct ?? '–'}% → {w.afterPct ?? '–'}%</span>
                       <span className={`text-xs font-semibold ${deltaColor}`}>
@@ -120,7 +121,7 @@ export function ResultDefault({ data }: { data: ResultData }) {
             <div className="space-y-1">
               {wrongItems.map((r, i) => (
                 <div key={i} className="flex items-center justify-between text-sm py-1">
-                  <span className="text-slate-600">{r.itemKey}</span>
+                  <span className="text-slate-600">{formatItemKey(mode, r.itemKey)}</span>
                   <span className="text-red-500 text-xs">
                     {r.skipped ? '건너뜀' : r.partialScore > 0 ? `${Math.round(r.partialScore * 100)}%` : '오답'}
                   </span>

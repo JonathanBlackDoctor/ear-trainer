@@ -310,6 +310,9 @@ export interface AppSettings {
   difficultyMode: 'manual' | 'adaptive';
   questionsPerSession: number;
   showStaffFeedback: boolean;
+  // When true, choice answers need a second tap on the armed option to submit
+  // (guards against fat-finger mis-taps). Default off = single-tap submit.
+  tapToConfirm?: boolean;
   weakSessionLength: number;
   // Last-used difficulty level per mode, so the setup screen restores the
   // level the user practiced at (per-mode because each mode's maxLevel and
