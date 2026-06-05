@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>음감 훈련 — preview</title>
+<style>
+  @font-face{font-family:'Pretendard';font-weight:400;font-display:block;
+    src:url('fonts/Pretendard-Regular.woff2') format('woff2');}
+  @font-face{font-family:'Pretendard';font-weight:500;font-display:block;
+    src:url('fonts/Pretendard-Medium.woff2') format('woff2');}
+  @font-face{font-family:'Pretendard';font-weight:600;font-display:block;
+    src:url('fonts/Pretendard-SemiBold.woff2') format('woff2');}
+  @font-face{font-family:'Pretendard';font-weight:700;font-display:block;
+    src:url('fonts/Pretendard-Bold.woff2') format('woff2');}
+  html,body{margin:0;padding:0;background:#d8dae6;}
+  /* on-screen preview only; the renderer reads the canvas directly */
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  canvas{width:1000px;height:625px;box-shadow:0 30px 80px rgba(30,27,75,.18);border-radius:8px;}
+</style>
+</head>
+<body>
+<canvas id="c" width="2000" height="1250"></canvas>
+<script>
+/* ───────────────────────────────────────────────────────────────────────
+   음감 훈련 (Ear Trainer) — minimal staged preview animation
+   Deterministic: renderFrame(phase), phase ∈ [0,1).  render(0) === render(1)
+   so the loop is perfectly seamless.  Logical canvas = 1000×625 (16:10),
+   drawn at 2× into a 2000×1250 backing store for crisp anti-aliasing.
+   ─────────────────────────────────────────────────────────────────────── */
+const W = 1000, H = 625, SCALE = 2;
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+
+/* palette ─ indigo (#3730a3) family on a calm off-white */
+const C = {
+  frame:'#eef0f7', card:'#ffffff', cardEdge:'#e9e9f3',
+  ink:'#211f44', muted:'#9a9ab4', hair:'#ececf4',
+  indigo:'#3730a3', indigoBright:'#6366f1', indigoSoft:'#c7cbf5',
+  indigoTint:'#eef1ff', indigoTint2:'#e3e7ff',
+  key:'#ffffff', keyEdge:'#e4e4ee', black:'#2b2950',
+  green:'#16a34a', greenBright:'#22c55e',
+};
+
+const F = (w,s)=>`${w} ${s}px Pretendard, 'WenQuanYi Zen Hei', system-ui, sans-serif`;
+
+/* ── tiny math helpers ──────────────────────────────────────────────── */
+const clamp=(x,a=0,b=1)=>x<a?a:x>b?b:x;
+const lerp=(a,b,t)=>a+(b-a)*t;
+const smooth=t=>{t=clamp(t);return t*t*(3-2*t);};          // smoothstep
+const smoother=t=>{t=clamp(t);return t*t*t*(t*(t*6-15)+10);};
+/* normalize p over [a,b] then smoothstep */
+const seg=(p,a,b)=>smooth((p-a)/(b-a));
+/* 0→1→0 pulse that is 1 across [a,b] with eased ramps of width r */
+const pulse=(p,a,b,r)=>smooth((p-a)/r)*(1-smooth((p-b)/r));
+const easeOutBack=t=>{t=clamp(t);const c1=1.70158,c3=c1+1;const u=t-1;return 1+c3*u*u*u+c1*u*u;};
+
+function hx(h){return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];}
+function mix(h1,h2,t){const a=hx(h1),b=hx(h2);return `rgb(${Math.round(lerp(a[0],b[0],t))},${Math.round(lerp(a[1],b[1],t))},${Math.round(lerp(a[2],b[2],t))})`;}
+
+function rr(x,y,w,h,r){
+  r=Math.min(r,w/2,h/2);
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+
+/* ── layout constants (logical 1000×625) ───────────────────────────── */
+const CARD={x:40,y:40,w:920,h:545,r:34};
+const PAD=38;
+const TOPY=92;                                  // top-bar vertical centre
+const RING={cx:894,cy:92,r:30,seg:8,baseline:4};
+const KB={cx:500,cy:312,keys:7,wk:44,gap:3,h:150,pressed:[0,4]}; // C..B, press C+G
+const CH={cy:486,w:152,h:50,gap:24,labels:['장3도','완전5도','완전4도'],correct:1};
+const CHIPS=['인터벌','코드','진행','리듬'];     // interval · chord · progression · rhythm
+
+/* ── drawing pieces ─────────────────────────────────────────────────── */
+
+function drawCard(){
+  ctx.save();
+  ctx.shadowColor='rgba(40,38,90,.10)';ctx.shadowBlur=34;ctx.shadowOffsetY=18;
+  rr(CARD.x,CARD.y,CARD.w,CARD.h,CARD.r);ctx.fillStyle=C.card;ctx.fill();
+  ctx.restore();
+  rr(CARD.x+.5,CARD.y+.5,CARD.w-1,CARD.h-1,CARD.r);ctx.strokeStyle=C.cardEdge;ctx.lineWidth=1;ctx.stroke();
+}
+
+function drawWordmark(){
+  const x=CARD.x+PAD, s=30, y=TOPY-s/2;
+  rr(x,y,s,s,9);ctx.fillStyle=C.indigo;ctx.fill();
+  // little equalizer mark
+  ctx.fillStyle='#fff';
+  const bx=x+9, by=y+s-9, bars=[8,15,11];
+  bars.forEach((bh,i)=>{rr(bx+i*5, by-bh, 3, bh, 1.5);ctx.fill();});
+  ctx.fillStyle=C.ink;ctx.font=F(600,19);ctx.textBaseline='middle';ctx.textAlign='left';
+  ctx.fillText('음감 훈련', x+s+12, TOPY+1);
+}
+
+function drawChips(p){
+  ctx.font=F(600,14.5);ctx.textBaseline='middle';ctx.textAlign='center';
+  const padX=15, gap=10, h=30;
+  const ws=CHIPS.map(t=>ctx.measureText(t).width+padX*2);
+  const total=ws.reduce((a,b)=>a+b,0)+gap*(CHIPS.length-1);
+  let x=500-total/2;
+  const cx=[]; CHIPS.forEach((t,i)=>{cx.push(x+ws[i]/2);x+=ws[i]+gap;});
+  // gentle scanning highlight gliding across the row (seamless, period = loop)
+  const sweep=(Math.sin(p*Math.PI*2-Math.PI/2)+1)/2;       // 0→1→0
+  const sx=lerp(cx[0],cx[CHIPS.length-1],sweep);
+  // re-walk to draw
+  x=500-total/2;
+  CHIPS.forEach((t,i)=>{
+    const w=ws[i], active=(i===0);
+    const near=clamp(1-Math.abs(sx-cx[i])/70);              // proximity of sweep
+    if(active){
+      rr(x,TOPY-h/2,w,h,h/2);ctx.fillStyle=C.indigo;ctx.fill();
+      ctx.fillStyle='#fff';
+    }else{
+      if(near>0.02){rr(x,TOPY-h/2,w,h,h/2);ctx.fillStyle=`rgba(99,102,241,${0.10*near})`;ctx.fill();}
+      ctx.fillStyle=mix(C.muted,C.ink,0.45*near);
+    }
+    ctx.font=F(active?700:600,14.5);
+    ctx.fillText(t,x+w/2,TOPY+1);
+    x+=w+gap;
+  });
+}
+
+function drawStreak(p){
+  const {cx,cy,r,seg,baseline}=RING;
+  const newSeg = seg!==null ? pulse(p,0.64,0.86,0.10) : 0;  // 5th segment fills then releases
+  const gap=0.20, step=Math.PI*2/seg, lw=7;
+  ctx.lineCap='round';
+  for(let i=0;i<seg;i++){
+    const a0=-Math.PI/2 + i*step + gap/2;
+    const a1=-Math.PI/2 + (i+1)*step - gap/2;
+    let col=C.hair, alpha=1, rr2=r;
+    if(i<baseline){col=C.indigo;}
+    else if(i===baseline){                                  // the animated one
+      if(newSeg<=0.001){col=C.hair;}
+      else{col=mix(C.indigoSoft,C.indigoBright,newSeg);alpha=lerp(0.0,1,smooth(newSeg*1.4));}
+    }else{col=C.hair;}
+    ctx.globalAlpha=alpha;
+    ctx.beginPath();ctx.arc(cx,cy,rr2,a0,a1);ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.stroke();
+    ctx.globalAlpha=1;
+  }
+  // glow burst when the new segment lands
+  if(newSeg>0.01){
+    const g=pulse(p,0.66,0.74,0.06);
+    if(g>0.01){ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+      ctx.strokeStyle=`rgba(99,102,241,${0.35*g})`;ctx.lineWidth=2+10*g;ctx.stroke();}
+  }
+  // little flame-ish dot in the centre (identity, static)
+  ctx.fillStyle=mix(C.indigoTint2,C.indigoBright,0.15+0.85*newSeg);
+  ctx.beginPath();ctx.arc(cx,cy,5.5,0,Math.PI*2);ctx.fill();
+  // "+1" floats up and fades
+  const f=pulse(p,0.66,0.84,0.07);
+  if(f>0.01){
+    ctx.globalAlpha=f;ctx.fillStyle=C.green;ctx.font=F(700,15);
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('+1', cx, cy-r-10 - 12*smooth((p-0.64)/0.18));
+    ctx.globalAlpha=1;
+  }
+}
+
+function whiteKeyX(i){
+  const totalW=KB.keys*KB.wk+(KB.keys-1)*KB.gap;
+  const x0=KB.cx-totalW/2;
+  return x0+i*(KB.wk+KB.gap);
+}
+
+function drawKeyboard(p){
+  const kt=KB.cy-KB.h/2, kb=KB.cy+KB.h/2;
+  // press envelope: quick down, hold, up — then at rest for rest of loop
+  const press=pulse(p,0.16,0.30,0.05);
+  // white keys
+  for(let i=0;i<KB.keys;i++){
+    const x=whiteKeyX(i), pr=KB.pressed.includes(i)?press:0;
+    const dy=pr*3;
+    rr(x,kt+dy,KB.wk,KB.h-dy,8);
+    ctx.fillStyle = pr>0 ? mix(C.key,C.indigoTint,pr) : C.key;
+    ctx.fill();
+    ctx.strokeStyle=C.keyEdge;ctx.lineWidth=1.2;ctx.stroke();
+    if(pr>0){                                               // soft inner glow at base
+      ctx.save();rr(x,kt+dy,KB.wk,KB.h-dy,8);ctx.clip();
+      const g=ctx.createLinearGradient(0,kb-60,0,kb);
+      g.addColorStop(0,'rgba(99,102,241,0)');g.addColorStop(1,`rgba(99,102,241,${0.28*pr})`);
+      ctx.fillStyle=g;ctx.fillRect(x,kb-60,KB.wk,60);ctx.restore();
+    }
+  }
+  // black keys (between C-D, D-E, F-G, G-A, A-B) → after white indices 0,1,3,4,5
+  const bh=KB.h*0.62, bw=26;
+  [0,1,3,4,5].forEach(i=>{
+    const cx=whiteKeyX(i)+KB.wk+KB.gap/2;
+    rr(cx-bw/2,kt,bw,bh,4);ctx.fillStyle=C.black;ctx.fill();
+  });
+
+  // sound waves rising from each pressed key (one "ding").
+  // emit may exceed 1 so the staggered ripples can finish & fully fade.
+  const emit=(p-0.14)/0.30;
+  if(emit>0){
+    KB.pressed.forEach(i=>{
+      const ex=whiteKeyX(i)+KB.wk/2, ey=kt-2;
+      for(let k=0;k<3;k++){
+        const local=emit - k*0.22;
+        if(local<=0||local>=1)continue;
+        const rad=lerp(6,118,smoother(local));
+        const a=(1-local)*0.5;
+        ctx.beginPath();ctx.arc(ex,ey,rad,Math.PI*1.06,Math.PI*1.94);
+        ctx.strokeStyle=`rgba(99,102,241,${a})`;ctx.lineWidth=2.4;ctx.stroke();
+      }
+    });
+  }
+}
+
+function drawChoices(p){
+  const n=CH.labels.length;
+  const total=n*CH.w+(n-1)*CH.gap;
+  let x=500-total/2;
+  const appear=seg(p,0.42,0.54);
+  const disappear=seg(p,0.90,1.0);
+  const selAmt=appear*(1-disappear);
+  const pop=pulse(p,0.46,0.56,0.05);
+  for(let i=0;i<n;i++){
+    const sel=(i===CH.correct);
+    const a = sel? selAmt : 0;
+    const sc = sel? 1+0.035*pop : 1;
+    const cx=x+CH.w/2, cy=CH.cy;
+    ctx.save();ctx.translate(cx,cy);ctx.scale(sc,sc);ctx.translate(-cx,-cy);
+    rr(x,cy-CH.h/2,CH.w,CH.h,CH.h/2);
+    ctx.fillStyle = sel? mix(C.card,C.indigo,a) : C.card; ctx.fill();
+    ctx.lineWidth=1.6; ctx.strokeStyle = sel? mix(C.cardEdge,C.indigo,a) : C.cardEdge; ctx.stroke();
+    ctx.fillStyle = sel? mix('#54546e','#ffffff',a) : '#54546e';
+    ctx.font=F(sel?700:600,16.5);ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(CH.labels[i], cx, cy+1);
+    ctx.restore();
+
+    if(sel){                                                // green check badge
+      const ca=easeOutBack(seg(p,0.54,0.66));
+      const cAmt=ca*(1-disappear);
+      if(cAmt>0.01){
+        const bx=x+CH.w-12, by=cy-CH.h/2+2, br=15*Math.min(1,cAmt);
+        ctx.beginPath();ctx.arc(bx,by,br,0,Math.PI*2);
+        ctx.fillStyle=C.greenBright;ctx.fill();
+        ctx.strokeStyle='#fff';ctx.lineWidth=1.6;ctx.stroke();
+        // check mark
+        const t=clamp(cAmt*1.3);
+        ctx.strokeStyle='#fff';ctx.lineWidth=2.6;ctx.lineCap='round';ctx.lineJoin='round';
+        ctx.beginPath();
+        ctx.moveTo(bx-6, by+0.5);
+        if(t>0.4)ctx.lineTo(bx-2, by+4.5);
+        if(t>0.7)ctx.lineTo(bx+6, by-4.5);
+        ctx.stroke();
+      }
+    }
+    x+=CH.w+CH.gap;
+  }
+}
+
+/* tiny instructional caption under the keyboard — minimal text */
+function drawPrompt(){
+  ctx.fillStyle=C.muted;ctx.font=F(500,15);ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('두 음의 음정은?', 500, KB.cy+KB.h/2+34);
+}
+
+/* ── master frame ───────────────────────────────────────────────────── */
+function renderFrame(p){
+  p=((p%1)+1)%1;
+  ctx.setTransform(SCALE,0,0,SCALE,0,0);
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle=C.frame;ctx.fillRect(0,0,W,H);
+  drawCard();
+  drawWordmark();
+  drawChips(p);
+  drawStreak(p);
+  drawKeyboard(p);
+  drawPrompt();
+  drawChoices(p);
+}
+window.renderFrame=renderFrame;
+
+/* live on-screen preview (disabled when the renderer drives frames) */
+const params=new URLSearchParams(location.search);
+const LOOP_MS=5000;
+window.LOOP_MS=LOOP_MS;
+if(params.get('static')==null){
+  const start=performance.now();
+  function tick(now){renderFrame(((now-start)%LOOP_MS)/LOOP_MS);requestAnimationFrame(tick);}
+  document.fonts.ready.then(()=>{renderFrame(0);requestAnimationFrame(tick);});
+}else{
+  document.fonts.ready.then(()=>renderFrame(0));
+}
+</script>
+</body>
+</html>
