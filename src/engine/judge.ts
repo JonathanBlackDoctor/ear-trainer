@@ -240,37 +240,30 @@ export function judge(question: Question, userAnswer: AnswerValue): JudgeResult 
 
     case 'lab-note-stack': {
       const data = question.data as NoteStackData;
-      // Choice input → a stack-code string; piano input → an array of notes.
-      if (typeof userAnswer === 'string') {
-        const isCorrect = userAnswer === data.stackCode;
-        return {
-          correct: isCorrect,
-          partialScore: isCorrect ? 1 : 0,
-          correctAnswer: data.stackCode,
-          details: { kind: 'lab', category: 'note-stack', userAnswer, correctAnswer: data.stackLabel },
-        };
-      }
-      const ua = Array.isArray(userAnswer) ? (userAnswer as string[]) : [];
-      const expectedPcs = data.notes.map((n) => Note.pitchClass(n));
-      const givenPcs = ua.map((n) => Note.pitchClass(n));
-      // Multiset intersection — octave-tolerant pitch-class match.
-      const remaining = [...expectedPcs];
+      // Both input methods arrive as syllable arrays (Train converts piano
+      // notes to movable-do syllables before submitting). Order-free multiset
+      // match with partial credit per identified syllable.
+      const expected = data.syllables;
+      const ua = Array.isArray(userAnswer)
+        ? (userAnswer as string[])
+        : typeof userAnswer === 'string' ? [userAnswer] : [];
+      const remaining = [...expected];
       let hits = 0;
-      for (const pc of givenPcs) {
-        const i = remaining.indexOf(pc);
+      for (const syl of ua) {
+        const i = remaining.indexOf(syl);
         if (i >= 0) { hits++; remaining.splice(i, 1); }
       }
-      const score = expectedPcs.length > 0 ? hits / expectedPcs.length : 0;
-      const isCorrect = score === 1 && givenPcs.length === expectedPcs.length;
+      const score = expected.length > 0 ? hits / expected.length : 0;
+      const isCorrect = score === 1 && ua.length === expected.length;
       return {
         correct: isCorrect,
         partialScore: score,
-        correctAnswer: data.notes,
+        correctAnswer: expected,
         details: {
           kind: 'lab',
           category: 'note-stack',
-          userAnswer: givenPcs.join(' · ') || '—',
-          correctAnswer: expectedPcs.join(' · '),
+          userAnswer: ua.join(' · ') || '—',
+          correctAnswer: expected.join(' · '),
         },
       };
     }

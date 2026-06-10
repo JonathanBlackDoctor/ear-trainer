@@ -49,6 +49,8 @@ export interface ProgressionLevelConfig {
   degreePool: number[];            // allowed degrees (1..7)
   playback: 'arpeggio' | 'block';
   keyMode: 'fixed' | 'random';
+  voiceLeading: boolean;           // smooth-connect each chord to the previous voicing
+  bass: boolean;                   // low root note (octave 2) under each chord
 }
 
 const CORE_TRIAD = [1, 4, 5];
@@ -77,17 +79,21 @@ const OPENINGS = [1, 6, 4];
 // Degrees that give a sense of resolution when they land last.
 const RESOLUTIONS = [1, 6];
 
+// Realism ramp: L1-2 keep the bare root-position sound so beginners hear the
+// degrees plainly; L3 adds the low root bass (the bass doubles as the answer
+// cue, easing the transition); L4+ voice-leads the upper structure so the root
+// no longer sits predictably at the bottom — like hearing a real accompaniment.
 export const PROGRESSION_LEVELS: Record<number, ProgressionLevelConfig> = {
-  1:  { label: '2화음 진행 (I·IV·V)',    length: 2, degreePool: CORE_TRIAD,    playback: 'arpeggio', keyMode: 'fixed'  },
-  2:  { label: '+ vi 추가',              length: 2, degreePool: CORE_PLUS_VI,  playback: 'arpeggio', keyMode: 'fixed'  },
-  3:  { label: '3화음 진행',             length: 3, degreePool: CORE_PLUS_VI,  playback: 'arpeggio', keyMode: 'fixed'  },
-  4:  { label: '4화음 진행',             length: 4, degreePool: CORE_PLUS_VI,  playback: 'arpeggio', keyMode: 'fixed'  },
-  5:  { label: '+ ii 추가',              length: 4, degreePool: CORE_PLUS_II,  playback: 'arpeggio', keyMode: 'fixed'  },
-  6:  { label: '+ iii 추가',             length: 4, degreePool: CORE_PLUS_III, playback: 'arpeggio', keyMode: 'fixed'  },
-  7:  { label: '블록 코드 재생',         length: 4, degreePool: CORE_PLUS_III, playback: 'block',    keyMode: 'fixed'  },
-  8:  { label: '+ vii° 추가 (전 7도)',   length: 4, degreePool: ALL_7,         playback: 'block',    keyMode: 'fixed'  },
-  9:  { label: '5화음 · 랜덤 키',        length: 5, degreePool: ALL_7,         playback: 'block',    keyMode: 'random' },
-  10: { label: '6화음 진행 · 랜덤 키',   length: 6, degreePool: ALL_7,         playback: 'block',    keyMode: 'random' },
+  1:  { label: '2화음 진행 (I·IV·V)',    length: 2, degreePool: CORE_TRIAD,    playback: 'arpeggio', keyMode: 'fixed',  voiceLeading: false, bass: false },
+  2:  { label: '+ vi 추가',              length: 2, degreePool: CORE_PLUS_VI,  playback: 'arpeggio', keyMode: 'fixed',  voiceLeading: false, bass: false },
+  3:  { label: '3화음 · 베이스 추가',    length: 3, degreePool: CORE_PLUS_VI,  playback: 'arpeggio', keyMode: 'fixed',  voiceLeading: false, bass: true  },
+  4:  { label: '4화음 · 부드러운 연결',  length: 4, degreePool: CORE_PLUS_VI,  playback: 'arpeggio', keyMode: 'fixed',  voiceLeading: true,  bass: true  },
+  5:  { label: '+ ii 추가',              length: 4, degreePool: CORE_PLUS_II,  playback: 'arpeggio', keyMode: 'fixed',  voiceLeading: true,  bass: true  },
+  6:  { label: '+ iii 추가',             length: 4, degreePool: CORE_PLUS_III, playback: 'arpeggio', keyMode: 'fixed',  voiceLeading: true,  bass: true  },
+  7:  { label: '블록 코드 재생',         length: 4, degreePool: CORE_PLUS_III, playback: 'block',    keyMode: 'fixed',  voiceLeading: true,  bass: true  },
+  8:  { label: '+ vii° 추가 (전 7도)',   length: 4, degreePool: ALL_7,         playback: 'block',    keyMode: 'fixed',  voiceLeading: true,  bass: true  },
+  9:  { label: '5화음 · 랜덤 키',        length: 5, degreePool: ALL_7,         playback: 'block',    keyMode: 'random', voiceLeading: true,  bass: true  },
+  10: { label: '6화음 진행 · 랜덤 키',   length: 6, degreePool: ALL_7,         playback: 'block',    keyMode: 'random', voiceLeading: true,  bass: true  },
 };
 
 /**
@@ -124,7 +130,10 @@ export function randomProgressionFromConfig(
     const info = MAJOR_DIATONIC[(d - 1) % 7];
     return [d, info?.quality ?? 'major'];
   });
-  return buildProgressionSteps(pattern, tonic, octave);
+  return buildProgressionSteps(pattern, tonic, octave, {
+    voiceLeading: cfg.voiceLeading,
+    bass: cfg.bass,
+  });
 }
 
 /** Get the scale notes for a major key */
@@ -140,21 +149,103 @@ export function degreeToNote(degree: number, tonic: string, octave = 4): string 
   return scale[idx] ?? (tonic + octave);
 }
 
-/** Build ChordStep objects for a progression in a key */
+const midiOf = (n: string): number => Note.midi(n) ?? 60;
+
+/**
+ * Total semitone movement between two voicings: sort both by pitch and sum
+ * the index-wise |difference| over the shorter length. Cardinality mismatch
+ * (triad → 7th) penalizes every candidate of the next chord equally, so the
+ * comparison stays fair.
+ */
+export function voicingCost(a: string[], b: string[]): number {
+  const am = a.map(midiOf).sort((x, y) => x - y);
+  const bm = b.map(midiOf).sort((x, y) => x - y);
+  const len = Math.min(am.length, bm.length);
+  let cost = 0;
+  for (let i = 0; i < len; i++) cost += Math.abs(am[i] - bm[i]);
+  return cost;
+}
+
+// Upper-structure register window for voice-led progressions. The C3 floor
+// keeps every voicing strictly above the octave-2 bass (max B2 = midi 47).
+const VOICING_LOW = 48;  // C3
+const VOICING_HIGH = 69; // A4
+
+const lexLess = (a: number[], b: number[]): boolean => {
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return a[i] < b[i];
+  }
+  return false;
+};
+
+/**
+ * Choose the close voicing of (rootPc, quality) — any inversion, octave 2-4 —
+ * that moves least from the previous voicing while staying inside the register
+ * window. Ties break deterministically (top-note movement, then inversion,
+ * then octave) so generation and tests are stable.
+ */
+export function pickNextVoicing(prevNotes: string[], rootPc: string, quality: string): string[] {
+  const chordLen = buildChord(rootPc + '3', quality, 0).length;
+  const candidates: Array<{ notes: string[]; inv: number; oct: number }> = [];
+  for (let inv = 0; inv < chordLen; inv++) {
+    for (const oct of [2, 3, 4]) {
+      candidates.push({ notes: buildChord(`${rootPc}${oct}`, quality, inv), inv, oct });
+    }
+  }
+  const inWindow = candidates.filter(({ notes }) => {
+    const ms = notes.map(midiOf);
+    return Math.min(...ms) >= VOICING_LOW && Math.max(...ms) <= VOICING_HIGH;
+  });
+  const pool = inWindow.length > 0 ? inWindow : candidates;
+
+  const prevTop = Math.max(...prevNotes.map(midiOf));
+  let best = pool[0];
+  let bestKey: number[] | null = null;
+  for (const cand of pool) {
+    const top = Math.max(...cand.notes.map(midiOf));
+    const key = [voicingCost(prevNotes, cand.notes), Math.abs(top - prevTop), cand.inv, cand.oct];
+    if (bestKey === null || lexLess(key, bestKey)) {
+      best = cand;
+      bestKey = key;
+    }
+  }
+  return best.notes;
+}
+
+export interface ProgressionVoicingOpts {
+  voiceLeading?: boolean;
+  bass?: boolean;
+}
+
+/**
+ * Build ChordStep objects for a progression in a key. Without opts the output
+ * is identical to the legacy behavior (root position at `octave`) — lab-cadence
+ * and lab-function depend on that. With `voiceLeading` each chord after the
+ * first connects smoothly to the previous voicing; with `bass` every step
+ * carries its root at octave 2.
+ */
 export function buildProgressionSteps(
   pattern: Array<[number, string]>,
   tonic: string,
-  octave = 3
+  octave = 3,
+  opts?: ProgressionVoicingOpts
 ): ChordStep[] {
-  return pattern.map(([degree, quality]) => {
+  const steps: ChordStep[] = [];
+  for (const [degree, quality] of pattern) {
     const rootNote = degreeToNote(degree, tonic, octave);
-    const notes = buildChord(rootNote, quality, 0);
-    return {
-      degree,
-      quality: Q_MAP[quality] ?? 'M',
-      notes,
-    };
-  });
+    const prev = steps[steps.length - 1];
+    const notes = opts?.voiceLeading && prev
+      ? pickNextVoicing(prev.notes, Note.pitchClass(rootNote), quality)
+      : buildChord(rootNote, quality, 0);
+    const step: ChordStep = { degree, quality: Q_MAP[quality] ?? 'M', notes };
+    // Octave 2 proper (C2..B2, midi 36-47): degreeToNote returns the scale
+    // octave starting at the tonic, which for e.g. degree 6 of G lands at E3 —
+    // inside the upper-voicing window. Pinning the pitch class to octave 2
+    // keeps the bass strictly below every upper voice in all keys.
+    if (opts?.bass) step.bass = `${Note.pitchClass(degreeToNote(degree, tonic, 2))}2`;
+    steps.push(step);
+  }
+  return steps;
 }
 
 /** Get random diatonic progression of given length */
@@ -203,7 +294,12 @@ export function randomPraiseProgression(
   const pattern = cfg && pat.pattern.length > cfg.length
     ? pat.pattern.slice(0, cfg.length)
     : pat.pattern;
-  return buildProgressionSteps(pattern, tonic, octave);
+  return buildProgressionSteps(
+    pattern,
+    tonic,
+    octave,
+    cfg ? { voiceLeading: cfg.voiceLeading, bass: cfg.bass } : undefined,
+  );
 }
 
 /** Degree number to Roman numeral or arabic */

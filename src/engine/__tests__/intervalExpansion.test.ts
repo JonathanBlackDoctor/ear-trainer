@@ -5,7 +5,8 @@ import {
   makeMicrotuningQuestion, makeHarmonicQuestion,
 } from '../questionFactory';
 import { judge } from '../judge';
-import { WIDE_SEMITONES, WIDE_LEVELS, NOTE_STACK_LEVELS } from '../../modes/labModes';
+import { WIDE_SEMITONES, WIDE_LEVELS, NOTE_STACK_LEVELS, getNoteStackChoices } from '../../modes/labModes';
+import { semitoneToSolfege } from '../../theory/solfege';
 import type { IntervalData, NoteStackData, HarmonicData } from '../../types';
 
 describe('lab-wide-interval factory', () => {
@@ -36,41 +37,67 @@ describe('lab-wide-interval factory', () => {
   });
 });
 
-describe('lab-note-stack factory + judge', () => {
-  it('builds an ascending stack matching the pattern steps', () => {
+describe('lab-note-stack (다성 계명) factory + judge', () => {
+  it('builds ascending distinct notes within the level spacing constraints', () => {
     for (let i = 0; i < 60; i++) {
       const lvl = 1 + (i % 10);
+      const cfg = NOTE_STACK_LEVELS[lvl];
       const q = makeNoteStackQuestion(lvl);
       const d = q.data as NoteStackData;
-      const midis = d.notes.map((n) => Note.midi(n) ?? 0);
-      for (let k = 1; k < midis.length; k++) expect(midis[k]).toBeGreaterThan(midis[k - 1]);
-      const steps = d.stackCode.split('+').length; // consecutive interval count
-      expect(d.notes.length).toBe(steps + 1);
+      const n = Number(q.itemKey.slice('stack_n'.length));
+      expect(cfg.noteCounts).toContain(n);
+      expect(d.notes.length).toBe(n);
+      const midis = d.notes.map((nt) => Note.midi(nt) ?? 0);
+      for (let k = 1; k < midis.length; k++) {
+        expect(midis[k] - midis[k - 1]).toBeGreaterThanOrEqual(cfg.minGap);
+      }
+      expect(midis[midis.length - 1] - midis[0]).toBeLessThanOrEqual(cfg.maxSpan);
+      expect(midis[0]).toBeGreaterThanOrEqual(48);  // C3
+      expect(midis[midis.length - 1]).toBeLessThanOrEqual(84);  // C6
     }
   });
-  it('choice input: exact stack-code match is correct', () => {
-    const q = makeNoteStackQuestion(3);
-    const d = q.data as NoteStackData;
-    expect(judge(q, d.stackCode).correct).toBe(true);
-    expect(judge(q, d.stackCode + '_x').correct).toBe(false);
-  });
-  it('piano input: pitch-class set match is correct and octave-tolerant', () => {
-    const q = makeNoteStackQuestion(3);
-    const d = q.data as NoteStackData;
-    // Re-spell every note an octave up — pitch classes unchanged.
-    const shifted = d.notes.map((n) => Note.fromMidi((Note.midi(n) ?? 0) + 12) ?? n);
-    expect(judge(q, shifted).correct).toBe(true);
-    // Drop a note → partial, not correct.
-    const partial = judge(q, d.notes.slice(0, -1));
-    expect(partial.correct).toBe(false);
-    expect(partial.partialScore).toBeGreaterThan(0);
-    expect(partial.partialScore).toBeLessThan(1);
-  });
-  it('every level pool yields choices that include the played stack', () => {
-    for (let lvl = 1; lvl <= 10; lvl++) {
-      const codes = new Set(NOTE_STACK_LEVELS[lvl].map((p) => p.code));
+  it('syllables align with the notes relative to the key, all from the level pool', () => {
+    for (let i = 0; i < 60; i++) {
+      const lvl = 1 + (i % 10);
+      const cfg = NOTE_STACK_LEVELS[lvl];
       const q = makeNoteStackQuestion(lvl);
-      expect(codes.has((q.data as NoteStackData).stackCode)).toBe(true);
+      const d = q.data as NoteStackData;
+      expect(d.syllables.length).toBe(d.notes.length);
+      expect(new Set(d.syllables).size).toBe(d.syllables.length); // distinct pitch classes
+      const tonicMidi = Note.midi(d.key + '4') ?? 60;
+      d.notes.forEach((nt, idx) => {
+        const semis = (((Note.midi(nt) ?? 60) - tonicMidi) % 12 + 12) % 12;
+        expect(semitoneToSolfege(semis)).toBe(d.syllables[idx]);
+        expect(cfg.candidates).toContain(d.syllables[idx]);
+      });
+      expect(q.context.referenceToneNote).toBe(d.key + '4');
+      expect(q.context.absoluteMode).toBeFalsy();
+    }
+  });
+  it('judges the syllable set order-free with partial credit', () => {
+    const q = makeNoteStackQuestion(4); // 3 notes, diatonic
+    const d = q.data as NoteStackData;
+    expect(judge(q, [...d.syllables].reverse()).correct).toBe(true);
+    // Drop one syllable → partial, not correct.
+    const partial = judge(q, d.syllables.slice(0, -1));
+    expect(partial.correct).toBe(false);
+    expect(partial.partialScore).toBeCloseTo((d.syllables.length - 1) / d.syllables.length, 5);
+    // Replace one syllable with a wrong one → partial.
+    const wrongSyl = ['도', '레', '미', '파', '솔', '라', '시'].find((s) => !d.syllables.includes(s))!;
+    const mixed = judge(q, [...d.syllables.slice(0, -1), wrongSyl]);
+    expect(mixed.correct).toBe(false);
+    expect(mixed.partialScore).toBeLessThan(1);
+    // A duplicate of an already-matched syllable only counts once.
+    const dup = judge(q, [d.syllables[0], d.syllables[0], d.syllables[1]]);
+    expect(dup.correct).toBe(false);
+  });
+  it('every syllable answer is offered by the level choice grid', () => {
+    for (let lvl = 1; lvl <= 10; lvl++) {
+      const choices = new Set(getNoteStackChoices(lvl).map((c) => c.value));
+      const q = makeNoteStackQuestion(lvl);
+      for (const syl of (q.data as NoteStackData).syllables) {
+        expect(choices.has(syl)).toBe(true);
+      }
     }
   });
 });

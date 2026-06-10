@@ -89,9 +89,8 @@ export function wideIntervalItemKeys(level: number): string[] {
 
 /** Note-stack items are focused by note-count (2..4), e.g. "stack_n3". */
 export function noteStackItemKeys(level: number): string[] {
-  const counts = new Set<number>();
-  for (const p of NOTE_STACK_LEVELS[level] ?? NOTE_STACK_LEVELS[1]) counts.add(p.steps.length + 1);
-  return [...counts].map((n) => `stack_n${n}`);
+  const cfg = NOTE_STACK_LEVELS[level] ?? NOTE_STACK_LEVELS[1];
+  return cfg.noteCounts.map((n) => `stack_n${n}`);
 }
 
 export function microtuningItemKeys(level: number): string[] {

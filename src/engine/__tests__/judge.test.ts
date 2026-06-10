@@ -111,6 +111,34 @@ describe('judge — progression', () => {
   });
 });
 
+describe('judge — lab-note-stack (계이름 집합)', () => {
+  const ques = q({
+    mode: 'lab-note-stack',
+    answer: ['도', '미', '솔'],
+    data: { type: 'note-stack', notes: ['C3', 'E4', 'G4'], syllables: ['도', '미', '솔'], key: 'C' },
+  });
+  it('order-free full set → correct', () => {
+    const r = judge(ques, ['솔', '도', '미']);
+    expect(r.correct).toBe(true);
+    expect(r.partialScore).toBe(1);
+  });
+  it('missing one syllable → partial, not correct', () => {
+    const r = judge(ques, ['도', '미']);
+    expect(r.correct).toBe(false);
+    expect(r.partialScore).toBeCloseTo(2 / 3);
+  });
+  it('a duplicate pick only counts once', () => {
+    const r = judge(ques, ['도', '도', '미']);
+    expect(r.correct).toBe(false);
+    expect(r.partialScore).toBeCloseTo(2 / 3);
+  });
+  it('wrong syllable in the set → partial', () => {
+    const r = judge(ques, ['도', '미', '라']);
+    expect(r.correct).toBe(false);
+    expect(r.partialScore).toBeCloseTo(2 / 3);
+  });
+});
+
 describe('judge — rhythm', () => {
   const expected = [0, 500, 1000, 1500];
   const ques = q({ mode: 'rhythm', answer: expected, level: 1,

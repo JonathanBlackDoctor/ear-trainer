@@ -24,6 +24,7 @@ import { judge } from '../engine/judge';
 import { awardXp } from '../engine/xp';
 import { PlaybackControls } from '../components/PlaybackControls';
 import { ChoiceGrid, type ChoiceOption } from '../components/ChoiceGrid';
+import { MultiChoiceGrid } from '../components/MultiChoiceGrid';
 import { Piano } from '../components/Piano';
 import { Staff } from '../components/Staff';
 import { ProgressBar } from '../components/ProgressBar';
@@ -123,6 +124,8 @@ export function Train() {
   const [audioQuality, setAudioQuality] = useState<AudioQuality>('synth');
   const [solfegeInputMethod, setSolfegeInputMethod] = useState<'choice' | 'piano'>('choice');
   const [stackInputMethod, setStackInputMethod] = useState<'choice' | 'piano'>('choice');
+  // Multi-select syllable picks for the note-stack (다성 계명) choice input.
+  const [stackChoices, setStackChoices] = useState<string[]>([]);
   // Playback speed is owned here (not inside PlaybackControls) so the choice
   // persists across questions and applies to the next question's auto-play too.
   const [playbackSpeed, setPlaybackSpeed] = useState<1 | 0.5>(1);
@@ -235,6 +238,7 @@ export function Train() {
     setSelectedAnswer(null);
     setPianoInput([]);
     setProgressionInput([]);
+    setStackChoices([]);
     setRhythmTaps([]);
     setRhythmStartTime(0);
     setTempoTaps([]);
@@ -367,11 +371,13 @@ export function Train() {
       case 'progression': {
         const d = data as ProgressionData;
         setPlaybackStage('progression');
+        // Include each step's low bass (when present) in the played notes; in
+        // arpeggio playback the bass leads, anchoring the root.
+        const withBass = (c: ChordStep) => (c.bass ? [c.bass, ...c.notes] : c.notes);
         if (d.playback === 'arpeggio') {
-          await playArpeggioProgression(d.chords.map((c) => c.notes), '8n', speed);
+          await playArpeggioProgression(d.chords.map(withBass), '8n', speed);
         } else {
-          const chordNotes = d.chords.map((c) => c.notes);
-          await playProgression(chordNotes, '2n', speed);
+          await playProgression(d.chords.map(withBass), '2n', speed);
         }
         break;
       }
@@ -472,12 +478,8 @@ export function Train() {
       }
       case 'note-stack': {
         const d = data as NoteStackData;
-        // Sound the lowest note alone first as a pitch anchor, then the full
-        // stack — so analysis/reconstruction is relative to the bass rather
-        // than requiring absolute pitch.
-        await playNote(d.notes[0], '4n');
-        await delay(450 / speed);
-        if (gen !== getPlaybackGen()) return;
+        // The movable-do reference tone (shared question flow) anchors the
+        // key; the stack itself sounds once as a single block.
         await playChord(d.notes, '2n');
         break;
       }
@@ -578,10 +580,19 @@ export function Train() {
       return;
     }
     if (modeKey === 'lab-note-stack') {
-      const expected = (currentQuestion?.data as NoteStackData)?.notes ?? [];
+      const q = currentQuestion;
+      if (!q) return;
+      const expected = (q.data as NoteStackData)?.notes ?? [];
       const next = [...pianoInput, note];
       setPianoInput(next);
-      if (next.length >= expected.length) submitAnswer(next);
+      if (next.length >= expected.length) {
+        // Judge in syllable space: convert each played note to its movable-do
+        // syllable so piano and choice input share one answer format.
+        const tonicMidi = Note.midi((q.context.key || 'C') + '4') ?? 60;
+        const syls = next.map((nt) =>
+          semitoneToSolfege((((Note.midi(nt) ?? 60) - tonicMidi) % 12 + 12) % 12));
+        submitAnswer(syls);
+      }
       return;
     }
     if (modeKey !== 'melody' && modeKey !== 'transpose') {
@@ -594,6 +605,20 @@ export function Train() {
     const next = [...pianoInput, note];
     setPianoInput(next);
     if (next.length >= expected.length) {
+      submitAnswer(next);
+    }
+  }
+
+  // Note-stack multi-select: toggle a syllable; auto-submit once as many
+  // syllables are picked as notes were heard (mirrors the piano accumulation).
+  function handleStackToggle(value: string) {
+    interruptPlayback();
+    const expected = (currentQuestion?.data as NoteStackData)?.syllables ?? [];
+    const next = stackChoices.includes(value)
+      ? stackChoices.filter((v) => v !== value)
+      : [...stackChoices, value];
+    setStackChoices(next);
+    if (expected.length > 0 && next.length >= expected.length) {
       submitAnswer(next);
     }
   }
@@ -863,11 +888,11 @@ export function Train() {
   const isMixChoice = modeKey.startsWith('mix-');
   const isNoteStack = modeKey === 'lab-note-stack';
   const isAbsolute = !!currentQuestion?.context?.absoluteMode;
-  // The note-stack mode toggles between a choice grid and piano reconstruction;
-  // only render the choice grid when it's actually the active input method.
+  // Note-stack uses its own multi-select grid (or piano reconstruction), so it
+  // never renders the single-select ChoiceGrid.
   const showChoiceGrid =
     isInterval || isChord || (isSolfege && solfegeInputMethod === 'choice')
-    || (isLabChoice && !(isNoteStack && stackInputMethod === 'piano')) || isMixChoice;
+    || (isLabChoice && !isNoteStack) || isMixChoice;
   const choiceColumns: 2 | 3 | 4 =
     isInterval ? 2
     : isChord ? 2
@@ -877,7 +902,6 @@ export function Train() {
     : modeKey === 'lab-inversion' ? 2
     : modeKey === 'lab-extended' ? 2
     : modeKey === 'lab-wide-interval' ? 2
-    : isNoteStack ? 2
     : 3;
 
   return (
@@ -1048,11 +1072,11 @@ export function Train() {
                 </div>
               )}
 
-              {/* Note-stack input-method toggle (choice vs piano reconstruction) */}
+              {/* Note-stack input-method toggle (syllable multi-select vs piano) */}
               {isNoteStack && (
                 <div className="flex justify-center gap-1 bg-slate-100 p-1 rounded-lg w-fit mx-auto">
                   {[
-                    { value: 'choice', label: '🧱 음정 구성' },
+                    { value: 'choice', label: '🔤 계이름' },
                     { value: 'piano', label: '🎹 건반' },
                   ].map((opt) => (
                     <button
@@ -1062,7 +1086,11 @@ export function Train() {
                           ? 'bg-white text-primary-700 shadow-sm'
                           : 'text-slate-500 active:text-slate-700'
                       }`}
-                      onClick={() => { setStackInputMethod(opt.value as 'choice' | 'piano'); setPianoInput([]); }}
+                      onClick={() => {
+                        setStackInputMethod(opt.value as 'choice' | 'piano');
+                        setPianoInput([]);
+                        setStackChoices([]);
+                      }}
                     >
                       {opt.label}
                     </button>
@@ -1083,6 +1111,35 @@ export function Train() {
                   requireConfirm={!!settings.tapToConfirm}
                 />
               )}
+
+              {/* Note-stack syllable multi-select */}
+              {isNoteStack && stackInputMethod === 'choice' && (() => {
+                const nd = currentQuestion.data as NoteStackData;
+                return (
+                  <>
+                    <div className="text-center text-sm text-slate-500">
+                      들린 음들의 계이름 {nd.syllables.length}개 선택
+                      {stackChoices.length > 0 && ` (${stackChoices.length}/${nd.syllables.length})`}
+                    </div>
+                    <MultiChoiceGrid
+                      key={currentQuestion.id}
+                      options={getNoteStackChoices(level)}
+                      selectedValues={stackChoices}
+                      onToggle={handleStackToggle}
+                      columns={3}
+                      disabled={false}
+                      ariaLabel="계이름 선택 (복수)"
+                    />
+                    {stackChoices.length > 0 && (
+                      <div className="flex justify-center">
+                        <button className="btn-ghost text-sm text-slate-400" onClick={() => setStackChoices([])}>
+                          전체 지우기
+                        </button>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
 
               {/* Note-stack piano reconstruction */}
               {isNoteStack && stackInputMethod === 'piano' && (() => {
@@ -1340,6 +1397,16 @@ export function Train() {
                   answered
                   onSelect={() => {}}
                   columns={choiceColumns}
+                />
+              )}
+              {isNoteStack && stackInputMethod === 'choice' && (
+                <MultiChoiceGrid
+                  options={getNoteStackChoices(level)}
+                  selectedValues={stackChoices}
+                  correctValues={(currentQuestion.data as NoteStackData).syllables}
+                  answered
+                  onToggle={() => {}}
+                  columns={3}
                 />
               )}
               {isNoteStack && stackInputMethod === 'piano' && feedbackResult && (
