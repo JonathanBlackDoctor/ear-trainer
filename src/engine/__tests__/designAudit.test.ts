@@ -4,10 +4,11 @@ import {
   makeOddNoteQuestion, makeMicrotuningQuestion, makeBassQuestion, makeScaleQuestion,
 } from '../questionFactory';
 import { getMicrotuningChoices, getBassChoices } from '../../modes/labModes';
+import { degreeToNote } from '../../theory/progressions';
 import { formatItemKey } from '../../modes/itemLabels';
 import { MODE_REGISTRY } from '../../modes/registry';
 import { useStore } from '../../store/useStore';
-import type { OddNoteData, ScaleData, ModeKey } from '../../types';
+import type { OddNoteData, ScaleData, ChordData, ModeKey } from '../../types';
 
 // ── A1: odd-note alteration must never coincide with another scale tone ──────
 describe('A1 — odd-note has no ambiguous/duplicate altered note', () => {
@@ -60,6 +61,57 @@ describe('B1 — bass identification is relative (no absolute pitch required)', 
         expect(choices).toContain(q.answer);
       }
     }
+  });
+});
+
+// ── B2: bass is independent of the upper chord (slash-chord redesign) ────────
+describe('B2 — bass lives in its own register and is not implied by the chord', () => {
+  it('the bass note is strictly the lowest, in octave 2, and matches the answer degree', () => {
+    for (let level = 1; level <= 10; level++) {
+      for (let i = 0; i < 80; i++) {
+        const q = makeBassQuestion(level, {});
+        const d = q.data as ChordData;
+        const midis = d.notes.map((n) => Note.midi(n) ?? 0);
+        // Strictly lowest with a real registral gap (bass ≤ B2 < C3 ≤ upper).
+        expect(midis[0]).toBeLessThanOrEqual(47);
+        for (let k = 1; k < midis.length; k++) expect(midis[k]).toBeGreaterThanOrEqual(48);
+        // The bass pitch class is the answered scale degree of the key.
+        const deg = Number(String(q.answer).replace('도', ''));
+        const expectedPc = Note.pitchClass(degreeToNote(deg, q.context.key, 2));
+        expect(Note.pitchClass(d.notes[0])).toBe(expectedPc);
+      }
+    }
+  });
+  it('chord-tone levels keep the bass inside the upper chord; free levels escape it', () => {
+    // Compare by chroma: the bass comes from the (possibly flat-spelled) scale
+    // while buildChord re-spells with sharps — Bb and A# must match.
+    const bassInUpper = (q: ReturnType<typeof makeBassQuestion>) => {
+      const d = q.data as ChordData;
+      const upperChromas = new Set(d.notes.slice(1).map((n) => Note.chroma(n)));
+      return upperChromas.has(Note.chroma(d.notes[0]));
+    };
+    for (let i = 0; i < 120; i++) {
+      expect(bassInUpper(makeBassQuestion(1 + (i % 6), {}))).toBe(true);
+    }
+    let sawOutside = false;
+    for (let i = 0; i < 300 && !sawOutside; i++) {
+      if (!bassInUpper(makeBassQuestion(7 + (i % 4), {}))) sawOutside = true;
+    }
+    expect(sawOutside).toBe(true);
+  });
+  it('the same upper chord appears over different basses (no degree→answer shortcut)', () => {
+    // Group L1 samples by upper-chord root pitch class; at least one root must
+    // occur with ≥2 distinct answers, i.e. chord identity ≠ bass identity.
+    const answersByRoot = new Map<string, Set<string>>();
+    for (let i = 0; i < 250; i++) {
+      const q = makeBassQuestion(1, {});
+      const d = q.data as ChordData;
+      const root = Note.pitchClass(d.root);
+      if (!answersByRoot.has(root)) answersByRoot.set(root, new Set());
+      answersByRoot.get(root)!.add(String(q.answer));
+    }
+    const decoupled = [...answersByRoot.values()].some((s) => s.size >= 2);
+    expect(decoupled).toBe(true);
   });
 });
 

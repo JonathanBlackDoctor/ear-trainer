@@ -38,9 +38,9 @@ import {
   ODD_LEVELS, CONTOUR_LEVELS, CONTOUR_LABEL,
   TUNING_IN_TUNE, TUNING_SHARP, TUNING_FLAT, TUNING_CENTS,
   DEGREE_FUNCTION, FUNCTION_LEVELS,
-  EXTENDED_LEVELS, BASS_LEVELS, bassDegreeOf, BASS_TRIAD_QUALITIES, BASS_SEVENTH_QUALITIES,
+  EXTENDED_LEVELS, BASS_LEVELS, bassCompatibleRoots, BASS_TRIAD_QUALITIES, BASS_SEVENTH_QUALITIES,
   TENSION_SEMITONES, TENSION_LABEL, TENSION_LEVELS,
-  WIDE_LEVELS, WIDE_SEMITONES, NOTE_STACK_LEVELS, NOTE_STACK_RANDOM_REGISTER_LEVEL,
+  WIDE_LEVELS, WIDE_SEMITONES, NOTE_STACK_LEVELS, type NoteStackLevelConfig,
   MICROTUNING_LEVELS, HARMONICS_LEVELS, harmonicAnswer,
 } from '../modes/labModes';
 import {
@@ -773,37 +773,42 @@ export function makeExtendedQuestion(level: number, opts?: SelectOpts): Question
   };
 }
 
-// ─── Lab: Bass (scale degree of the lowest note, relative to a sounded tonic) ─
+// ─── Lab: Bass (independent low bass under an upper-structure chord) ─────────
+// Slash-chord generation: the bass degree and the upper chord are chosen
+// independently, so recognizing which diatonic chord is playing never reveals
+// the bass — the listener has to isolate the lowest voice itself.
 export function makeBassQuestion(level: number, opts?: SelectOpts): Question {
   const cfg = BASS_LEVELS[level] ?? BASS_LEVELS[1];
   const key = cfg.randomKey ? pickRandom(COMMON_KEYS) : 'C';
   const itemKey = selectItemKey(bassItemKeys(level), opts);
-  const targetDeg = Number(itemKey.slice('bass_deg'.length)) || 1;
-  // Pick a (rootDegree, inversion) in the level's pool whose bass lands on the
-  // targeted scale degree.
-  const combos: Array<{ deg: number; inv: number }> = [];
-  for (const d of cfg.rootDegrees)
-    for (const inv of cfg.inversions)
-      if (bassDegreeOf(d, inv) === targetDeg) combos.push({ deg: d, inv });
-  const chosen = combos.length > 0 ? pickRandom(combos) : { deg: targetDeg, inv: 0 };
+  const bassDegree = Number(itemKey.slice('bass_deg'.length)) || 1;
+
+  // Upper chord: any allowed root whose diatonic chord contains the bass at
+  // chord-tone levels, or any allowed root at free-bass (pedal/slash) levels.
+  const roots = cfg.bassChordToneOnly ? bassCompatibleRoots(bassDegree, cfg) : cfg.chordDegrees;
+  const rootDegree = pickRandom(roots.length > 0 ? roots : [bassDegree]);
   const qualities = cfg.sevenths ? BASS_SEVENTH_QUALITIES : BASS_TRIAD_QUALITIES;
-  const quality = qualities[(chosen.deg - 1) % 7];
-  // Fixed octave 3 keeps the bass clearly below the octave-4 tonic reference.
-  const rootNote = degreeToNote(chosen.deg, key, 3);
-  const notes = buildChord(rootNote, quality, chosen.inv);
-  // Recompute the bass degree from the actual lowest note so the answer always
-  // matches what is sounded.
-  const keyScale = getScaleNotes(key, 4);
-  const bassPc = Note.pitchClass(notes[0]);
-  const degIdx = keyScale.findIndex((nt) => Note.pitchClass(nt) === bassPc);
-  const bassDegree = degIdx >= 0 ? degIdx + 1 : targetDeg;
+  const quality = qualities[(rootDegree - 1) % 7];
+
+  const upperRoot = degreeToNote(rootDegree, key, pickRandom(cfg.upperOctaves));
+  const chordLen = buildChord(upperRoot, quality, 0).length;
+  const rotation = cfg.rotateUpper ? Math.floor(Math.random() * chordLen) : 0;
+  let upper = buildChord(upperRoot, quality, rotation);
+  // Normalize the upper structure so its lowest note sits in C3..E4 — always
+  // above the octave-2 bass, never up in the squeal register.
+  while ((Note.midi(upper[0]) ?? 60) > 64) {
+    upper = upper.map((nt) => Note.fromMidi((Note.midi(nt) ?? 60) - 12) ?? nt);
+  }
+  // The bass lives in octave 2 proper (C2..B2, midi 36-47) — strictly below
+  // every upper voice (≥ C3 = 48), so it reads as a real bass register.
+  const bassNote = `${Note.pitchClass(degreeToNote(bassDegree, key, 2))}2`;
 
   return {
     id: genId(),
     mode: 'lab-bass',
     level,
     itemKey: `bass_deg${bassDegree}`,
-    data: { type: 'chord', notes, root: rootNote, quality, inversion: chosen.inv, arpeggio: false },
+    data: { type: 'chord', notes: [bassNote, ...upper], root: upperRoot, quality, inversion: rotation, arpeggio: false },
     answer: `${bassDegree}도`,
     context: { key, referenceToneNote: key + '4' },
   };
@@ -854,33 +859,96 @@ export function makeWideIntervalQuestion(level: number, opts?: SelectOpts): Ques
   };
 }
 
-// ─── Lab: Note Stack (simultaneous multi-note) ──────────────────────────────
-export function makeNoteStackQuestion(level: number, opts?: SelectOpts): Question {
-  const patterns = NOTE_STACK_LEVELS[level] ?? NOTE_STACK_LEVELS[1];
-  const itemKey = selectItemKey(noteStackItemKeys(level), opts);
-  const n = Number(itemKey.slice('stack_n'.length)) || 2;
-  const candidates = patterns.filter((p) => p.steps.length + 1 === n);
-  const pat = pickRandom(candidates.length > 0 ? candidates : patterns);
-
-  // Low, narrow root range keeps even the widest voicing within the C3–C5
-  // keyboard so the piano-reconstruction input stays usable.
-  const rootRange: [string, string] = level >= NOTE_STACK_RANDOM_REGISTER_LEVEL ? ['C3', 'A3'] : ['C3', 'E3'];
-  const root = randomNote(...rootRange);
-  const notes: string[] = [root];
-  let midi = Note.midi(root) ?? 60;
-  for (const step of pat.steps) {
-    midi += step;
-    notes.push(Note.fromMidi(midi) ?? root);
+// ─── Lab: Note Stack → 다성 계명 (polyphonic movable-do solfege) ─────────────
+/** Fisher-Yates copy shuffle. */
+function shuffleCopy<T>(arr: T[]): T[] {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
   }
+  return out;
+}
+
+// Absolute register band for stacked notes (C3..C6): low enough to stay warm,
+// high enough to keep every voice distinct on the on-screen keyboard.
+const STACK_MIDI_LOW = 48;
+const STACK_MIDI_HIGH = 84;
+
+/**
+ * Every octave placement (0..2 octaves above `tonicMidi`) of the given
+ * semitone offsets that satisfies the level's spacing constraints, each as an
+ * ascending midi list. ≤ 3^4 = 81 combinations, so enumeration is cheap and
+ * sampling among the results keeps voicings uniformly varied.
+ */
+function stackPlacements(semis: number[], tonicMidi: number, cfg: NoteStackLevelConfig): number[][] {
+  const valid: number[][] = [];
+  const total = Math.pow(3, semis.length);
+  for (let combo = 0; combo < total; combo++) {
+    let rest = combo;
+    const cand: number[] = [];
+    for (const s of semis) {
+      cand.push(tonicMidi + s + 12 * (rest % 3));
+      rest = Math.floor(rest / 3);
+    }
+    cand.sort((a, b) => a - b);
+    let ok = cand[0] >= STACK_MIDI_LOW
+      && cand[cand.length - 1] <= STACK_MIDI_HIGH
+      && cand[cand.length - 1] - cand[0] <= cfg.maxSpan;
+    for (let i = 1; ok && i < cand.length; i++) {
+      if (cand[i] - cand[i - 1] < cfg.minGap) ok = false;
+    }
+    if (ok) valid.push(cand);
+  }
+  return valid;
+}
+
+export function makeNoteStackQuestion(level: number, opts?: SelectOpts): Question {
+  const cfg = NOTE_STACK_LEVELS[level] ?? NOTE_STACK_LEVELS[1];
+  const key = cfg.keyMode === 'random' ? pickRandom(cfg.keyPool) : 'C';
+  const itemKey = selectItemKey(noteStackItemKeys(level), opts);
+  const parsed = Number(itemKey.slice('stack_n'.length)) || 2;
+  // Guard against stale SRS keys whose count this level no longer asks.
+  const n = cfg.noteCounts.includes(parsed) ? parsed : cfg.noteCounts[0];
+
+  // Distinct syllables = distinct pitch classes, so the unordered syllable-set
+  // answer stays well-defined no matter where each note lands by octave.
+  const syllables = shuffleCopy(cfg.candidates).slice(0, n);
+  const semis = syllables.map(solfegeToSemitone);
+  const tonicMidi = Note.midi(key + '3') ?? 48;
+
+  const placements = stackPlacements(semis, tonicMidi, cfg);
+  let midis: number[];
+  if (placements.length > 0) {
+    midis = pickRandom(placements);
+  } else {
+    // Defensive fallback (level tables always admit ≥1 placement): lift each
+    // note to the lowest octave that clears minGap, then pull into range.
+    midis = [];
+    for (const s of [...semis].sort((a, b) => a - b)) {
+      let m = tonicMidi + s;
+      const prev = midis[midis.length - 1];
+      while (prev !== undefined && m - prev < cfg.minGap) m += 12;
+      midis.push(m);
+    }
+    while (midis[midis.length - 1] > STACK_MIDI_HIGH && midis[0] - 12 >= 36) {
+      midis = midis.map((m) => m - 12);
+    }
+  }
+
+  const notes = midis.map((m) => Note.fromMidi(m) ?? 'C4');
+  // Re-derive the syllable of each placed note so syllables[] stays aligned
+  // with the ascending notes[].
+  const orderedSyllables = midis.map((m) => semitoneToSolfege(m - tonicMidi));
 
   return {
     id: genId(),
     mode: 'lab-note-stack',
     level,
     itemKey,
-    data: { type: 'note-stack', notes, stackCode: pat.code, stackLabel: pat.label },
-    answer: notes,
-    context: { key: 'C', absoluteMode: true },
+    data: { type: 'note-stack', notes, syllables: orderedSyllables, key },
+    answer: orderedSyllables,
+    context: { key, referenceToneNote: key + '4' },
   };
 }
 

@@ -2,6 +2,7 @@ import type { ChoiceOption } from '../components/ChoiceGrid';
 import type { ModeKey } from '../types';
 import { chordLabel } from '../theory/chords';
 import type { IntervalDirection } from '../theory/intervals';
+import { DIATONIC_SOLFEGE, solfegeToSemitone } from '../theory/solfege';
 
 export const LAB_SCALE_MODE_INFO = {
   key: 'lab-scale' as ModeKey,
@@ -394,17 +395,18 @@ export function getExtendedChoices(level: number): ChoiceOption[] {
 }
 
 // ─── Bass (scale degree of the lowest note, relative to a sounded tonic) ─────
-// Reframed from "name the absolute bass pitch" (which required perfect pitch
-// with no reference) to "which scale degree is the bass" after the tonic is
-// sounded — a relative, trainable bass-line listening skill, distinct from the
-// inversion mode (which asks the chord's position, not the key-relative degree).
+// The bass is generated INDEPENDENTLY of the upper chord (slash-chord style):
+// a close-voiced upper structure sounds in the mid register while a separate
+// low bass note (octave 2) carries the answer. Knowing which diatonic chord is
+// playing therefore never reveals the bass — the ear has to isolate the lowest
+// voice, which is the actual bass-line listening skill.
 export const LAB_BASS_MODE_INFO = {
   key: 'lab-bass' as ModeKey,
   name: '베이스 식별',
   emoji: '🔊',
-  description: '베이스가 조성에서 몇 번째 음인지 맞혀보세요',
-  howTo: '으뜸음(기준음)이 먼저 들리고 이어서 한 화음이 들립니다. 가장 낮은 음(베이스)이 그 조성에서 몇 번째 음(음계 도수)인지 아래 보기에서 고르세요.',
-  theory: '베이스는 화음에서 가장 낮은 음으로, 화음의 토대이자 진행의 무게중심을 잡아 줍니다. 같은 화음이라도 베이스가 근음이 아니면 자리바꿈(전위)이나 슬래시 코드(예: C/E)가 되어 흐름의 느낌이 달라집니다. 으뜸음을 기준으로 베이스가 조성의 몇 번째 음(도수)인지 짚어 내는 것은 베이스 라인을 따라 듣고 곡을 채보하는 데 핵심이 되는 능력입니다.',
+  description: '화음 아래 깔린 베이스가 몇 번째 음인지 맞혀보세요',
+  howTo: '으뜸음(기준음)이 먼저 들리고, 이어서 낮은 베이스 음과 그 위의 화음이 함께 울립니다. 가장 낮은 베이스 음이 그 조성에서 몇 번째 음(도수)인지 아래 보기에서 고르세요. 베이스는 화음의 근음이 아닐 수도 있습니다(슬래시 코드).',
+  theory: '실제 음악에서 베이스는 화음과 별개의 성부로 움직입니다. 같은 C 화음이라도 베이스가 미면 C/E, 솔이면 C/G처럼 슬래시 코드가 되고, 화음 구성음이 아닌 페달 베이스도 흔합니다. 그래서 "무슨 화음인지" 아는 것만으로는 베이스를 알 수 없고, 가장 낮은 성부를 따로 가려 듣는 귀가 필요합니다. 이 능력이 베이스 라인 채보와 반주 카피의 핵심입니다.',
   maxLevel: 10,
   defaultLevel: 1,
 };
@@ -415,37 +417,48 @@ export const BASS_SEVENTH_QUALITIES = ['major7', 'minor7', 'minor7', 'major7', '
 
 const DEGREE_SOLFEGE = ['', '도', '레', '미', '파', '솔', '라', '시'];
 
-// Bass scale degree (1-7) produced by a diatonic chord rooted on `rootDegree`
-// at the given inversion: inv0→root, inv1→3rd (+2 steps), inv2→5th (+4),
-// inv3→7th (+6), wrapped within the 7-degree scale.
-export function bassDegreeOf(rootDegree: number, inversion: number): number {
-  return ((rootDegree - 1 + 2 * inversion) % 7) + 1;
+export interface BassLevelConfig {
+  bassDegrees: number[];       // answer pool (itemKeys = bass_deg{n})
+  chordDegrees: number[];      // allowed upper-chord root degrees
+  bassChordToneOnly: boolean;  // true → bass must be a chord tone of the upper chord
+  sevenths: boolean;           // upper qualities from BASS_SEVENTH_QUALITIES
+  rotateUpper: boolean;        // randomize the upper close-voicing rotation
+  randomKey: boolean;
+  upperOctaves: number[];      // octave(s) the upper structure is built in
 }
 
-// Difficulty grows by: number of chord degrees, inversions allowed (more bass
-// positions), then key randomisation, then 7th chords (which add the 7th in the
-// bass at inv3). `sevenths:true` levels are the only ones that include inv 3.
-export const BASS_LEVELS: Record<number, { rootDegrees: number[]; inversions: number[]; sevenths: boolean; randomKey: boolean }> = {
-  1:  { rootDegrees: [1, 4, 5],             inversions: [0],          sevenths: false, randomKey: false },
-  2:  { rootDegrees: [1, 4, 5, 6],          inversions: [0],          sevenths: false, randomKey: false },
-  3:  { rootDegrees: [1, 2, 4, 5, 6],       inversions: [0, 1],       sevenths: false, randomKey: false },
-  4:  { rootDegrees: [1, 2, 3, 4, 5, 6, 7], inversions: [0, 1],       sevenths: false, randomKey: false },
-  5:  { rootDegrees: [1, 2, 3, 4, 5, 6, 7], inversions: [0, 1, 2],    sevenths: false, randomKey: false },
-  6:  { rootDegrees: [1, 2, 3, 4, 5, 6, 7], inversions: [0, 1, 2],    sevenths: false, randomKey: true  },
-  7:  { rootDegrees: [1, 4, 5],             inversions: [0, 1, 2, 3], sevenths: true,  randomKey: true  },
-  8:  { rootDegrees: [1, 2, 4, 5, 6],       inversions: [0, 1, 2, 3], sevenths: true,  randomKey: true  },
-  9:  { rootDegrees: [1, 2, 3, 4, 5, 6, 7], inversions: [0, 1, 2, 3], sevenths: true,  randomKey: true  },
-  10: { rootDegrees: [1, 2, 3, 4, 5, 6, 7], inversions: [0, 1, 2, 3], sevenths: true,  randomKey: true  },
+const ALL_DEGREES = [1, 2, 3, 4, 5, 6, 7];
+
+// Difficulty ramp: more bass degrees → upper-voicing rotation → random keys →
+// 7th chords (7th-in-the-bass slash sounds) → free bass (any diatonic degree,
+// chord tone or not — pedal/slash bass) → upper-register jitter. At every
+// level the same upper chord can appear over several different basses, so the
+// chord's identity never determines the answer.
+export const BASS_LEVELS: Record<number, BassLevelConfig> = {
+  1:  { bassDegrees: [1, 3, 5],          chordDegrees: [1, 4, 5, 6],       bassChordToneOnly: true,  sevenths: false, rotateUpper: false, randomKey: false, upperOctaves: [3] },
+  2:  { bassDegrees: [1, 3, 4, 5],       chordDegrees: [1, 2, 4, 5, 6],    bassChordToneOnly: true,  sevenths: false, rotateUpper: false, randomKey: false, upperOctaves: [3] },
+  3:  { bassDegrees: [1, 2, 3, 4, 5, 6], chordDegrees: [1, 2, 3, 4, 5, 6], bassChordToneOnly: true,  sevenths: false, rotateUpper: true,  randomKey: false, upperOctaves: [3] },
+  4:  { bassDegrees: ALL_DEGREES,        chordDegrees: ALL_DEGREES,        bassChordToneOnly: true,  sevenths: false, rotateUpper: true,  randomKey: false, upperOctaves: [3] },
+  5:  { bassDegrees: ALL_DEGREES,        chordDegrees: ALL_DEGREES,        bassChordToneOnly: true,  sevenths: false, rotateUpper: true,  randomKey: true,  upperOctaves: [3] },
+  6:  { bassDegrees: ALL_DEGREES,        chordDegrees: ALL_DEGREES,        bassChordToneOnly: true,  sevenths: true,  rotateUpper: true,  randomKey: true,  upperOctaves: [3] },
+  7:  { bassDegrees: ALL_DEGREES,        chordDegrees: ALL_DEGREES,        bassChordToneOnly: false, sevenths: false, rotateUpper: true,  randomKey: true,  upperOctaves: [3] },
+  8:  { bassDegrees: ALL_DEGREES,        chordDegrees: ALL_DEGREES,        bassChordToneOnly: false, sevenths: true,  rotateUpper: true,  randomKey: true,  upperOctaves: [3] },
+  9:  { bassDegrees: ALL_DEGREES,        chordDegrees: ALL_DEGREES,        bassChordToneOnly: false, sevenths: true,  rotateUpper: true,  randomKey: true,  upperOctaves: [3, 4] },
+  10: { bassDegrees: ALL_DEGREES,        chordDegrees: ALL_DEGREES,        bassChordToneOnly: false, sevenths: true,  rotateUpper: true,  randomKey: true,  upperOctaves: [3, 4] },
 };
 
-/** Unique bass scale degrees reachable at a level (sorted) — the answer pool. */
+/** Upper-chord root degrees whose diatonic chord contains the given bass degree. */
+export function bassCompatibleRoots(bassDegree: number, cfg: BassLevelConfig): number[] {
+  const offsets = cfg.sevenths ? [0, 2, 4, 6] : [0, 2, 4];
+  return cfg.chordDegrees.filter((r) =>
+    offsets.some((off) => ((r - 1 + off) % 7) + 1 === bassDegree),
+  );
+}
+
+/** Bass scale degrees askable at a level (sorted) — the answer pool. */
 export function bassDegreesForLevel(level: number): number[] {
   const cfg = BASS_LEVELS[level] ?? BASS_LEVELS[1];
-  const set = new Set<number>();
-  for (const d of cfg.rootDegrees)
-    for (const inv of cfg.inversions)
-      set.add(bassDegreeOf(d, inv));
-  return [...set].sort((a, b) => a - b);
+  return [...cfg.bassDegrees].sort((a, b) => a - b);
 }
 
 export function getBassChoices(level: number): ChoiceOption[] {
@@ -560,82 +573,58 @@ export function getWideIntervalChoices(level: number): ChoiceOption[] {
   return cfg.names.map((n) => ({ value: n, label: n, sublabel: WIDE_LABEL[n] ?? n }));
 }
 
-// ─── Note Stack (identify simultaneous notes / interval stack) ──────────────
+// ─── Note Stack → 다성 계명 (polyphonic movable-do solfege) ──────────────────
+// Redesigned from interval-stack patterns (which duplicated chord-quality ID)
+// into the polyphonic sibling of the solfege mode: the tonic reference sounds,
+// then N notes ring simultaneously and the user names every syllable. Octave
+// spacing is free — 2nds/4ths/6ths/wide spreads, never forced into 3rd-stacks.
 export const LAB_NOTE_STACK_MODE_INFO = {
   key: 'lab-note-stack' as ModeKey,
-  name: '다성 음 쌓기',
+  name: '다성 계명',
   emoji: '🗼',
-  description: '동시에 울린 2~4개 음을 찾으세요',
-  howTo: '여러 음이 동시에 울립니다. "건반" 입력에서는 들은 음을 모두 눌러 재구성하고, "보기" 입력에서는 베이스부터 쌓인 음정 구성을 고르세요.',
-  theory: '두 개 이상의 음이 동시에 울리면 각 음을 따로 가려내기가 어려운데, 이를 베이스(맨 아래 음)부터 위로 쌓인 음정의 연속으로 분석하면 구조가 보입니다. 예컨대 "장3도 위에 단3도"는 장3화음, "단3도 위에 장3도"는 단3화음입니다. 동시에 울리는 음을 분해해 듣는 능력은 화음 채보와 편곡의 토대입니다.',
+  description: '동시에 울린 2~4개 음의 계이름을 모두 맞혀보세요',
+  howTo: '기준음(도)이 먼저 들리고, 이어서 여러 음이 동시에 울립니다. 들린 음들의 계이름(도·레·미…)을 모두 고르세요 — 순서는 상관없습니다. "건반" 입력에서는 들은 음을 모두 눌러 재구성합니다.',
+  theory: '화음 청음의 본질은 동시에 울리는 소리 덩어리를 조성 안의 자리(계이름)로 한 음씩 분해해 듣는 것입니다. 단선율 계명 훈련의 다성(多聲) 확장판으로, 3도 쌓기에 묶이지 않은 자유로운 간격의 음들을 가려 듣게 합니다. 찬양 반주에서 멜로디 위아래 성부를 따고 코러스 화음을 채보하는 능력의 토대가 됩니다.',
   maxLevel: 10,
   defaultLevel: 1,
 };
 
-export interface StackPattern { code: string; label: string; steps: number[] }
-
-const STACK_DYADS: StackPattern[] = [
-  { code: 'M3', label: '장3도', steps: [4] },
-  { code: 'm3', label: '단3도', steps: [3] },
-  { code: 'P5', label: '완전5도', steps: [7] },
-  { code: 'P4', label: '완전4도', steps: [5] },
-];
-const STACK_DYADS_PLUS: StackPattern[] = [
-  ...STACK_DYADS,
-  { code: 'A4', label: '증4도 (트라이톤)', steps: [6] },
-  { code: 'M6', label: '장6도', steps: [9] },
-  { code: 'm7', label: '단7도', steps: [10] },
-];
-const STACK_TRIADS: StackPattern[] = [
-  { code: 'M3+m3', label: '장3+단3 (장3화음형)', steps: [4, 3] },
-  { code: 'm3+M3', label: '단3+장3 (단3화음형)', steps: [3, 4] },
-  { code: 'm3+m3', label: '단3+단3 (감3화음형)', steps: [3, 3] },
-  { code: 'M3+M3', label: '장3+장3 (증3화음형)', steps: [4, 4] },
-  { code: 'P4+P4', label: '완4+완4 (4도 쌓기)', steps: [5, 5] },
-  { code: 'M2+M2', label: '장2+장2 (온음 클러스터)', steps: [2, 2] },
-];
-const STACK_SEVENTHS: StackPattern[] = [
-  { code: 'M3+m3+M3', label: '장3+단3+장3 (장7화음형)', steps: [4, 3, 4] },
-  { code: 'M3+m3+m3', label: '장3+단3+단3 (속7화음형)', steps: [4, 3, 3] },
-  { code: 'm3+M3+m3', label: '단3+장3+단3 (단7화음형)', steps: [3, 4, 3] },
-  { code: 'm3+m3+M3', label: '단3+단3+장3 (반감7형)', steps: [3, 3, 4] },
-  { code: 'm3+m3+m3', label: '단3+단3+단3 (감7화음형)', steps: [3, 3, 3] },
-];
-const STACK_WIDE: StackPattern[] = [
-  { code: 'P8+M3', label: '옥타브+장3도 (넓은 보이싱)', steps: [12, 4] },
-  { code: 'P5+P8', label: '완전5도+옥타브 (넓은 보이싱)', steps: [7, 12] },
-  { code: 'P4+P8', label: '완전4도+옥타브 (넓은 보이싱)', steps: [5, 12] },
-];
-
-export const NOTE_STACK_LEVELS: Record<number, StackPattern[]> = {
-  1:  STACK_DYADS,
-  2:  STACK_DYADS_PLUS,
-  3:  STACK_TRIADS,
-  4:  [...STACK_TRIADS],
-  5:  [...STACK_DYADS_PLUS, ...STACK_TRIADS],
-  6:  STACK_SEVENTHS,
-  7:  [...STACK_TRIADS, ...STACK_SEVENTHS],
-  8:  [...STACK_TRIADS, ...STACK_SEVENTHS, ...STACK_WIDE],
-  9:  [...STACK_DYADS_PLUS, ...STACK_TRIADS, ...STACK_SEVENTHS, ...STACK_WIDE],
-  10: [...STACK_DYADS_PLUS, ...STACK_TRIADS, ...STACK_SEVENTHS, ...STACK_WIDE],
-};
-
-// Levels at or above this randomize the register (essence-independent listening).
-export const NOTE_STACK_RANDOM_REGISTER_LEVEL = 5;
-
-export function getNoteStackChoices(level: number): ChoiceOption[] {
-  return (NOTE_STACK_LEVELS[level] ?? NOTE_STACK_LEVELS[1]).map((p) => ({
-    value: p.code,
-    label: p.label,
-  }));
+export interface NoteStackLevelConfig {
+  noteCounts: number[];      // simultaneous note counts this level asks (itemKeys stack_n{N})
+  candidates: string[];      // movable-do syllable pool
+  minGap: number;            // min semitones between adjacent stacked notes
+  maxSpan: number;           // max semitones bottom → top
+  keyMode: 'fixed' | 'random';
+  keyPool: string[];         // used when keyMode === 'random'
 }
 
-export function noteStackLabel(code: string): string {
-  for (const lvl of Object.values(NOTE_STACK_LEVELS)) {
-    const found = lvl.find((p) => p.code === code);
-    if (found) return found.label;
-  }
-  return code;
+const SYL_TRIAD = ['도', '미', '솔'];
+const SYL_PENTA5 = ['도', '레', '미', '파', '솔'];
+const SYL_CHROMATIC_12 = ['도', '도#', '레', '레#', '미', '파', '파#', '솔', '솔#', '라', '라#', '시'];
+const STACK_KEYS_8 = ['C', 'G', 'D', 'A', 'E', 'F', 'Bb', 'Eb'];
+const STACK_KEYS_12 = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+// Difficulty ramp mirrors the solfege mode: syllable pool grows, note count
+// rises 2→4, spacing constraints loosen (minGap 1 allows semitone clusters),
+// then keys randomize. The wide maxSpan keeps voicings genuinely free.
+export const NOTE_STACK_LEVELS: Record<number, NoteStackLevelConfig> = {
+  1:  { noteCounts: [2],    candidates: SYL_TRIAD,        minGap: 3, maxSpan: 12, keyMode: 'fixed',  keyPool: [] },
+  2:  { noteCounts: [2],    candidates: SYL_PENTA5,       minGap: 2, maxSpan: 12, keyMode: 'fixed',  keyPool: [] },
+  3:  { noteCounts: [2],    candidates: DIATONIC_SOLFEGE, minGap: 2, maxSpan: 14, keyMode: 'fixed',  keyPool: [] },
+  4:  { noteCounts: [3],    candidates: DIATONIC_SOLFEGE, minGap: 3, maxSpan: 16, keyMode: 'fixed',  keyPool: [] },
+  5:  { noteCounts: [3],    candidates: DIATONIC_SOLFEGE, minGap: 2, maxSpan: 19, keyMode: 'fixed',  keyPool: [] },
+  6:  { noteCounts: [3],    candidates: DIATONIC_SOLFEGE, minGap: 2, maxSpan: 19, keyMode: 'random', keyPool: STACK_KEYS_8 },
+  7:  { noteCounts: [4],    candidates: DIATONIC_SOLFEGE, minGap: 3, maxSpan: 22, keyMode: 'random', keyPool: STACK_KEYS_8 },
+  8:  { noteCounts: [4],    candidates: DIATONIC_SOLFEGE, minGap: 2, maxSpan: 24, keyMode: 'random', keyPool: STACK_KEYS_8 },
+  9:  { noteCounts: [3, 4], candidates: SYL_CHROMATIC_12, minGap: 2, maxSpan: 24, keyMode: 'random', keyPool: STACK_KEYS_8 },
+  10: { noteCounts: [4],    candidates: SYL_CHROMATIC_12, minGap: 1, maxSpan: 24, keyMode: 'random', keyPool: STACK_KEYS_12 },
+};
+
+export function getNoteStackChoices(level: number): ChoiceOption[] {
+  const cfg = NOTE_STACK_LEVELS[level] ?? NOTE_STACK_LEVELS[1];
+  return [...cfg.candidates]
+    .sort((a, b) => solfegeToSemitone(a) - solfegeToSemitone(b))
+    .map((s) => ({ value: s, label: s }));
 }
 
 // ─── Microtuning (cents-level intonation on a sustained dyad) ────────────────
@@ -768,7 +757,7 @@ export function getLabLevelLabel(modeKey: ModeKey, level: number): string {
     }
     case 'lab-bass': {
       const c = BASS_LEVELS[level] ?? BASS_LEVELS[1];
-      return `베이스 ${bassDegreesForLevel(level).length}택 · ${invLabel(Math.max(...c.inversions))}${c.sevenths ? ' · 7화음' : ''}${c.randomKey ? ' · 랜덤 키' : ''}`;
+      return `베이스 ${c.bassDegrees.length}택 · ${c.bassChordToneOnly ? '코드톤 베이스' : '자유 베이스'}${c.sevenths ? ' · 7화음' : ''}${c.randomKey ? ' · 랜덤 키' : ''}`;
     }
     case 'lab-tension': {
       const c = TENSION_LEVELS[level] ?? TENSION_LEVELS[1];
@@ -782,8 +771,8 @@ export function getLabLevelLabel(modeKey: ModeKey, level: number): string {
       return `음정 ${c.names.length}종 · ${dirTxt}`;
     }
     case 'lab-note-stack': {
-      const patterns = NOTE_STACK_LEVELS[level] ?? NOTE_STACK_LEVELS[1];
-      return `${patterns.length}종${level >= NOTE_STACK_RANDOM_REGISTER_LEVEL ? ' · 음역 랜덤' : ''}`;
+      const c = NOTE_STACK_LEVELS[level] ?? NOTE_STACK_LEVELS[1];
+      return `${c.noteCounts.join('·')}음 동시 · 계이름 ${c.candidates.length}종${c.keyMode === 'random' ? ' · 랜덤 키' : ''}`;
     }
     case 'lab-microtuning': {
       const c = MICROTUNING_LEVELS[level] ?? MICROTUNING_LEVELS[1];

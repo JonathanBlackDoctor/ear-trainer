@@ -120,7 +120,8 @@ export interface ProgressionData {
 export interface ChordStep {
   degree: number;        // 1-7
   quality: 'M' | 'm' | 'dim' | 'aug' | '7' | 'M7' | 'm7' | 'm7b5';
-  notes: string[];
+  notes: string[];       // upper-structure voicing
+  bass?: string;         // low root note (~octave 2) sounded under the chord
 }
 
 export interface MelodyData {
@@ -223,9 +224,9 @@ export interface TensionData {
 
 export interface NoteStackData {
   type: 'note-stack';
-  notes: string[];       // simultaneously-sounded notes, ascending
-  stackCode: string;     // interval steps from the bottom, e.g. "M3+m3"
-  stackLabel: string;    // human label, e.g. "장3도+단3도 (장3화음형)"
+  notes: string[];       // simultaneously-sounded notes, ascending by pitch
+  syllables: string[];   // movable-do syllable of each note, aligned with notes[]
+  key: string;           // tonic of the movable-do context, e.g. "C"
 }
 
 export interface MicrotuningData {
